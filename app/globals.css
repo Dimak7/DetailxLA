@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #10131b;
+  --graphite: #182033;
+  --charcoal: #24314a;
+  --smoke: #fff7f0;
+  --white: #ffffff;
+  --ash: #f6d7c3;
+  --steel: #687286;
+  --red: #f07b46;
+  --red-dark: #c85a2c;
+  --red-soft: #ffe4d7;
+  --sand: #ffd6b8;
+  --sky: #96d3f8;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-graphite: var(--graphite);
+  --color-charcoal: var(--charcoal);
+  --color-smoke: var(--smoke);
+  --color-white: var(--white);
+  --color-ash: var(--ash);
+  --color-steel: var(--steel);
+  --color-red: var(--red);
+  --color-red-dark: var(--red-dark);
+  --color-red-soft: var(--red-soft);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 14% 16%, rgba(240, 123, 70, 0.24), transparent 26rem),
+    radial-gradient(circle at 82% 10%, rgba(150, 211, 248, 0.22), transparent 24rem),
+    linear-gradient(180deg, #10131b 0%, #1a2438 40%, #fff7f0 40%, #fff7f0 100%);
+  color: var(--ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+::selection {
+  background: var(--red);
+  color: var(--white);
+}
+
+.section-pad {
+  padding: 5rem 1rem;
+}
+
+.content-shell {
+  margin-inline: auto;
+  width: min(1160px, calc(100% - 2rem));
+}
+
+.eyebrow {
+  color: var(--red);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.glass-panel {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(24, 32, 51, 0.68);
+  box-shadow: 0 24px 80px rgba(16, 19, 27, 0.34);
+  backdrop-filter: blur(18px);
+}
+
+.dark-panel {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(145deg, rgba(36, 49, 74, 0.96), rgba(16, 19, 27, 0.98)),
+    var(--ink);
+  box-shadow: 0 24px 80px rgba(16, 19, 27, 0.34);
+}
+
+.soft-ring {
+  box-shadow:
+    inset 0 0 0 1px rgba(5, 5, 6, 0.08),
+    0 22px 60px rgba(5, 5, 6, 0.14);
+}
+
+.motion-card {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.motion-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 70px rgba(12, 13, 11, 0.18);
+}
+
+.admin-input {
+  min-height: 48px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid rgba(5, 5, 6, 0.12);
+  background: #ffffff;
+  padding: 0.75rem 0.9rem;
+  color: var(--ink);
+  font-weight: 700;
+  outline: none;
+}
+
+.admin-input:focus {
+  border-color: var(--red);
+  box-shadow: 0 0 0 4px rgba(193, 18, 31, 0.16);
+}
+
+.testimonial-track {
+  animation: testimonial-slide 34s linear infinite;
+}
+
+.testimonial-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes testimonial-slide {
+  from {
+    transform: translateX(-50%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 768px) {
+  .section-pad {
+    padding-block: 7rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
