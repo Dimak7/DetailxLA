@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
-import { clearAdminSessionCookie } from "@/lib/adminAuth";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
+import { logout, sessionCookie, assertOrigin } from "@/lib/platform/auth";
+import { apiError } from "@/lib/platform/http";
 export async function POST(request: Request) {
-  const response = NextResponse.redirect(new URL("/admin/login", request.url), { status: 303 });
-  clearAdminSessionCookie(response);
-  return response;
+  try {
+    assertOrigin(request);
+    await logout(request);
+    const r = NextResponse.redirect(new URL("/admin/login", request.url), 303);
+    r.cookies.set(sessionCookie, "", { maxAge: 0, path: "/" });
+    return r;
+  } catch (e) {
+    return apiError(e);
+  }
 }

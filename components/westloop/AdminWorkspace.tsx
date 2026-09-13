@@ -1,0 +1,1805 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Editor,
+  Modal,
+  action,
+  IntegrationStatus,
+  type EditorSpec,
+  type Field,
+  type RecordData as R,
+} from "./AdminControls";
+import { BookingWizard } from "./BookingWizard";
+import {
+  money,
+  timeLabel,
+  dateToday,
+  bookingStatuses,
+  leadStatuses,
+  channels,
+  type Session,
+  type BusinessSettings,
+  type Service,
+} from "@/lib/platform/types";
+import type { report } from "@/lib/platform/reporting";
+type Report = Awaited<ReturnType<typeof report>>;
+const rows = (v: unknown) => (Array.isArray(v) ? v : []) as R[];
+const s = (v: unknown) => (v == null ? "" : String(v));
+const n = (v: unknown) => Number(v || 0);
+const title = (v: string) =>
+  v.replaceAll("_", " ").replace(/\b\w/g, (x) => x.toUpperCase());
+const f = (
+  key: string,
+  label: string,
+  type = "text",
+  extra: Partial<Field> = {},
+): Field => ({ key, label, type, ...extra });
+const status = (v: unknown) => (
+  <span className="status-pill">{title(s(v))}</span>
+);
+const stamp = (v: unknown) =>
+  v
+    ? new Date(s(v)).toLocaleString("en-US", {
+        timeZone: "America/Chicago",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "Not yet";
+export function AdminWorkspace({
+  section,
+  data,
+  user,
+  business,
+}: {
+  section: string;
+  data: R;
+  user: Session;
+  business: BusinessSettings;
+}) {
+  const router = useRouter(),
+    params = useSearchParams();
+  const [editor, setEditor] = useState<EditorSpec | null>(null),
+    [creating, setCreating] = useState(false),
+    [lead, setLead] = useState<
+      { id: string; name: string; email: string; phone: string } | undefined
+    >(),
+    [notice, setNotice] = useState(""),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  const list = rows(data.rows),
+    team = rows(data.team),
+    staff = user.role === "staff";
+  const teamOptions = [
+    { value: "", label: "Unassigned" },
+    ...team
+      .filter((t) => t.active)
+      .map((t) => ({ value: s(t.id), label: s(t.name) })),
+  ];
+  const rep = data.report as Report | undefined;
+  async function run(name: string, d: R, message = "Saved.") {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await action(name, d);
+      setNotice(message);
+      router.refresh();
+      if (result?.url) location.assign(s(result.url));
+      if (result?.customer_id)
+        router.push("/admin/customers?id=" + s(result.customer_id));
+      return result;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  function edit(
+    title: string,
+    action: string,
+    initial: R,
+    fields: Field[],
+    transform?: (d: R) => R,
+  ) {
+    setEditor({ title, action, initial, fields, transform });
+  }
+  function serviceEdit(r: R = {}) {
+    edit(
+      r.id ? "Edit service" : "Create service",
+      "save_service",
+      {
+        name: "",
+        slug: "",
+        category: "Essential care",
+        description: "",
+        includes: "",
+        price_cents: 0,
+        suv_extra_cents: 0,
+        truck_extra_cents: 0,
+        pricing_mode: "fixed",
+        duration_minutes: 120,
+        active: true,
+        sort_order: list.length,
+        image_url: "",
+        ...r,
+        ...(r.id
+          ? {
+              includes: Array.isArray(r.includes) ? r.includes.join("\n") : "",
+              price_cents: n(r.price_cents) / 100,
+              suv_extra_cents: n(r.suv_extra_cents) / 100,
+              truck_extra_cents: n(r.truck_extra_cents) / 100,
+            }
+          : {}),
+      },
+      [
+        f("name", "Service name", "text", { required: true }),
+        f("slug", "URL slug", "text", {
+          required: true,
+          hint: "Lowercase words separated by hyphens",
+        }),
+        f("category", "Category", "text", { required: true }),
+        f("pricing_mode", "Pricing", "select", {
+          options: ["fixed", "starting", "quote"],
+        }),
+        f("price_cents", "Sedan price ($)", "money"),
+        f("suv_extra_cents", "SUV additional ($)", "money"),
+        f("truck_extra_cents", "Truck additional ($)", "money"),
+        f("duration_minutes", "Duration (minutes)", "number", {
+          min: 30,
+          max: 720,
+        }),
+        f("sort_order", "Display order", "number"),
+        f("active", "Available to book", "checkbox"),
+        f("description", "Short description", "textarea", { wide: true }),
+        f("includes", "What's included (one per line)", "lines", {
+          wide: true,
+        }),
+        f("image_url", "Service image", "upload"),
+      ],
+    );
+  }
+  function bookingEdit(r: R) {
+    edit(
+      "Manage " + s(r.reference),
+      "update_booking",
+      {
+        id: r.id,
+        status: r.status,
+        notes: r.notes,
+        internal_notes: r.internal_notes,
+        ...(!staff
+          ? {
+              date: r.booking_date,
+              start_minute: r.start_minute,
+              assigned_to: r.assigned_to || "",
+              price_cents: r.price_cents == null ? "" : n(r.price_cents) / 100,
+            }
+          : {}),
+      },
+      [
+        f("status", "Status", "select", { options: [...bookingStatuses] }),
+        ...(!staff
+          ? [
+              f("date", "Appointment date", "date"),
+              f("start_minute", "Start time", "select", {
+                options: Array.from({ length: 48 }, (_, i) => ({
+                  value: s(i * 30),
+                  label: timeLabel(i * 30),
+                })),
+              }),
+              f("assigned_to", "Assigned to", "nullable-select", {
+                options: teamOptions,
+              }),
+              f("price_cents", "Agreed service price ($)", "text", {
+                hint: "Leave empty for consultation pricing. Price changes should be approved by the customer.",
+              }),
+            ]
+          : []),
+        f("notes", "Customer notes", "textarea", { wide: true }),
+        f("internal_notes", "Internal notes", "textarea", { wide: true }),
+      ],
+      (d) => ({
+        ...d,
+        ...(!staff
+          ? {
+              start_minute: Number(d.start_minute),
+              price_cents:
+                d.price_cents === ""
+                  ? null
+                  : Math.round(Number(d.price_cents) * 100),
+            }
+          : {}),
+      }),
+    );
+  }
+  function customerEdit(r: R) {
+    edit("Customer details", "save_customer", r, [
+      f("first_name", "First name", "text", { required: true }),
+      f("last_name", "Last name", "text", { required: true }),
+      f("email", "Email", "email", { required: true }),
+      f("phone", "Phone"),
+      f("notes", "Customer notes", "textarea", { wide: true }),
+    ]);
+  }
+  function leadEdit(r: R = {}) {
+    edit(
+      r.id ? "Edit lead" : "Add lead",
+      "save_lead",
+      {
+        name: "",
+        email: "",
+        phone: "",
+        source: "Phone",
+        campaign: "",
+        status: "new",
+        notes: "",
+        assigned_to: "",
+        ...r,
+      },
+      [
+        f("name", "Full name", "text", { required: true }),
+        f("email", "Email", "email"),
+        f("phone", "Phone"),
+        f("source", "Source", "select", { options: [...channels] }),
+        f("campaign", "Campaign"),
+        f("status", "Status", "select", { options: [...leadStatuses] }),
+        f("assigned_to", "Assign to", "nullable-select", {
+          options: teamOptions,
+        }),
+        f("notes", "Notes", "textarea", { wide: true }),
+      ],
+    );
+  }
+  function campaignEdit(r: R = {}) {
+    edit(
+      "Campaign",
+      "save_campaign",
+      {
+        name: "",
+        channel: "sms",
+        audience: "all",
+        subject: "",
+        body: "",
+        scheduled_at: "",
+        ...r,
+        ...(r.scheduled_at
+          ? {
+              scheduled_at: new Date(
+                new Date(s(r.scheduled_at)).getTime() -
+                  new Date().getTimezoneOffset() * 60000,
+              )
+                .toISOString()
+                .slice(0, 16),
+            }
+          : {}),
+      },
+      [
+        f("name", "Campaign name", "text", { required: true }),
+        f("channel", "Channel", "select", { options: ["sms", "email"] }),
+        f("audience", "Consented audience", "select", {
+          options: [
+            "all",
+            "inactive60",
+            "inactive90",
+            "ceramic",
+            "interior",
+            "repeat",
+          ],
+        }),
+        f("subject", "Email subject"),
+        f("body", "Message", "textarea", {
+          required: true,
+          wide: true,
+          hint: "Use {{customer_name}}. An opt-out footer is added automatically.",
+        }),
+        f("scheduled_at", "Schedule (your local timezone)", "datetime-local", {
+          hint: "Leave empty to save a draft. A running worker is required for scheduled delivery.",
+        }),
+      ],
+    );
+  }
+  function galleryEdit(r: R = {}) {
+    edit(
+      "Gallery item",
+      "save_gallery",
+      {
+        title: "",
+        caption: "",
+        category: "Exterior",
+        image_url: "",
+        before_url: "",
+        sort_order: list.length,
+        published: false,
+        ...r,
+      },
+      [
+        f("title", "Title", "text", { required: true }),
+        f("category", "Category", "select", {
+          options: [
+            "Interior",
+            "Exterior",
+            "Paint correction",
+            "Ceramic coating",
+            "Wheels",
+            "Luxury vehicles",
+            "Transformations",
+          ],
+        }),
+        f("image_url", "Image / after photo", "upload", { required: true }),
+        f("before_url", "Before photo (optional)", "upload"),
+        f("caption", "Caption", "textarea", { wide: true }),
+        f("sort_order", "Display order", "number"),
+        f("published", "Publish on website", "checkbox"),
+      ],
+    );
+  }
+  function teamEdit(r: R = {}) {
+    edit(
+      "Team member",
+      "save_user",
+      { name: "", email: "", role: "staff", password: "", active: true, ...r },
+      [
+        f("name", "Name", "text", { required: true }),
+        f("email", "Email", "email", { required: true }),
+        f("role", "Role", "select", {
+          options: ["owner", "admin", "manager", "staff"],
+        }),
+        f(
+          "password",
+          r.id
+            ? "New password (leave blank to keep)"
+            : "Password (12+ characters)",
+          "password",
+          { required: !r.id },
+        ),
+        f("active", "Active", "checkbox"),
+      ],
+    );
+  }
+  function templateEdit(r: R) {
+    edit("Edit " + title(s(r.key)) + " template", "save_template", r, [
+      f("subject", "Subject", "text", { required: true, wide: true }),
+      f("body", "Message template", "textarea", {
+        required: true,
+        wide: true,
+        hint: "Variables: {{customer_name}}, {{service_name}}, {{booking_date}}, {{booking_time}}, {{vehicle}}, {{total}}, {{booking_url}}, {{business_name}}.",
+      }),
+    ]);
+  }
+  function messageEdit(customer: R) {
+    edit(
+      "Message " + s(customer.first_name),
+      "send_message",
+      {
+        customer_id: customer.id,
+        channel: "email",
+        purpose: "transactional",
+        subject: "",
+        body: "",
+      },
+      [
+        f("channel", "Channel", "select", { options: ["email", "sms"] }),
+        f("purpose", "Purpose", "select", {
+          options: ["transactional", "marketing"],
+        }),
+        f("subject", "Subject"),
+        f("body", "Message", "textarea", {
+          required: true,
+          wide: true,
+          hint: "Promotional messages require recorded consent. Saving queues delivery.",
+        }),
+      ],
+    );
+  }
+  function settingsEdit(group: string) {
+    const b = data.settings as R;
+    const groups: Record<string, Field[]> = {
+      Business: [
+        f("name", "Business name"),
+        f("phone", "Business phone"),
+        f("email", "Business email", "email"),
+        f("address", "Street address", "text", { wide: true }),
+        f("hours_label", "Public hours"),
+        f("service_area", "Service area", "textarea", { wide: true }),
+      ],
+      Booking: [
+        f("appointment_mode", "Appointment location", "select", {
+          options: ["shop", "mobile", "both"],
+        }),
+        f("days", "Available weekdays (0=Sun, 6=Sat)", "text", {
+          hint: "Comma separated, e.g. 1,2,3,4,5,6",
+        }),
+        f("open_time", "Open", "time"),
+        f("close_time", "Close", "time"),
+        f("buffer_minutes", "Buffer (minutes)", "number"),
+        f("deposit_percent", "Deposit (%)", "number", { max: 100 }),
+        f("cancellation_policy", "Cancellation policy", "textarea", {
+          wide: true,
+        }),
+      ],
+      Branding: [
+        f("logo_url", "Logo", "upload"),
+        f("favicon_url", "Favicon", "upload"),
+        f("instagram_url", "Instagram URL", "url"),
+        f("google_review_url", "Google review URL", "url"),
+      ],
+      Tracking: [
+        f("google_tag_id", "Google Tag ID (GT-)"),
+        f("ga4_id", "GA4 measurement (G-)"),
+        f("google_ads_id", "Google Ads ID (AW-)"),
+        f("google_ads_label", "Conversion label"),
+        f("meta_pixel_id", "Meta Pixel ID"),
+        f("meta_dataset_id", "Meta dataset ID"),
+        f("meta_token", "Meta CAPI access token", "password", {
+          hint: "Leave blank to keep existing secret",
+        }),
+      ],
+      Notifications: [
+        f("email_from", "Verified sender (Resend)"),
+        f("telegram_chat_id", "Telegram chat ID"),
+        f("sms_from", "Twilio phone number"),
+        ...[
+          "email_key",
+          "telegram_token",
+          "telegram_webhook",
+          "sms_account",
+          "sms_token",
+        ].map((k) =>
+          f(k, title(k), "password", {
+            hint: "Leave blank to keep existing secret",
+          }),
+        ),
+      ],
+      Payments: [
+        f("stripe_key", "Stripe secret key", "password"),
+        f("stripe_webhook", "Stripe webhook signing secret", "password"),
+      ],
+    };
+    const credentials = [
+      "email_key",
+      "telegram_token",
+      "telegram_webhook",
+      "sms_account",
+      "sms_token",
+      "stripe_key",
+      "stripe_webhook",
+      "meta_token",
+    ];
+    edit(
+      group + " settings",
+      "save_settings",
+      { ...b, days: (b.days as number[]).join(",") },
+      groups[group],
+      (d) => {
+        const cfg = { ...b, ...d };
+        const secrets: R = {};
+        for (const k of credentials) {
+          if (d[k]) secrets[k] = d[k];
+          delete cfg[k];
+        }
+        cfg.days =
+          typeof d.days === "string"
+            ? s(d.days).split(",").map(Number)
+            : b.days;
+        return { settings: cfg, credentials: secrets };
+      },
+    );
+  }
+  function table(headers: string[], values: React.ReactNode[][]) {
+    return values.length ? (
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              {headers.map((h) => (
+                <th key={h}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {values.map((cells, i) => (
+              <tr key={i}>
+                {cells.map((x, j) => (
+                  <td key={j}>{x}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <div className="empty-state">
+        <h3>No records yet</h3>
+        <p>
+          Real activity will appear here. Try a different filter or create your
+          first record.
+        </p>
+      </div>
+    );
+  }
+  function bookingsTable(values: R[]) {
+    return table(
+      [
+        "Appointment",
+        "Customer / vehicle",
+        "Date & time",
+        "Status",
+        ...(!staff ? ["Estimate"] : []),
+        "Actions",
+      ],
+      values.map((r) => [
+        <>
+          <strong>{s(r.reference)}</strong>
+          <small>{s(r.service_name)}</small>
+        </>,
+        <>
+          {!staff ? (
+            <Link
+              className="text-link"
+              href={"/admin/customers?id=" + s(r.customer_id)}
+            >
+              {s(r.customer_name)}
+            </Link>
+          ) : (
+            s(r.customer_name)
+          )}
+          <small>{s(r.vehicle)}</small>
+          <small>{s(r.phone)}</small>
+        </>,
+        <>
+          {s(r.booking_date)}
+          <small>
+            {timeLabel(n(r.start_minute))} CT · {n(r.duration_minutes) / 60}h
+          </small>
+        </>,
+        status(r.status),
+        ...(!staff
+          ? [money(r.price_cents == null ? null : n(r.price_cents))]
+          : []),
+        <>
+          <button onClick={() => bookingEdit(r)}>Manage</button>
+          {!staff && r.status === "completed" && (
+            <button
+              disabled={busy}
+              onClick={() =>
+                run(
+                  "request_review",
+                  { booking_id: r.id },
+                  "Review request queued.",
+                )
+              }
+            >
+              Request review
+            </button>
+          )}
+        </>,
+      ]),
+    );
+  }
+  const profile = data.profile as {
+    customer: R;
+    vehicles: R[];
+    bookings: R[];
+    timeline: R[];
+    consents: R[];
+  } | null;
+  const reportMode = !!rep;
+  return (
+    <>
+      <div className="admin-heading">
+        <div>
+          <h1>{title(section)}</h1>
+          <p>
+            {section === "dashboard"
+              ? "Your business, at a glance."
+              : section === "marketing"
+                ? "Connect the first click to verified revenue."
+                : "One connected workspace. Real business records."}
+          </p>
+        </div>
+        {["bookings", "calendar"].includes(section) && !staff && (
+          <button
+            className="button"
+            onClick={() => {
+              setLead(undefined);
+              setCreating(true);
+            }}
+          >
+            New appointment +
+          </button>
+        )}
+        {section === "services" && (
+          <button className="button" onClick={() => serviceEdit()}>
+            Add service +
+          </button>
+        )}
+        {section === "leads" && (
+          <button className="button" onClick={() => leadEdit()}>
+            Add lead +
+          </button>
+        )}
+        {section === "gallery" && (
+          <button className="button" onClick={() => galleryEdit()}>
+            Add photos +
+          </button>
+        )}
+        {section === "marketing" && (
+          <button className="button" onClick={() => campaignEdit()}>
+            Create campaign +
+          </button>
+        )}
+      </div>
+      {notice && (
+        <div className="success-message" role="status">
+          {notice}
+        </div>
+      )}
+      {error && (
+        <div className="error-message" role="alert">
+          {error}
+        </div>
+      )}
+      {reportMode && rep && (
+        <>
+          <form className="toolbar">
+            <label className="field">
+              <span>Reporting period</span>
+              <select name="range" defaultValue={params.get("range") || "30"}>
+                {[
+                  ["1", "Today"],
+                  ["7", "7 days"],
+                  ["30", "30 days"],
+                  ["90", "90 days"],
+                  ["year", "This year"],
+                ].map(([v, l]) => (
+                  <option value={v} key={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Custom from</span>
+              <input
+                type="date"
+                name="from"
+                defaultValue={params.get("from") || ""}
+              />
+            </label>
+            <label className="field">
+              <span>To</span>
+              <input
+                type="date"
+                name="to"
+                defaultValue={params.get("to") || ""}
+              />
+            </label>
+            <button className="button">Apply dates</button>
+          </form>
+          <p className="small-note">
+            {rep.start} through {rep.end} · Central Time. Revenue uses verified
+            payments less refunds, never unpaid booking estimates.
+          </p>
+          <div className="stats-grid">
+            {[
+              ["Net revenue", money(rep.revenue), "Selected period"],
+              ["Bookings", s(rep.bookings.total), "Created in period"],
+              ["New leads", s(rep.leads), "Recorded enquiries & bookings"],
+              [
+                "Booking conversion",
+                rep.conversion_rate == null
+                  ? "No visits"
+                  : rep.conversion_rate.toFixed(1) + "%",
+                "Booked sessions / tracked visitors",
+              ],
+              [
+                "Average paid order",
+                money(rep.average_order),
+                "Net revenue / paid appointments",
+              ],
+              [
+                "Revenue per payer",
+                money(rep.revenue_per_customer),
+                "Net revenue / paying customers",
+              ],
+              [
+                "New customers",
+                s(rep.customers.new_customers),
+                "Created in period",
+              ],
+              [
+                "Returning customers",
+                s(rep.customers.returning),
+                "2+ completed visits, all time",
+              ],
+            ].map(([k, v, h]) => (
+              <div className="stat" key={k}>
+                <p>{k}</p>
+                <strong>{v}</strong>
+                <small>{h}</small>
+              </div>
+            ))}
+          </div>
+          {section === "dashboard" && (
+            <>
+              <div className="stats-grid">
+                {Object.entries(rep.windows).map(([k, v]) => (
+                  <div className="stat" key={k}>
+                    <p>
+                      Revenue{" "}
+                      {k === "week"
+                        ? "this week"
+                        : k === "month"
+                          ? "this month"
+                          : k === "year"
+                            ? "this year"
+                            : k}
+                    </p>
+                    <strong>{money(n(v))}</strong>
+                    <small>Verified net payments</small>
+                  </div>
+                ))}
+              </div>
+              <div className="admin-grid">
+                <section className="paper">
+                  <h2>Today's appointments</h2>
+                  {table(
+                    ["Time", "Customer", "Service", "Status"],
+                    rows(data.today).map((r) => [
+                      timeLabel(n(r.start_minute)),
+                      s(r.customer_name),
+                      s(r.service_name),
+                      status(r.status),
+                    ]),
+                  )}
+                  <Link
+                    className="text-link"
+                    href={"/admin/calendar?date=" + dateToday()}
+                  >
+                    Open calendar ↗
+                  </Link>
+                </section>
+                <section className="paper">
+                  <h2>Booking health</h2>
+                  {Object.entries(rep.bookings).map(([k, v]) => (
+                    <div className="summary-row" key={k}>
+                      <span>{title(k)}</span>
+                      <strong>{s(v)}</strong>
+                    </div>
+                  ))}
+                  <div className="summary-row">
+                    <span>Customers, all time</span>
+                    <strong>{s(rep.customers.total)}</strong>
+                  </div>
+                  <div className="summary-row">
+                    <span>Repeat customer share</span>
+                    <strong>
+                      {n(rep.customers.total)
+                        ? (
+                            (n(rep.customers.returning) /
+                              n(rep.customers.total)) *
+                            100
+                          ).toFixed(1) + "%"
+                        : "No customers"}
+                    </strong>
+                  </div>
+                </section>
+              </div>
+            </>
+          )}
+          <div className="admin-grid">
+            <section className="paper">
+              <h2>Revenue by payment date</h2>
+              {rep.series.length ? (
+                <>
+                  <div
+                    className="chart"
+                    role="img"
+                    aria-label="Daily net payment revenue"
+                  >
+                    {rep.series.map((r) => (
+                      <div
+                        key={s(r.day)}
+                        style={{
+                          height:
+                            Math.max(
+                              2,
+                              (n(r.revenue) /
+                                Math.max(
+                                  ...rep.series.map((x) => n(x.revenue)),
+                                  1,
+                                )) *
+                                100,
+                            ) + "%",
+                        }}
+                        title={s(r.day) + ": " + money(n(r.revenue))}
+                      />
+                    ))}
+                  </div>
+                  <div className="chart-labels">
+                    <span>{rep.start}</span>
+                    <span>{rep.end}</span>
+                  </div>
+                  <details>
+                    <summary>View chart data</summary>
+                    {table(
+                      ["Date", "Revenue"],
+                      rep.series.map((r) => [s(r.day), money(n(r.revenue))]),
+                    )}
+                  </details>
+                </>
+              ) : (
+                <div className="empty-state">
+                  <p>No verified payments in this period.</p>
+                </div>
+              )}
+            </section>
+            <section className="paper">
+              <h2>Customer journey</h2>
+              {rep.events.length ? (
+                rep.events.map((r) => (
+                  <div className="summary-row" key={s(r.name)}>
+                    <span>{title(s(r.name))}</span>
+                    <strong>{s(r.count)}</strong>
+                  </div>
+                ))
+              ) : (
+                <p>No tracked activity yet.</p>
+              )}
+              <p className="small-note">
+                Phone clicks measure intent, not answered calls. Manually record
+                actual phone leads in Leads.
+              </p>
+            </section>
+          </div>
+          <section className="paper">
+            <h2>Channel performance</h2>
+            {table(
+              [
+                "Channel",
+                "Leads",
+                "Bookings",
+                "Revenue",
+                "Spend",
+                "CPL",
+                "CPA",
+                "ROAS",
+              ],
+              rep.channels.map((r) => [
+                r.channel,
+                s(r.leads),
+                s(r.bookings),
+                money(r.revenue),
+                r.spend == null ? "Not entered" : money(r.spend),
+                r.cpl == null ? "—" : money(r.cpl),
+                r.cpa == null ? "—" : money(r.cpa),
+                r.roas == null ? "—" : r.roas.toFixed(2) + "×",
+              ]),
+            )}
+            <p className="small-note">
+              Spend is manually entered unless an ad reporting connector is
+              added. Missing spend is not zero spend. Source is linked to the
+              actual booking and payment record.
+            </p>
+          </section>
+          {section !== "dashboard" && (
+            <>
+              <section className="paper">
+                <h2>Campaign attribution</h2>
+                {table(
+                  ["Channel", "Campaign", "Leads", "Bookings", "Revenue"],
+                  rep.campaigns
+                    .filter((r) => n(r.leads) || n(r.bookings) || n(r.revenue))
+                    .map((r) => [
+                      s(r.source),
+                      s(r.campaign) || "(not tagged)",
+                      s(r.leads),
+                      s(r.bookings),
+                      money(n(r.revenue)),
+                    ]),
+                )}
+              </section>
+              <section className="paper">
+                <h2>Services by paid revenue</h2>
+                {table(
+                  ["Service", "Paid bookings", "Revenue"],
+                  rep.topServices.map((r) => [
+                    s(r.service_name),
+                    s(r.bookings),
+                    money(n(r.revenue)),
+                  ]),
+                )}
+              </section>
+            </>
+          )}
+          {section === "marketing" && (
+            <>
+              <section className="paper">
+                <div className="section-heading">
+                  <h2>Ad spend</h2>
+                  <button
+                    className="button outline"
+                    onClick={() =>
+                      edit(
+                        "Enter verified ad spend",
+                        "save_spend",
+                        {
+                          channel: "Google Ads",
+                          campaign: "",
+                          spend_date: dateToday(),
+                          amount_cents: 0,
+                        },
+                        [
+                          f("channel", "Channel", "select", {
+                            options: [...channels],
+                          }),
+                          f("campaign", "Campaign"),
+                          f("spend_date", "Spend date", "date"),
+                          f("amount_cents", "Spend ($)", "money"),
+                        ],
+                      )
+                    }
+                  >
+                    Record spend +
+                  </button>
+                </div>
+                {table(
+                  ["Date", "Channel", "Campaign", "Amount"],
+                  rows(data.spend).map((r) => [
+                    s(r.spend_date),
+                    s(r.channel),
+                    s(r.campaign),
+                    money(n(r.amount_cents)),
+                  ]),
+                )}
+              </section>
+              <section className="paper">
+                <h2>Email & SMS campaigns</h2>
+                <p className="small-note">
+                  Only opted-in recipients are selected. Consent is checked
+                  again immediately before delivery. Scheduled sends require the
+                  worker service.
+                </p>
+                {table(
+                  [
+                    "Campaign",
+                    "Audience",
+                    "Status",
+                    "Scheduled",
+                    "Sent / Failed",
+                    "Actions",
+                  ],
+                  rows(data.campaigns).map((r) => [
+                    <>
+                      {s(r.name)}
+                      <small>{s(r.channel)}</small>
+                    </>,
+                    s(r.audience),
+                    status(r.status),
+                    stamp(r.scheduled_at),
+                    s(r.sent) + " / " + s(r.failed),
+                    <>
+                      {["draft", "scheduled"].includes(s(r.status)) && (
+                        <>
+                          <button onClick={() => campaignEdit(r)}>Edit</button>
+                          <button
+                            disabled={busy}
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  "Send this campaign now to its consented audience?",
+                                )
+                              )
+                                void run(
+                                  "queue_campaign",
+                                  { id: r.id },
+                                  "Campaign queued for consented recipients.",
+                                );
+                            }}
+                          >
+                            Send now
+                          </button>
+                        </>
+                      )}
+                      {!["completed", "cancelled"].includes(s(r.status)) && (
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            run(
+                              "cancel_campaign",
+                              { id: r.id },
+                              "Pending campaign messages cancelled.",
+                            )
+                          }
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </>,
+                  ]),
+                )}
+              </section>
+              <section className="paper">
+                <h2>Integration configuration</h2>
+                <IntegrationStatus value={data.integrations as R} />
+                <Link className="text-link" href="/admin/settings">
+                  Open settings ↗
+                </Link>
+              </section>
+            </>
+          )}
+        </>
+      )}
+      {!reportMode &&
+        ["bookings", "customers", "leads", "calendar", "payments"].includes(
+          section,
+        ) && (
+          <form className="toolbar">
+            <label className="field">
+              <span>Search records</span>
+              <input
+                name="search"
+                placeholder="Name, reference..."
+                defaultValue={params.get("search") || ""}
+              />
+            </label>
+            {["bookings", "calendar", "payments"].includes(section) && (
+              <>
+                <label className="field">
+                  <span>Date</span>
+                  <input
+                    type="date"
+                    name="date"
+                    defaultValue={params.get("date") || ""}
+                  />
+                </label>
+                <label className="field">
+                  <span>Status</span>
+                  <select
+                    name="status"
+                    defaultValue={params.get("status") || ""}
+                  >
+                    <option value="">All statuses</option>
+                    {bookingStatuses.map((x) => (
+                      <option key={x}>{x}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+            <button className="button">Filter</button>
+            <Link className="text-link" href={"/admin/" + section}>
+              Clear
+            </Link>
+          </form>
+        )}
+      {section === "bookings" && (
+        <>
+          <div className="filter-tabs">
+            {[
+              ["", "All"],
+              ["?date=" + dateToday(), "Today"],
+              ["?view=upcoming", "Upcoming"],
+              ["?view=past", "Past"],
+              ["?status=completed", "Completed"],
+              ["?status=cancelled", "Cancelled"],
+              ["?status=no_show", "No-show"],
+            ].map(([q, l]) => (
+              <Link key={l} href={"/admin/bookings" + q}>
+                {l}
+              </Link>
+            ))}
+          </div>
+          {bookingsTable(list)}
+          <p className="small-note">
+            {s(data.total)} matching appointments. Showing up to 100 per page.
+          </p>
+        </>
+      )}
+      {section === "calendar" && (
+        <>
+          <Calendar
+            records={list}
+            onEdit={bookingEdit}
+            date={params.get("date") || dateToday()}
+          />
+          <div className="paper">
+            <h2>Availability blocks</h2>
+            {!staff && (
+              <button
+                className="button outline"
+                onClick={() =>
+                  edit(
+                    "Block appointment time",
+                    "block_time",
+                    {
+                      date: dateToday(),
+                      start_minute: 480,
+                      end_minute: 1080,
+                      reason: "Unavailable",
+                    },
+                    [
+                      f("date", "Date", "date", { required: true }),
+                      f("start_minute", "Start", "select", {
+                        options: Array.from({ length: 48 }, (_, i) => ({
+                          value: s(i * 30),
+                          label: timeLabel(i * 30),
+                        })),
+                      }),
+                      f("end_minute", "End", "select", {
+                        options: Array.from({ length: 48 }, (_, i) => ({
+                          value: s((i + 1) * 30),
+                          label: timeLabel((i + 1) * 30),
+                        })),
+                      }),
+                      f("reason", "Reason"),
+                    ],
+                    (d) => ({
+                      ...d,
+                      start_minute: Number(d.start_minute),
+                      end_minute: Number(d.end_minute),
+                    }),
+                  )
+                }
+              >
+                Block time +
+              </button>
+            )}
+            {table(
+              ["Date", "Time", "Reason", "Action"],
+              rows(data.blocks).map((r) => [
+                s(r.booking_date),
+                timeLabel(n(r.start_minute)) +
+                  " – " +
+                  timeLabel(n(r.end_minute)),
+                s(r.reason),
+                !staff && (
+                  <button
+                    disabled={busy}
+                    onClick={() => run("remove_block", { id: r.id })}
+                  >
+                    Remove
+                  </button>
+                ),
+              ]),
+            )}
+          </div>
+        </>
+      )}
+      {section === "services" &&
+        table(
+          [
+            "Service",
+            "Category",
+            "Price / duration",
+            "Visibility",
+            "Order",
+            "Actions",
+          ],
+          list.map((r) => [
+            <strong>{s(r.name)}</strong>,
+            s(r.category),
+            <>
+              {s(r.pricing_mode) === "quote"
+                ? "By consultation"
+                : money(n(r.price_cents))}
+              <small>
+                {n(r.duration_minutes) / 60} hours · {s(r.pricing_mode)}
+              </small>
+            </>,
+            status(r.active ? "active" : "disabled"),
+            s(r.sort_order),
+            <button onClick={() => serviceEdit(r)}>Edit service</button>,
+          ]),
+        )}
+      {section === "customers" && (
+        <>
+          {profile?.customer && (
+            <section className="paper">
+              <div className="section-heading">
+                <div>
+                  <h2>
+                    {s(profile.customer.first_name)}{" "}
+                    {s(profile.customer.last_name)}
+                  </h2>
+                  <p>
+                    {s(profile.customer.email)} · {s(profile.customer.phone)}
+                  </p>
+                </div>
+                <button
+                  className="button"
+                  onClick={() => customerEdit(profile.customer)}
+                >
+                  Edit profile
+                </button>
+              </div>
+              <div className="profile-details">
+                <div>
+                  <div className="button-row">
+                    <a
+                      className="text-link"
+                      href={"tel:" + s(profile.customer.phone)}
+                    >
+                      Call
+                    </a>
+                    <a
+                      className="text-link"
+                      href={"mailto:" + s(profile.customer.email)}
+                    >
+                      Email
+                    </a>
+                    <button
+                      className="button outline"
+                      onClick={() => messageEdit(profile.customer)}
+                    >
+                      Send message
+                    </button>
+                  </div>
+                  <dl>
+                    <dt>First recorded source / campaign</dt>
+                    <dd>
+                      {s(profile.customer.source) || "Unknown"} /{" "}
+                      {s(profile.customer.campaign) || "Not tagged"}
+                    </dd>
+                    <dt>Email marketing</dt>
+                    <dd>
+                      {profile.customer.marketing_email
+                        ? "Consented"
+                        : "Not consented"}
+                    </dd>
+                    <dt>SMS marketing</dt>
+                    <dd>
+                      {profile.customer.sms_opted_out
+                        ? "Opted out"
+                        : profile.customer.marketing_sms
+                          ? "Consented"
+                          : "Not consented"}
+                    </dd>
+                    <dt>Customer notes</dt>
+                    <dd>{s(profile.customer.notes) || "No notes"}</dd>
+                  </dl>
+                  <h3>Vehicles</h3>
+                  {profile.vehicles.map((v) => (
+                    <p key={s(v.id)}>
+                      {s(v.year)} {s(v.make)} {s(v.model)} · {s(v.type)}
+                    </p>
+                  ))}
+                  <button
+                    className="button outline"
+                    onClick={() =>
+                      edit(
+                        "Add customer note",
+                        "add_note",
+                        { customer_id: profile.customer.id, body: "" },
+                        [
+                          f("body", "Note", "textarea", {
+                            required: true,
+                            wide: true,
+                          }),
+                        ],
+                      )
+                    }
+                  >
+                    Add timeline note
+                  </button>
+                  <h3>Consent history</h3>
+                  {table(
+                    ["Channel", "Choice", "Recorded"],
+                    profile.consents.map((c) => [
+                      s(c.channel),
+                      c.consent ? "Opted in" : "Opted out",
+                      stamp(c.created_at),
+                    ]),
+                  )}
+                </div>
+                <div>
+                  <h3>Connected timeline</h3>
+                  <ul className="timeline">
+                    {profile.timeline.map((t) => (
+                      <li key={s(t.id)}>
+                        <strong>{title(s(t.type))}</strong>
+                        {s(t.body)}
+                        <small>{stamp(t.created_at)}</small>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <h3>Booking history</h3>
+              {table(
+                ["Reference", "Service", "Date", "Status"],
+                profile.bookings.map((b) => [
+                  s(b.reference),
+                  s(b.service_name),
+                  s(b.booking_date),
+                  status(b.status),
+                ]),
+              )}
+            </section>
+          )}
+          {table(
+            [
+              "Customer",
+              "Contact",
+              "Bookings",
+              "Net lifetime spend",
+              "Last / upcoming",
+              "Action",
+            ],
+            list.map((r) => [
+              <>
+                {s(r.first_name)} {s(r.last_name)}
+                <small>Since {stamp(r.created_at)}</small>
+              </>,
+              <>
+                {s(r.email)}
+                <small>{s(r.phone)}</small>
+              </>,
+              s(r.booking_count),
+              money(n(r.total_spent)),
+              <>
+                {s(r.last_booking) || "No past visit"}
+                <small>{s(r.upcoming_booking) || "No upcoming visit"}</small>
+              </>,
+              <Link
+                className="text-link"
+                href={"/admin/customers?id=" + s(r.id)}
+              >
+                Open profile ↗
+              </Link>,
+            ]),
+          )}
+        </>
+      )}
+      {section === "leads" &&
+        table(
+          ["Lead", "Source / campaign", "Status", "Contact", "Actions"],
+          list.map((r) => [
+            <>
+              {s(r.name)}
+              <small>{s(r.notes)}</small>
+            </>,
+            <>
+              {s(r.source)}
+              <small>{s(r.campaign)}</small>
+            </>,
+            status(r.status),
+            <>
+              {!!r.phone && (
+                <a className="text-link" href={"tel:" + s(r.phone)}>
+                  Call
+                </a>
+              )}
+              <small>
+                {!!r.email && <a href={"mailto:" + s(r.email)}>{s(r.email)}</a>}
+              </small>
+              {!!r.phone && <a href={"sms:" + s(r.phone)}>SMS</a>}
+            </>,
+            <>
+              <button onClick={() => leadEdit(r)}>Edit</button>
+              {!r.customer_id && (
+                <button
+                  disabled={busy}
+                  onClick={() => run("convert_lead", { id: r.id })}
+                >
+                  Create customer
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setLead({
+                    id: s(r.id),
+                    name: s(r.name),
+                    email: s(r.email),
+                    phone: s(r.phone),
+                  });
+                  setCreating(true);
+                }}
+              >
+                Book
+              </button>
+            </>,
+          ]),
+        )}
+      {section === "payments" && (
+        <>
+          <p className="small-note">
+            Payment records are written by verified Stripe webhooks. Checkout
+            links do not mark appointments paid.
+          </p>
+          {table(
+            [
+              "Appointment",
+              "Amount",
+              "Refunded",
+              "Status",
+              "Transaction",
+              "Paid",
+            ],
+            rows(data.payments).map((r) => [
+              s(r.reference),
+              money(n(r.amount_cents)),
+              money(n(r.refunded_cents)),
+              status(r.status),
+              s(r.stripe_payment_id) || "Pending",
+              stamp(r.paid_at),
+            ]),
+          )}
+          <h2>Collect payment</h2>
+          {table(
+            ["Appointment", "Customer", "Estimate", "Action"],
+            list
+              .filter((r) => !["cancelled", "no_show"].includes(s(r.status)))
+              .map((r) => [
+                s(r.reference),
+                s(r.customer_name),
+                money(r.price_cents == null ? null : n(r.price_cents)),
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    run("create_payment", { booking_id: r.id, kind: "balance" })
+                  }
+                >
+                  Open secure checkout
+                </button>,
+              ]),
+          )}
+        </>
+      )}
+      {section === "messages" && (
+        <>
+          <IntegrationStatus value={data.integrations as R} />
+          {table(
+            [
+              "Channel / purpose",
+              "Recipient",
+              "Message",
+              "Status",
+              "Provider ID",
+              "Date / error",
+              "Action",
+            ],
+            list.map((r) => [
+              <>
+                {s(r.channel)}
+                <small>{s(r.purpose)}</small>
+              </>,
+              s(r.recipient),
+              <details>
+                <summary>{s(r.subject) || "View message"}</summary>
+                <p>{s(r.body)}</p>
+              </details>,
+              status(r.status),
+              s(r.provider_id) || "Not sent",
+              <>
+                {stamp(r.sent_at || r.created_at)}
+                <small>{s(r.error)}</small>
+              </>,
+              ["failed", "skipped"].includes(s(r.status)) ? (
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    run("retry_message", { id: r.id }, "Message requeued.")
+                  }
+                >
+                  Retry
+                </button>
+              ) : r.status === "uncertain" ? (
+                "Check provider before retrying"
+              ) : (
+                "—"
+              ),
+            ]),
+          )}
+          <section className="paper">
+            <h2>Transactional templates</h2>
+            {table(
+              ["Template", "Subject", "Action"],
+              rows(data.templates).map((r) => [
+                title(s(r.key)),
+                s(r.subject),
+                <button onClick={() => templateEdit(r)}>Edit template</button>,
+              ]),
+            )}
+          </section>
+        </>
+      )}
+      {section === "reviews" && (
+        <>
+          <p className="small-note">
+            Requests are tied to completed appointments. Only genuine submitted
+            feedback can be published.
+          </p>
+          {table(
+            ["Customer", "Rating", "Feedback", "Status", "Received", "Actions"],
+            list.map((r) => [
+              s(r.name),
+              r.rating ? s(r.rating) + "/5" : "Awaiting",
+              s(r.text),
+              status(r.status),
+              stamp(r.created_at),
+              r.rating ? (
+                <>
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      run("publish_review", { id: r.id, status: "published" })
+                    }
+                  >
+                    Publish
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      run("publish_review", { id: r.id, status: "hidden" })
+                    }
+                  >
+                    Hide
+                  </button>
+                </>
+              ) : (
+                "Awaiting customer"
+              ),
+            ]),
+          )}
+        </>
+      )}
+      {section === "gallery" &&
+        table(
+          [
+            "Photo",
+            "Title / caption",
+            "Category",
+            "Order",
+            "Visibility",
+            "Actions",
+          ],
+          list.map((r) => [
+            <img
+              alt={s(r.title)}
+              src={s(r.image_url)}
+              style={{ width: 100, height: 75, objectFit: "cover" }}
+            />,
+            <>
+              {s(r.title)}
+              <small>{s(r.caption)}</small>
+            </>,
+            s(r.category),
+            s(r.sort_order),
+            status(r.published ? "published" : "draft"),
+            <>
+              <button onClick={() => galleryEdit(r)}>Edit</button>
+              <button
+                disabled={busy}
+                onClick={() => {
+                  if (confirm("Remove this gallery entry from the website?"))
+                    void run("delete_gallery", { id: r.id });
+                }}
+              >
+                Delete
+              </button>
+            </>,
+          ]),
+        )}
+      {section === "settings" && (
+        <>
+          <section className="paper">
+            <h2>Business configuration</h2>
+            <div className="integration-list">
+              {[
+                "Business",
+                "Booking",
+                "Branding",
+                "Tracking",
+                "Notifications",
+                "Payments",
+              ].map((g) => (
+                <div key={g}>
+                  <strong>{g}</strong>
+                  <button
+                    className="button outline"
+                    onClick={() => settingsEdit(g)}
+                  >
+                    Configure
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="small-note">
+              Credentials are encrypted server-side. Blank password fields keep
+              existing values. Environment variables can also provide
+              configuration. Review all services, contact details and hours
+              before launch.
+            </p>
+          </section>
+          <section className="paper">
+            <h2>Integration readiness</h2>
+            <IntegrationStatus value={data.integrations as R} />
+          </section>
+          <section className="paper">
+            <div className="section-heading">
+              <h2>Team & permissions</h2>
+              {user.role === "owner" && (
+                <button className="button" onClick={() => teamEdit()}>
+                  Add team member +
+                </button>
+              )}
+            </div>
+            {table(
+              ["Name", "Email", "Role", "Status", "Action"],
+              rows(data.team).map((r) => [
+                s(r.name),
+                s(r.email),
+                s(r.role),
+                status(r.active ? "active" : "disabled"),
+                user.role === "owner" && (
+                  <button onClick={() => teamEdit(r)}>Edit access</button>
+                ),
+              ]),
+            )}
+            <p className="small-note">
+              Staff see only their assigned appointments and cannot access
+              financial, customer database or marketing reports. Owners manage
+              team access. Password changes invalidate existing sessions.
+            </p>
+          </section>
+        </>
+      )}
+      {!reportMode &&
+        [
+          "bookings",
+          "customers",
+          "leads",
+          "reviews",
+          "messages",
+          "payments",
+        ].includes(section) && (
+          <div className="toolbar">
+            {n(params.get("page") || 1) > 1 && (
+              <Link
+                className="button outline"
+                href={
+                  "?" +
+                  new URLSearchParams({
+                    ...Object.fromEntries(params),
+                    page: s(n(params.get("page") || 1) - 1),
+                  })
+                }
+              >
+                Previous page
+              </Link>
+            )}
+            {list.length === 100 && (
+              <Link
+                className="button outline"
+                href={
+                  "?" +
+                  new URLSearchParams({
+                    ...Object.fromEntries(params),
+                    page: s(n(params.get("page") || 1) + 1),
+                  })
+                }
+              >
+                Next page
+              </Link>
+            )}
+          </div>
+        )}
+      {editor && (
+        <Editor
+          key={editor.title + s(editor.initial.id)}
+          spec={editor}
+          onClose={() => setEditor(null)}
+        />
+      )}
+      {creating && (
+        <Modal
+          title={lead ? "Book for " + lead.name : "Create appointment"}
+          onClose={() => setCreating(false)}
+          wide
+        >
+          <BookingWizard
+            services={rows(data.services) as unknown as Service[]}
+            business={business}
+            admin
+            lead={lead}
+            onComplete={() => {
+              setCreating(false);
+              setNotice("Appointment created.");
+              router.refresh();
+            }}
+          />
+        </Modal>
+      )}
+    </>
+  );
+}
+function Calendar({
+  records,
+  onEdit,
+  date,
+}: {
+  records: R[];
+  onEdit: (r: R) => void;
+  date: string;
+}) {
+  const [view, setView] = useState("week");
+  const base = new Date(date + "T12:00:00Z");
+  const start = new Date(base);
+  if (view === "week") start.setUTCDate(start.getUTCDate() - start.getUTCDay());
+  if (view === "month") {
+    start.setUTCDate(1);
+    start.setUTCDate(start.getUTCDate() - start.getUTCDay());
+  }
+  const days = Array.from(
+    { length: view === "day" ? 1 : view === "week" ? 7 : 42 },
+    (_, i) => {
+      const d = new Date(start);
+      d.setUTCDate(d.getUTCDate() + i);
+      return d.toISOString().slice(0, 10);
+    },
+  );
+  return (
+    <>
+      <div className="filter-tabs">
+        {["day", "week", "month"].map((v) => (
+          <button
+            className="button outline"
+            key={v}
+            onClick={() => setView(v)}
+            aria-pressed={v === view}
+          >
+            {title(v)}
+          </button>
+        ))}
+      </div>
+      <p className="small-note">
+        Central Time. Select a date above to focus the calendar. Blocks and
+        assigned visits are shown below.
+      </p>
+      <div className="calendar-scroll">
+        <div
+          className="calendar-grid"
+          style={
+            view === "day"
+              ? { gridTemplateColumns: "1fr", minWidth: 0 }
+              : undefined
+          }
+        >
+          {days.map((day) => (
+            <div key={day} className="calendar-day">
+              <span>
+                {new Date(day + "T12:00:00Z").toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  timeZone: "UTC",
+                })}
+              </span>
+              {records
+                .filter((r) => r.booking_date === day)
+                .sort((a, b) => n(a.start_minute) - n(b.start_minute))
+                .map((r) => (
+                  <button
+                    className="calendar-event"
+                    key={s(r.id)}
+                    onClick={() => onEdit(r)}
+                  >
+                    <strong>
+                      {timeLabel(n(r.start_minute))} · {s(r.customer_name)}
+                    </strong>
+                    {s(r.service_name)}
+                    <br />
+                    {title(s(r.status))}
+                  </button>
+                ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}

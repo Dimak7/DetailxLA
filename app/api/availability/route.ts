@@ -1,24 +1,18 @@
 import { NextResponse } from "next/server";
-import { assertFutureDate } from "@/lib/bookingSchema";
-import { getAvailability } from "@/lib/bookingStore";
-
-export const runtime = "nodejs";
-
+import { availability } from "@/lib/platform/bookings";
+import { apiError } from "@/lib/platform/http";
+import { z } from "zod";
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const date = url.searchParams.get("date") || "";
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return NextResponse.json({ ok: false, error: "Choose a valid date." }, { status: 400 });
-  }
-
   try {
-    assertFutureDate(date);
-    return NextResponse.json({ ok: true, date, slots: await getAvailability(date) });
-  } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Could not load availability." },
-      { status: 400 }
-    );
+    const p = new URL(request.url).searchParams;
+    return NextResponse.json({
+      ok: true,
+      slots: await availability(
+        p.get("date") || "",
+        z.uuid().parse(p.get("service_id")),
+      ),
+    });
+  } catch (e) {
+    return apiError(e);
   }
 }

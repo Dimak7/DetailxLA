@@ -1,7 +1,2 @@
-import { handleBookingRequest } from "@/lib/bookingRequest";
-
+export { POST } from "../book/route";
 export const runtime = "nodejs";
-
-export async function POST(request: Request) {
-  return handleBookingRequest(request);
-}

@@ -1,17 +1,24 @@
 {
-  "name": "detailx-la",
+  "name": "west-loop-auto-spa",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start -H 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "worker": "tsx scripts/worker.ts"
   },
   "dependencies": {
-    "next": "latest",
+    "@electric-sql/pglite": "^0.3.14",
+    "next": "16.2.9",
     "pg": "^8.16.3",
-    "react": "latest",
-    "react-dom": "latest",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "stripe": "^18.5.0",
+    "sharp": "^0.34.5",
     "resend": "^6.0.2",
     "twilio": "^5.13.1",
     "zod": "^4.2.1"
@@ -23,6 +30,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "tsx": "^4.20.5"
   }
 }

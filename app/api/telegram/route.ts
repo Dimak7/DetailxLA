@@ -1,66 +1,72 @@
-import { NextResponse } from "next/server";
-import { handleTelegramCallbackQuery, handleTelegramMessage } from "@/lib/telegram";
-
-export const runtime = "nodejs";
-
-type TelegramUpdate = {
-  update_id?: number;
-  callback_query?: {
-    id: string;
-    data?: string;
-    message?: {
-      chat?: {
-        id?: number | string;
-      };
-      message_id?: number;
-    };
-  };
-  message?: {
-    chat?: {
-      id?: number | string;
-    };
-    text?: string;
-  };
-};
-
+import { NextResponse, after } from "next/server";
+import { timingSafeEqual, randomUUID } from "node:crypto";
+import { query, transaction } from "@/lib/platform/db";
+import { settings, secret } from "@/lib/platform/settings";
+import { enqueue } from "@/lib/platform/outbox";
+import { processOutbox } from "@/lib/platform/worker";
+import { dateToday, timeLabel } from "@/lib/platform/types";
+import { apiError, readJson } from "@/lib/platform/http";
+import { AppError } from "@/lib/platform/auth";
 export async function POST(request: Request) {
   try {
-    if (!isValidTelegramWebhookRequest(request)) {
-      console.error("Telegram webhook rejected: invalid secret token.");
-      return NextResponse.json({ ok: false }, { status: 401 });
-    }
-
-    const update = (await request.json()) as TelegramUpdate;
-    console.info("Telegram update received", {
-      updateId: update.update_id,
-      hasCallbackQuery: Boolean(update.callback_query),
-      hasMessage: Boolean(update.message),
-    });
-
-    if (update.callback_query) {
-      const result = await handleTelegramCallbackQuery(update.callback_query);
-      return NextResponse.json({ ok: result.ok, message: result.message });
-    }
-
-    if (update.message) {
-      const result = await handleTelegramMessage(update.message);
-      return NextResponse.json({ ok: result.ok, message: result.message });
-    }
-
-    return NextResponse.json({ ok: true, message: "No supported Telegram action." });
-  } catch (error) {
-    console.error("Telegram webhook failed", error);
-    return NextResponse.json({ ok: false, error: "Telegram update failed." }, { status: 500 });
+    const expected = await secret("telegram_webhook"),
+      given = request.headers.get("x-telegram-bot-api-secret-token") || "";
+    if (
+      !expected ||
+      expected.length !== given.length ||
+      !timingSafeEqual(Buffer.from(expected), Buffer.from(given))
+    )
+      throw new AppError("Unauthorized", 401);
+    const update = await readJson(request),
+      b = await settings();
+    if (String(update.message?.chat?.id) !== b.telegram_chat_id)
+      return NextResponse.json({ ok: true });
+    const text = String(update.message?.text || ""),
+      date = dateToday(
+        new Date(Date.now() + (text.startsWith("/tomorrow") ? 86400000 : 0)),
+      );
+    const appointments = await query<{
+      reference: string;
+      service_name: string;
+      start_minute: number;
+      name: string;
+      status: string;
+    }>(
+      "SELECT b.reference,b.service_name,b.start_minute,b.status,c.first_name||' '||c.last_name name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE booking_date=$1 AND status NOT IN ('cancelled','no_show') ORDER BY start_minute",
+      [date],
+    );
+    const body = [
+      "West Loop Auto Spa · " + date,
+      ...appointments.map(
+        (a) =>
+          timeLabel(a.start_minute) +
+          " · " +
+          a.name +
+          " · " +
+          a.service_name +
+          " · " +
+          a.status,
+      ),
+      appointments.length ? "" : "No appointments.",
+      "Use /today or /tomorrow. Manage appointments securely in the workspace.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    await transaction((q) =>
+      enqueue(q, {
+        key: "telegram-command:" + String(update.update_id || randomUUID()),
+        channel: "telegram",
+        recipient: b.telegram_chat_id,
+        body,
+      }),
+    );
+    after(() =>
+      processOutbox(5)
+        .then(() => {})
+        .catch(() => {}),
+    );
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return apiError(e);
   }
-}
-
-function isValidTelegramWebhookRequest(request: Request) {
-  const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
-
-  if (!secret) {
-    console.warn("TELEGRAM_WEBHOOK_SECRET is not configured; Telegram webhook is relying on chat ID validation.");
-    return true;
-  }
-
-  return request.headers.get("x-telegram-bot-api-secret-token") === secret;
 }

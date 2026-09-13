@@ -1,85 +1,47 @@
-# DETAILX LA
+# West Loop Auto Spa
 
-Premium mobile detailing website for DETAILX LA, built as a separate Next.js project for Los Angeles with the same booking flow, admin tools, pricing logic, and deployment shape as the original DETAILX site.
+Premium Chicago automotive care website and a relational business workspace. This release is for the DetailxLA repository and its separate Railway service, not the original Chicago application.
 
-## Stack
-
-- Next.js App Router
-- React + TypeScript
-- Tailwind CSS
-- PostgreSQL via `pg`
-- Resend for booking and invoice emails
-- Telegram Bot API for booking notifications and admin actions
-- Twilio for optional SMS confirmations
-- Stripe for admin-created payment links
-
-## Core features
-
-- Mobile-first public site with LA branding and SEO metadata
-- Booking flow powered by `POST /api/book`
-- Availability checks via `GET /api/availability?date=YYYY-MM-DD`
-- Shared admin portal under `/admin`
-- PostgreSQL persistence in production, local JSON fallback for development
-- Privacy Notice and Service Rules pages in the footer
-
-## Local setup
-
-1. Install Node.js 20 or newer.
-2. Run `npm install`.
-3. Copy `.env.example` to `.env.local`.
-4. Run `npm run dev`.
-5. Open `http://localhost:3000`.
-
-## Required production variables
-
-```bash
-NEXT_PUBLIC_SITE_URL=https://your-domain-or-railway-url
-DATABASE_URL=
-ADMIN_EMAIL=
-ADMIN_PASSWORD=
-ADMIN_SESSION_SECRET=
-RESEND_API_KEY=
-BUSINESS_EMAIL=
-EMAIL_FROM=
-RESEND_FROM_EMAIL=
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
-TELEGRAM_WEBHOOK_SECRET=
-CRON_SECRET=
-STRIPE_SECRET_KEY=
+## Run locally
+Use Node 24 and pnpm 11.19.0.
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm typecheck
+pnpm test
+pnpm build
 ```
+Development uses embedded PostgreSQL (PGlite) persisted under ignored `data/west-loop.pg`. Production requires a dedicated PostgreSQL `DATABASE_URL`; there is no ephemeral JSON fallback. Test databases are isolated in memory and contain synthetic records only.
 
-Optional public contact variables:
+## Railway
+Connect the existing DetailxLA service to `Dimak7/DetailxLA`, branch `main`. The checked-in Dockerfile builds the application and applies idempotent schema initialization before starting Next.js on Railway's PORT. Health check: `/api/health`.
 
-```bash
-NEXT_PUBLIC_BUSINESS_PHONE=
-NEXT_PUBLIC_INSTAGRAM_URL=
-NEXT_PUBLIC_INSTAGRAM_HANDLE=@detailxla
-NEXT_PUBLIC_GOOGLE_BUSINESS_URL=
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_FROM_NUMBER=
-ADMIN_SCHEDULE_KEY=
-DATABASE_SSL=false
-```
+Required variables: `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ characters), `ADMIN_SESSION_SECRET` (random 32+ characters), `SETTINGS_ENCRYPTION_KEY` (random 32+ characters). Use the generated Railway URL until a domain is connected. Do not reuse the Chicago database or notification destinations without reviewing them.
 
-## Railway notes
+For scheduled reminders/campaigns, add a worker service from the same repo, with the same environment and database, and override its start command to `pnpm worker`. Disable the HTTP health check on that worker. Alternatively invoke POST `/api/jobs` with a Bearer `CRON_SECRET` from a trusted scheduler. Immediate booking notifications are also processed after the booking response.
 
-- Create a new Railway project for this repo only.
-- Use the standard Next.js commands:
-  - Build: `npm run build`
-  - Start: `npm run start`
-- Attach a PostgreSQL database before taking live bookings.
-- Set the Telegram webhook to:
+## Before launch
+1. Sign in at `/admin/login` using the initial owner configuration.
+2. Review services, prices, opening days, hours, buffers, appointment location, business contact details, cancellation policy and any deposit.
+3. Configure provider credentials in Settings or through the documented environment variables. Database-saved credentials use AES-256-GCM; never rotate the encryption key without re-encrypting saved settings.
+4. Verify each connected provider with a controlled real delivery. Configured is not the same as verified.
+5. Upload authorized work photos and publish genuine reviews. No customers, reviews, revenue or ad metrics are fabricated.
+6. Have the business review its privacy notice, consent wording and service terms for its actual operations.
 
-```bash
-https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=<NEXT_PUBLIC_SITE_URL>/api/telegram&secret_token=<TELEGRAM_WEBHOOK_SECRET>
-```
+## Integrations
+- Email: Resend; set a verified sender and API key. Transactional templates are editable.
+- SMS: Twilio. Configure inbound and delivery webhooks at `/api/webhooks/sms`. Requests require a valid Twilio signature. STOP suppresses messages to the opted-out phone; marketing also requires affirmative consent.
+- Telegram: bot token, chat ID and webhook secret. Register `/api/telegram` with Telegram's secret_token. /today and /tomorrow show schedules; private admin links open authenticated management.
+- Payments: Stripe Checkout. Register `/api/webhooks/stripe` for checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed, checkout.session.expired and charge.refunded. Raw-body signature verification, invoice amount matching and event deduplication protect payment state.
+- Google/Meta: configurable browser tags and Meta server events. Purchase events require verified payment. Google/Meta ad account reporting APIs are not connected; the dashboard explicitly distinguishes unknown spend and allows manual verified spend entries.
 
-- If using a Railway cron for daily Telegram schedule messages, call:
+## Operations & scope
+Schema `wl` isolates the new platform from legacy tables. Legacy customer data is not imported automatically. Back up PostgreSQL and uploaded media before deployment. New services and business settings are seeded only as editable starting points.
 
-```bash
-GET /api/telegram/daily-schedule?secret=<CRON_SECRET>
-```
+Appointments reserve one shared service lane, including duration and buffer. Schedule mutations use a database row lock to prevent concurrent overlapping bookings across instances. Staff can see/update only their assigned bookings and cannot access financial or marketing reports.
 
-The app computes "today" in `America/Los_Angeles`.
+Outbox delivery states include queued, sent, failed, skipped, cancelled and uncertain. Timeouts are not blindly retried, to avoid duplicate SMS. Check provider logs before resolving an uncertain delivery. Missing integrations are recorded honestly and do not undo successful bookings.
+
+Revenue is net verified payment revenue, not booked estimates. Lifetime customer spend uses the same payment ledger. Phone clicks are not answered calls. Attribution is first-touch within a browser session; manual lead-to-booking conversion retains the lead source. Consent choices and customer activity have separate audit histories.
+
+Production payment collection, live message delivery and external advertising account reporting require business-owned credentials and provider setup. No external campaign is sent merely by deploying this code.
