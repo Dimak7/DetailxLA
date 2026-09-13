@@ -48,11 +48,14 @@ export async function rateLimit(key: string, limit = 20, seconds = 60) {
 }
 export function assertOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (
-    origin &&
-    origin !== new URL(request.url).origin &&
-    origin !== process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "")
-  )
+  const allowed = new Set([
+    new URL(request.url).origin,
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, ""),
+    process.env.RAILWAY_PUBLIC_DOMAIN
+      ? "https://" + process.env.RAILWAY_PUBLIC_DOMAIN
+      : undefined,
+  ]);
+  if (origin && !allowed.has(origin))
     throw new AppError("Invalid request origin.", 403);
   const fetchSite = request.headers.get("sec-fetch-site");
   if (fetchSite === "cross-site")
