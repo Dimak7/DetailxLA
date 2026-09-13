@@ -183,7 +183,50 @@ export default async function Home() {
             View the gallery ↗
           </Link>
         </div>
-        <Gallery items={gallery.slice(0, 6)} />
+        {gallery.length ? (
+          <Gallery items={gallery.slice(0, 6)} />
+        ) : (
+          <div className="detail-desk">
+            <div className="detail-desk-intro">
+              <p className="eyebrow">THE DETAIL DESK</p>
+              <h3>Material. Light. Finish.</h3>
+              <p>
+                Every appointment begins with a close look at the surfaces that
+                make your car feel like yours.
+              </p>
+              <Link className="text-link" href="/booking">
+                Start with your car ↗
+              </Link>
+            </div>
+            <figure className="detail-desk-main">
+              <Image
+                src="/portfolio/red-audi-light-detail.jpg"
+                alt="Close-up of a detailed red vehicle finish"
+                fill
+                sizes="(max-width: 760px) 100vw, 50vw"
+              />
+              <figcaption>01 / Paintwork</figcaption>
+            </figure>
+            <figure className="detail-desk-tall">
+              <Image
+                src="/portfolio/audi-cabin-detail.jpg"
+                alt="Detailed automotive interior"
+                fill
+                sizes="(max-width: 760px) 50vw, 25vw"
+              />
+              <figcaption>02 / Cabin</figcaption>
+            </figure>
+            <figure className="detail-desk-wide">
+              <Image
+                src="/portfolio/black-mercedes-rear.jpg"
+                alt="Polished rear vehicle detail"
+                fill
+                sizes="(max-width: 760px) 50vw, 25vw"
+              />
+              <figcaption>03 / Finish</figcaption>
+            </figure>
+          </div>
+        )}
       </section>
       <section className="steps-section wrap">
         <p className="eyebrow">LESS EFFORT. MORE ENJOYMENT.</p>
