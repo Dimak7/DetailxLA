@@ -189,13 +189,13 @@
   min-height: 70px;
 }
 :root {
-  --ink: #203e35;
-  --paper: #f7f4ee;
-  --white: #fffefa;
-  --muted: #72766d;
-  --line: #dcded4;
-  --sage: #e6ebe1;
-  --gold: #b69361;
+  --ink: #f4f0e8;
+  --paper: #0d0e0e;
+  --white: #171818;
+  --muted: #aaa89f;
+  --line: #30312f;
+  --sage: #1d201e;
+  --gold: #c6a66b;
   --font-sans: var(--font-body);
 }
 * {
@@ -293,8 +293,8 @@ button:disabled {
 .announcement {
   padding: 9px 6%;
   font-size: 10px;
-  background: var(--ink);
-  color: var(--paper);
+  background: #070808;
+  color: var(--gold);
   letter-spacing: 0.08em;
   display: flex;
   justify-content: space-between;
@@ -366,7 +366,9 @@ button:disabled {
   transition: background 0.2s;
 }
 .button:hover {
-  background: #34594b;
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #111;
 }
 .button.light {
   background: var(--paper);
