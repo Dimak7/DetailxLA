@@ -140,14 +140,13 @@ export async function logout(request: Request) {
   if (s) await query("DELETE FROM wl.sessions WHERE id=$1", [s.id]);
 }
 export async function receiptKey() {
-  if (
-    process.env.ADMIN_SESSION_SECRET?.length &&
-    process.env.ADMIN_SESSION_SECRET.length >= 32
-  )
+  if (process.env.BOOKING_TOKEN_SECRET?.length && process.env.BOOKING_TOKEN_SECRET.length >= 32)
+    return process.env.BOOKING_TOKEN_SECRET;
+  if (process.env.ADMIN_SESSION_SECRET?.length && process.env.ADMIN_SESSION_SECRET.length >= 32)
     return process.env.ADMIN_SESSION_SECRET;
   if (process.env.NODE_ENV === "production")
     throw new AppError(
-      "ADMIN_SESSION_SECRET must contain at least 32 characters.",
+      "Booking confirmation signing is temporarily unavailable.",
       503,
     );
   await query(
@@ -166,11 +165,12 @@ export async function receiptToken(id: string) {
     .digest("hex");
 }
 export async function verifyReceipt(id: string, token: string) {
-  const expected = await receiptToken(id);
-  return (
-    /^[a-f0-9]{64}$/.test(token) &&
-    timingSafeEqual(Buffer.from(expected), Buffer.from(token))
-  );
+  if (!/^[a-f0-9]{64}$/.test(token)) return false;
+  const keys = [await receiptKey()];
+  // Keep confirmations issued before BOOKING_TOKEN_SECRET was introduced valid.
+  if (process.env.BOOKING_TOKEN_SECRET && process.env.ADMIN_SESSION_SECRET && process.env.ADMIN_SESSION_SECRET.length >= 32 && process.env.ADMIN_SESSION_SECRET !== process.env.BOOKING_TOKEN_SECRET)
+    keys.push(process.env.ADMIN_SESSION_SECRET);
+  return keys.some((key) => timingSafeEqual(Buffer.from(createHmac("sha256", key).update("receipt:" + id).digest("hex")), Buffer.from(token)));
 }
 export async function createReset(email: string, ip: string) {
   await rateLimit("reset:" + ip, 8, 900);
