@@ -1027,6 +1027,47 @@ textarea.control {
   grid-template-columns: minmax(0, 1fr) 310px;
   gap: 25px;
 }
+.booking-main {
+  --booking-line: #3c423f;
+  --booking-text: #f7f4ed;
+  --booking-muted: #b5b8b1;
+  --booking-accent: #d3ae6a;
+  background: linear-gradient(145deg, #191c1b, #111313 55%);
+  border: 1px solid var(--booking-line);
+  box-shadow: 0 22px 65px #00000042;
+  color: var(--booking-text);
+}
+.booking-main h2, .booking-main h3, .booking-main p, .booking-main .field > span { color: var(--booking-text); }
+.booking-main > p, .booking-main .small-note { color: var(--booking-muted); }
+.booking-main .field input, .booking-main .field select, .booking-main .field textarea { background: #0d0f0f; border: 1px solid #535b56; border-radius: 6px; color: #fffdf7; caret-color: var(--booking-accent); }
+.booking-main .field input::placeholder, .booking-main .field textarea::placeholder { color: #9fa49e; }
+.booking-main .field input:focus, .booking-main .field select:focus, .booking-main .field textarea:focus { outline: 2px solid var(--booking-accent); outline-offset: 2px; border-color: var(--booking-accent); }
+.booking-main .button { background: var(--booking-accent); border-color: var(--booking-accent); color: #101110; letter-spacing: .08em; }
+.booking-main .button.outline { background: transparent; border-color: #59615b; color: var(--booking-text); letter-spacing: normal; }
+.booking-main .button:disabled { opacity: .55; cursor: not-allowed; }
+.booking-main .booking-progress { border-bottom: 1px solid var(--booking-line); padding-bottom: 18px; }
+.booking-main .booking-progress span { border-color: #535a55; color: #aeb3ac; }
+.booking-main .booking-progress .active { border-color: var(--booking-accent); color: #fffdf7; }
+.booking-checkout-header { margin-bottom: 22px; }
+.booking-checkout-header h2 { margin-bottom: 9px; }
+.booking-review { padding: 19px; margin: 20px 0 25px; border: 1px solid #555d56; border-radius: 8px; background: linear-gradient(135deg, #242924, #171a18); }
+.booking-review .eyebrow { color: var(--booking-accent); margin-bottom: 12px; }
+.booking-review-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 18px; align-items: end; }
+.booking-review-grid > div { display: grid; gap: 2px; }
+.booking-review-grid span { color: var(--booking-muted); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.booking-review-grid strong { font-size: 16px; color: #fffdf7; }
+.booking-review-grid small { color: #d1d4ce; font-size: 12px; }
+.booking-review-price { text-align: right; }
+.booking-review-price strong { color: var(--booking-accent); font-family: var(--font-display); font-size: 30px; line-height: 1; }
+.booking-details-heading { margin: 2px 0 17px; color: var(--booking-accent) !important; font-family: var(--font-body); font-size: 11px; letter-spacing: .15em; }
+.booking-consents { display: grid; gap: 10px; margin-top: 8px; }
+.booking-consent { display: flex; gap: 12px; align-items: flex-start; padding: 13px; border: 1px solid #464d48; border-radius: 6px; color: var(--booking-muted); font-size: 12px; line-height: 1.55; }
+.booking-consent.required { border-color: #897043; background: #292419; }
+.booking-consent input { width: 18px; height: 18px; margin: 1px 0 0; flex: 0 0 auto; accent-color: var(--booking-accent); }
+.booking-consent span { display: grid; gap: 3px; }
+.booking-consent strong { color: #fffdf7; font-size: 12px; }
+.booking-consent .text-link { color: #f0cc88; border-color: #a8844a; display: inline; padding: 0; font-size: inherit; }
+.booking-main .error-message { background: #351b18; border-left-color: #ed846f; color: #ffe3dc; }
 .booking-progress {
   display: flex;
   gap: 10px;
@@ -2175,6 +2216,12 @@ td small {
   .skip-link {
     font-size: 12px;
   }
+}
+@media (max-width: 760px) {
+  .booking-review-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
+  .booking-review-price { grid-column: 1 / -1; text-align: left; border-top: 1px solid #444b46; padding-top: 12px; }
+  .booking-review-price strong { font-size: 28px; }
+  .booking-consent { padding: 12px; font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * {

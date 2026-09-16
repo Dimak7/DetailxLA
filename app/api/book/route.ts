@@ -30,6 +30,10 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (e) {
+    console.error(
+      "Public booking request failed",
+      e instanceof Error ? e.message : "Unknown error",
+    );
     return apiError(e);
   }
 }

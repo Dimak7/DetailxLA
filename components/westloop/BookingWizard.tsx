@@ -154,7 +154,9 @@ export function BookingWizard({
       const result = await res.json();
       if (!res.ok || result.ok === false)
         throw Error(
-          result.error || "We couldn't reserve this time. Please try again.",
+          admin
+            ? result.error || "We couldn't reserve this time. Please try again."
+            : "Something went wrong while creating your appointment. Please try again.",
         );
       if (admin) {
         onComplete?.();
@@ -172,9 +174,9 @@ export function BookingWizard({
       window.location.assign(result.confirmation_url);
     } catch (e) {
       setError(
-        e instanceof Error
+        admin && e instanceof Error
           ? e.message
-          : "Something went wrong. Please try again.",
+          : "Something went wrong while creating your appointment. Please try again.",
       );
     } finally {
       setBusy(false);
@@ -229,7 +231,7 @@ export function BookingWizard({
               key={s}
               aria-current={i === step ? "step" : undefined}
             >
-              0{i + 1} / {s}
+              0{i + 1} {s}
             </span>
           ))}
         </div>
@@ -357,8 +359,20 @@ export function BookingWizard({
         )}
         {step === 3 && (
           <>
-            <h2>Almost yours.</h2>
-            <p>Review your appointment and add your contact details.</p>
+            <div className="booking-checkout-header">
+              <p className="eyebrow">CREATE APPOINTMENT</p>
+              <h2>Almost yours.</h2>
+              <p>Review your appointment and add your contact details.</p>
+            </div>
+            <section className="booking-review" aria-label="Your appointment">
+              <p className="eyebrow">YOUR APPOINTMENT</p>
+              <div className="booking-review-grid">
+                <div><span>Care</span><strong>{service?.name}</strong><small>{draft.vehicle_type}</small></div>
+                <div><span>When</span><strong>{draft.date}</strong><small>{timeLabel(draft.start_minute)} CT</small></div>
+                <div className="booking-review-price"><span>{service?.pricing_mode === "starting" ? "Starting at" : "Your estimate"}</span><strong>{money(price)}</strong></div>
+              </div>
+            </section>
+            <h3 className="booking-details-heading">YOUR DETAILS</h3>
             <div className="form-grid">
               {field("First name", "first_name")}
               {field("Last name", "last_name")}
@@ -378,68 +392,11 @@ export function BookingWizard({
                 />
               </label>
             </div>
-            <div className="paper">
-              <strong>
-                {service?.name} · {draft.vehicle_type}
-              </strong>
-              <p>
-                {draft.year} {draft.make} {draft.model}
-                <br />
-                {draft.date} at {timeLabel(draft.start_minute)} CT
-              </p>
-              <p>
-                {service?.pricing_mode === "starting"
-                  ? "Starting price: "
-                  : "Price: "}
-                {money(price)}
-                {price !== null && business.deposit_percent > 0
-                  ? " · Deposit: " +
-                    money(Math.round((price * business.deposit_percent) / 100))
-                  : ""}
-              </p>
+            <div className="booking-consents">
+              <label className="booking-consent optional"><input type="checkbox" checked={draft.marketing_email} onChange={(e) => set("marketing_email", e.target.checked)} /><span><strong>Optional email offers</strong>I would like offers and care tips by email.</span></label>
+              <label className="booking-consent optional"><input type="checkbox" checked={draft.marketing_sms} onChange={(e) => set("marketing_sms", e.target.checked)} /><span><strong>Optional promotional texts</strong>I agree to recurring promotional texts. Consent is optional and not a condition of purchase. Message and data rates may apply. Reply STOP to opt out.</span></label>
+              <label className="booking-consent required"><input type="checkbox" required checked={draft.terms} onChange={(e) => set("terms", e.target.checked)} /><span><strong>Required to reserve</strong>{admin ? "The customer agrees to" : "I agree to"} the <a className="text-link" href="/service-rules" target="_blank">service terms</a> and <a className="text-link" href="/privacy-notice" target="_blank">privacy notice</a>, and to appointment-related messages.</span></label>
             </div>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={draft.marketing_email}
-                onChange={(e) => set("marketing_email", e.target.checked)}
-              />
-              <span>
-                I would like offers and care tips by email. I can unsubscribe at
-                any time.
-              </span>
-            </label>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={draft.marketing_sms}
-                onChange={(e) => set("marketing_sms", e.target.checked)}
-              />
-              <span>
-                I agree to recurring promotional texts. Consent is optional and
-                not a condition of purchase. Message and data rates may apply.
-                Reply STOP to opt out.
-              </span>
-            </label>
-            <label className="check">
-              <input
-                type="checkbox"
-                required
-                checked={draft.terms}
-                onChange={(e) => set("terms", e.target.checked)}
-              />
-              <span>
-                {admin ? "The customer agrees to" : "I agree to"} the{" "}
-                <a className="text-link" href="/service-rules" target="_blank">
-                  service terms
-                </a>{" "}
-                and{" "}
-                <a className="text-link" href="/privacy-notice" target="_blank">
-                  privacy notice
-                </a>
-                , and to appointment-related messages.
-              </span>
-            </label>
           </>
         )}
         {error && (
@@ -467,7 +424,7 @@ export function BookingWizard({
             {busy
               ? "Reserving..."
               : step === 3
-                ? "Confirm appointment"
+                ? "CONFIRM APPOINTMENT"
                 : "Continue"}{" "}
             <span>↗</span>
           </button>
