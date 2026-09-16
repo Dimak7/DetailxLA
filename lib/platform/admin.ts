@@ -285,6 +285,7 @@ const actionSections: Record<string, string> = {
   save_employee: "employees",
   save_shift: "schedule",
   delete_shift: "schedule",
+  generate_schedule: "schedule",
 };
 export async function adminAction(action: string, raw: unknown, user: Session) {
   const section = actionSections[action];
@@ -306,6 +307,13 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     await query("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,break_minutes,status,notes,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(id) DO UPDATE SET employee_id=$2,shift_date=$3,start_minute=$4,end_minute=$5,break_minutes=$6,status=$7,notes=$8,updated_at=now()", [shift.id || randomUUID(),shift.employee_id,shift.shift_date,shift.start_minute,shift.end_minute,shift.break_minutes,shift.status,shift.notes,user.user_id]);
   }
   if (action === "delete_shift") await query("DELETE FROM wl.employee_shifts WHERE id=$1 AND published=false", [uuid.parse(data.id)]);
+  if (action === "generate_schedule") {
+    const g = z.object({ week: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), start_minute: z.number().int().min(0).max(1439).default(480), end_minute: z.number().int().min(1).max(1440).default(960) }).parse(data);
+    if (g.end_minute <= g.start_minute) throw new AppError("Business hours are invalid.");
+    const employees = await query<{ id:string }>("SELECT id FROM wl.employees WHERE active=true");
+    const availability = await query<{employee_id:string;weekday:number;available:boolean;start_minute:number;end_minute:number}>("SELECT * FROM wl.employee_availability WHERE available=true");
+    await transaction(async q => { for (let day=0; day<7; day++) for (const e of employees) { const a=availability.find(x=>x.employee_id===e.id&&x.weekday===day); if (!a) continue; const date=(await q<{d:string}>("SELECT ($1::date+$2)::text d",[g.week,day])).rows[0].d; await q("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,status,created_by) SELECT $1,$2,$3,$4,$5,'scheduled',$6 WHERE NOT EXISTS(SELECT 1 FROM wl.employee_shifts WHERE employee_id=$2 AND shift_date=$3)",[randomUUID(),e.id,date,Math.max(g.start_minute,a.start_minute),Math.min(g.end_minute,a.end_minute),user.user_id]); } });
+  }
   if (action === "save_service") {
     const s = serviceSchema.parse(data),
       id = s.id || randomUUID();
