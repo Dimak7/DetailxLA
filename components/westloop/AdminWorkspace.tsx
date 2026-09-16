@@ -359,6 +359,10 @@ export function AdminWorkspace({
       ],
     );
   }
+  function employeeEdit(r: R = {}) {
+    const availability = Array.isArray(r.availability) ? r.availability : Array.from({ length: 7 }, (_, weekday) => ({ weekday, available: weekday > 0 && weekday < 6, start_minute: 480, end_minute: 1020 }));
+    edit("Employee", "save_employee", { name: "", phone: "", email: "", position: "Detailer", hourly_rate_cents: 20, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number"), f("email", "Email", "email"), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"] }), f("hourly_rate_cents", "Hourly pay ($)", "money"), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, hourly_rate_cents: Math.round(Number(d.hourly_rate_cents) * 100), hire_date: d.hire_date || null, availability }));
+  }
   function templateEdit(r: R) {
     edit("Edit " + title(s(r.key)) + " template", "save_template", r, [
       f("subject", "Subject", "text", { required: true, wide: true }),

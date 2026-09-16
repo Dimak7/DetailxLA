@@ -101,6 +101,8 @@ CREATE TABLE IF NOT EXISTS wl.employees (
  id uuid PRIMARY KEY, user_id uuid UNIQUE REFERENCES wl.users(id), phone text NOT NULL DEFAULT '', position text NOT NULL DEFAULT 'Other',
  hourly_rate_cents integer NOT NULL DEFAULT 0 CHECK(hourly_rate_cents >= 0), hire_date text, notes text NOT NULL DEFAULT '', avatar_url text NOT NULL DEFAULT '',
  active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '';
+ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS email text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS wl.employee_availability (
  employee_id uuid NOT NULL REFERENCES wl.employees(id) ON DELETE CASCADE, weekday integer NOT NULL CHECK(weekday BETWEEN 0 AND 6),
  available boolean NOT NULL DEFAULT false, start_minute integer NOT NULL DEFAULT 480 CHECK(start_minute BETWEEN 0 AND 1439), end_minute integer NOT NULL DEFAULT 1020 CHECK(end_minute BETWEEN 0 AND 1440),

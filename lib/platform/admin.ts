@@ -90,6 +90,16 @@ export async function adminData(
     return {
       rows: await query("SELECT * FROM wl.services ORDER BY sort_order,name"),
     };
+  if (section === "employees") {
+    const week = p.get("week") || (await import("./types")).dateToday();
+    return {
+      rows: await query(
+        `SELECT e.*,COALESCE((SELECT SUM(s.end_minute-s.start_minute-s.break_minutes) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text AND s.status='scheduled'),0)::int scheduled_minutes,
+         (SELECT min(s.shift_date) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND s.status='scheduled') next_shift
+         FROM wl.employees e ORDER BY e.active DESC,e.name`, [week]),
+      availability: await query("SELECT * FROM wl.employee_availability ORDER BY employee_id,weekday"),
+    };
+  }
   if (section === "gallery")
     return {
       rows: await query("SELECT * FROM wl.gallery ORDER BY sort_order"),
@@ -268,12 +278,22 @@ const actionSections: Record<string, string> = {
   publish_review: "reviews",
   request_review: "reviews",
   create_payment: "payments",
+  save_employee: "employees",
 };
 export async function adminAction(action: string, raw: unknown, user: Session) {
   const section = actionSections[action];
   if (!section || !access[section]?.includes(user.role))
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
+  if (action === "save_employee") {
+    const e = z.object({ id: uuid.optional(), name: z.string().trim().min(2).max(100), phone: z.string().max(30), email: z.union([z.email(), z.literal("")]), position: z.string().min(2).max(80), hourly_rate_cents: z.number().int().min(0), hire_date: z.string().max(10).nullable(), notes: txt, active: z.boolean(), availability: z.array(z.object({ weekday: z.number().int().min(0).max(6), available: z.boolean(), start_minute: z.number().int().min(0).max(1439), end_minute: z.number().int().min(1).max(1440) })).length(7) }).parse(data);
+    const id = e.id || randomUUID();
+    await transaction(async (q) => {
+      await q("INSERT INTO wl.employees(id,name,email,phone,position,hourly_rate_cents,hire_date,notes,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(id) DO UPDATE SET name=$2,email=$3,phone=$4,position=$5,hourly_rate_cents=$6,hire_date=$7,notes=$8,active=$9,updated_at=now()", [id,e.name,e.email,e.phone,e.position,e.hourly_rate_cents,e.hire_date,e.notes,e.active]);
+      for (const a of e.availability) await q("INSERT INTO wl.employee_availability(employee_id,weekday,available,start_minute,end_minute) VALUES($1,$2,$3,$4,$5) ON CONFLICT(employee_id,weekday) DO UPDATE SET available=$3,start_minute=$4,end_minute=$5",[id,a.weekday,a.available,a.start_minute,a.end_minute]);
+    });
+    return { id };
+  }
   if (action === "save_service") {
     const s = serviceSchema.parse(data),
       id = s.id || randomUUID();
