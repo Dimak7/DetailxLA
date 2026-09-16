@@ -964,6 +964,28 @@ textarea.control {
 .form-grid .wide {
   grid-column: 1/-1;
 }
+
+.availability-editor {
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+.availability-day {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(105px, 130px) auto minmax(105px, 130px);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--paper) 88%, var(--ink));
+}
+.availability-day label { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.availability-day input[type="checkbox"] { width: auto; }
+@media (max-width: 620px) {
+  .availability-day { grid-template-columns: 1fr 1fr; }
+  .availability-day label { grid-column: 1 / -1; }
+}
 .check {
   display: flex;
   gap: 10px;

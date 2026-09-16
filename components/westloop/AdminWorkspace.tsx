@@ -72,6 +72,9 @@ export function AdminWorkspace({
     [busy, setBusy] = useState(false);
   const list = rows(data.rows),
     team = rows(data.team),
+    employeeAvailability = rows(data.availability),
+    scheduleEmployees = rows(data.employees),
+    scheduleShifts = rows(data.shifts),
     staff = user.role === "staff";
   const teamOptions = [
     { value: "", label: "Unassigned" },
@@ -91,6 +94,21 @@ export function AdminWorkspace({
       if (result?.customer_id)
         router.push("/admin/customers?id=" + s(result.customer_id));
       return result;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function clock(clockAction: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/employee/clock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: clockAction }) });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error || "Time clock could not be updated.");
+      setNotice("Time clock updated.");
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Please try again.");
     } finally {
@@ -361,7 +379,10 @@ export function AdminWorkspace({
   }
   function employeeEdit(r: R = {}) {
     const availability = Array.isArray(r.availability) ? r.availability : Array.from({ length: 7 }, (_, weekday) => ({ weekday, available: weekday > 0 && weekday < 6, start_minute: 480, end_minute: 1020 }));
-    edit("Employee", "save_employee", { name: "", phone: "", email: "", position: "Detailer", hourly_rate_cents: 20, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number"), f("email", "Email", "email"), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"] }), f("hourly_rate_cents", "Hourly pay ($)", "money"), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, hourly_rate_cents: Math.round(Number(d.hourly_rate_cents) * 100), hire_date: d.hire_date || null, availability }));
+    edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", hourly_rate_cents: 20, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : "Login password (12+ characters)", "password", { required: !r.user_id }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"] }), f("hourly_rate_cents", "Hourly pay ($)", "money"), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, hire_date: d.hire_date || null }));
+  }
+  function shiftEdit(r: R = {}) {
+    edit(r.id ? "Edit shift" : "Add shift", "save_shift", { employee_id: scheduleEmployees[0]?.id || "", shift_date: s(data.week) || dateToday(), start_minute: 540, end_minute: 1020, break_minutes: 30, status: "scheduled", notes: "", ...r }, [f("employee_id", "Employee", "select", { required: true, options: scheduleEmployees.map((employee) => ({ value: s(employee.id), label: s(employee.name) + " - " + s(employee.position) })) }), f("shift_date", "Shift date", "date", { required: true }), f("start_minute", "Start time (minutes after midnight)", "number", { min: 0, max: 1439, hint: "540 = 9:00 AM" }), f("end_minute", "End time (minutes after midnight)", "number", { min: 1, max: 1440, hint: "1020 = 5:00 PM" }), f("break_minutes", "Unpaid break (minutes)", "number", { min: 0, max: 720 }), f("status", "Status", "select", { options: ["scheduled", "off", "pto", "sick"] }), f("notes", "Manager notes", "textarea", { wide: true })]);
   }
   function templateEdit(r: R) {
     edit("Edit " + title(s(r.key)) + " template", "save_template", r, [
@@ -649,8 +670,44 @@ export function AdminWorkspace({
       {section === "employees" && (
         <section className="paper">
           <div className="section-heading"><div><p className="eyebrow">TEAM</p><h2>{list.filter((r) => r.active).length} active employees</h2></div><button className="button" onClick={() => employeeEdit()}>Add employee +</button></div>
-          {table(["Employee", "Role", "Phone", "Status", "Rate", "This week", "Actions"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>, s(r.position), s(r.phone) || "Not set", status(r.active ? "active" : "inactive"), money(n(r.hourly_rate_cents)), (n(r.scheduled_minutes) / 60).toFixed(1) + "h", <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100 })}>Edit</button>]))}
+          <p className="small-note">Each employee gets a separate staff login and can only view their own schedule and time clock.</p>
+          {table(["Employee", "Role", "Phone", "Status", "Rate", "This week", "Actions"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>, s(r.position), s(r.phone) || "Not set", status(r.active ? "active" : "inactive"), money(n(r.hourly_rate_cents)), (n(r.scheduled_minutes) / 60).toFixed(1) + "h", <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit</button>]))}
         </section>
+      )}
+      {section === "schedule" && (
+        <>
+          <section className="paper">
+            <div className="section-heading"><div><p className="eyebrow">WEEKLY ROSTER</p><h2>Schedule week of {s(data.week)}</h2></div><div className="button-row"><button className="button" disabled={busy || !scheduleEmployees.length} onClick={() => run("generate_schedule", { week: s(data.week), start_minute: 540, end_minute: 1020 }, "Draft shifts created from availability.")}>Generate week</button><button disabled={busy} onClick={() => run("publish_schedule", { week: s(data.week) }, "Schedule published. Notification status is recorded below.")}>Publish schedule</button><button onClick={() => shiftEdit()} disabled={!scheduleEmployees.length}>Add shift +</button></div></div>
+            <form className="toolbar"><label className="field"><span>Week starts</span><input name="week" type="date" defaultValue={s(data.week)} /></label><button className="button">Load week</button></form>
+            {table(["Date", "Employee", "Shift", "Break", "Status", "Published", "Actions"], scheduleShifts.map((r) => [s(r.shift_date), <><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, timeLabel(n(r.start_minute)) + " - " + timeLabel(n(r.end_minute)), n(r.break_minutes) + " min", status(r.status), r.published ? "Yes" : "Draft", <><button onClick={() => shiftEdit(r)}>Edit</button>{!r.published && <button disabled={busy} onClick={() => run("delete_shift", { id: r.id }, "Draft shift removed.")}>Delete</button>}</>]))}
+          </section>
+          <section className="paper"><div className="section-heading"><div><p className="eyebrow">BOOKING DEMAND</p><h2>Appointments this week</h2></div></div>{table(["Date", "Bookings"], rows(data.workload).map((r) => [s(r.booking_date), s(r.bookings)]))}</section>
+          <section className="paper"><div className="section-heading"><div><p className="eyebrow">PUBLISH STATUS</p><h2>Employee notifications</h2></div></div>{table(["Employee", "Channel", "Status", "Details"], rows(data.notifications).map((r) => [s(r.name), s(r.channel).toUpperCase(), status(r.status), s(r.error) || "Queued for delivery"]))}{!(data.integrations as R | undefined)?.sms && <p className="small-note">SMS is not configured. Add the Twilio account SID, auth token, and sending number in Settings → Notifications before publishing a future schedule.</p>}</section>
+        </>
+      )}
+      {section === "hours" && (
+        <section className="paper">
+          <div className="section-heading"><div><p className="eyebrow">TIME REVIEW</p><h2>Actual worked hours</h2></div></div>
+          <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Load hours</button></form>
+          {table(["Employee", "Clock in", "Clock out", "Break", "Worked", "Approval"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "Currently clocked in", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h", r.approved ? "Approved" : <button disabled={busy || !r.clock_out} onClick={() => run("approve_time", { id: r.id }, "Time entry approved.")}>Approve</button>]))}
+        </section>
+      )}
+      {section === "payroll" && (
+        <section className="paper">
+          <div className="section-heading"><div><p className="eyebrow">PAYROLL ESTIMATE</p><h2>Worked hours and estimated gross pay</h2></div><a className="button" href={`/api/manage?section=payroll&export=csv&start=${encodeURIComponent(s(data.start))}&end=${encodeURIComponent(s(data.end))}`}>Export CSV</a></div>
+          <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
+          <p className="small-note">Overtime is estimated after 40 worked hours in the selected period at 1.5x. This is a planning estimate, not a tax filing or payroll disbursement.</p>
+          {table(["Employee", "Regular", "Overtime", "Rate", "Estimated gross"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, (n(r.regular_minutes) / 60).toFixed(2) + "h", (n(r.overtime_minutes) / 60).toFixed(2) + "h", money(n(r.hourly_rate_cents)), money(n(r.estimated_gross_cents))]))}
+        </section>
+      )}
+      {section === "my_schedule" && (
+        <>
+          <section className="paper"><div className="section-heading"><div><p className="eyebrow">MY WORKSPACE</p><h2>{s((data.employee as R | undefined)?.name)}'s schedule</h2></div></div>
+            {(() => { const active = rows(data.entries).find((entry) => !entry.clock_out); return <div className="button-row">{!active ? <button className="button" disabled={busy} onClick={() => clock("in")}>Clock in</button> : <><button disabled={busy || Boolean(active.break_started_at)} onClick={() => clock("break_start")}>Start break</button><button disabled={busy || !active.break_started_at} onClick={() => clock("break_end")}>End break</button><button className="button" disabled={busy || Boolean(active.break_started_at)} onClick={() => clock("out")}>Clock out</button></>}</div>; })()}
+            {table(["Date", "Shift", "Break", "Notes"], rows(data.shifts).map((r) => [s(r.shift_date), timeLabel(n(r.start_minute)) + " - " + timeLabel(n(r.end_minute)), n(r.break_minutes) + " min", s(r.notes) || "-"]))}
+          </section>
+          <section className="paper"><h2>Recent time entries</h2>{table(["Clock in", "Clock out", "Break", "Worked"], rows(data.entries).map((r) => [stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "In progress", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h"]))}</section>
+        </>
       )}
       {reportMode && rep && (
         <>

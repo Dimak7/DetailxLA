@@ -26,6 +26,7 @@ import {
   handleStripeEvent,
 } from "../lib/integrations/payments";
 import type { Service, Session } from "../lib/platform/types";
+import { POST as employeeClock } from "../app/api/employee/clock/route";
 process.env.PGLITE_PATH = "memory://";
 delete process.env.DATABASE_URL;
 process.env.ADMIN_EMAIL = "owner@example.test";
@@ -370,6 +371,53 @@ test("Relational platform integration", async (t) => {
         );
       },
     );
+    await t.test("employee scheduling, self-service time clock, hours and payroll work end to end", async () => {
+      const sunday = new Date();
+      sunday.setUTCDate(sunday.getUTCDate() + ((7 - sunday.getUTCDay()) % 7));
+      const week = sunday.toISOString().slice(0, 10);
+      const availability = Array.from({ length: 7 }, (_, weekday) => ({
+        weekday,
+        available: true,
+        start_minute: 480,
+        end_minute: 1080,
+      }));
+      const created = await adminAction("save_employee", {
+        name: "John Smith",
+        email: "john.smith@example.test",
+        phone: "+13125550124",
+        password: "John-test-password-4821",
+        position: "Detailer",
+        hourly_rate_cents: 2500,
+        max_weekly_minutes: 2400,
+        hire_date: week,
+        notes: "Test employee",
+        active: true,
+        availability,
+      }, owner!);
+      const employeeId = String((created as { id: string }).id);
+      const johnToken = await login("john.smith@example.test", "John-test-password-4821", "john");
+      const john = await sessionFromToken(johnToken);
+      assert.ok(john);
+      assert.equal((await query<{ user_id: string }>("SELECT user_id FROM wl.employees WHERE id=$1", [employeeId]))[0].user_id, john!.user_id);
+      await adminAction("generate_schedule", { week, start_minute: 540, end_minute: 1020 }, owner!);
+      const draft = (await query<{ id: string; employee_id: string; shift_date: string; start_minute: number; end_minute: number; break_minutes: number; status: string }>("SELECT * FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date=$2", [employeeId, week]))[0];
+      assert.ok(draft);
+      await adminAction("save_shift", { ...draft, notes: "Bring detailing kit" }, owner!);
+      await adminAction("publish_schedule", { week }, owner!);
+      assert.equal((await query<{ published: boolean }>("SELECT published FROM wl.employee_shifts WHERE id=$1", [draft.id]))[0].published, true);
+      assert.equal((await query<{ status: string; error: string }>("SELECT status,error FROM wl.schedule_notifications WHERE employee_id=$1 AND week_start=$2", [employeeId, week]))[0].status, "skipped");
+      const schedule = await adminData("my_schedule", new URLSearchParams(), john!);
+      assert.ok((schedule.shifts as unknown[]).length > 0);
+      const request = (action: string) => new Request("http://localhost/api/employee/clock", { method: "POST", headers: { origin: "http://localhost", cookie: "wl_session=" + johnToken, "content-type": "application/json" }, body: JSON.stringify({ action }) });
+      assert.equal((await employeeClock(request("in"))).status, 200);
+      await query("UPDATE wl.time_entries SET clock_in=now()-interval '2 hours' WHERE employee_id=$1 AND clock_out IS NULL", [employeeId]);
+      assert.equal((await employeeClock(request("out"))).status, 200);
+      const period = new URLSearchParams({ start: "2000-01-01", end: "2100-01-01" });
+      const hours = await adminData("hours", period, owner!);
+      assert.ok((hours.rows as Array<Record<string, unknown>>).some((entry) => entry.name === "John Smith" && Number(entry.worked_minutes) >= 119));
+      const payroll = await adminData("payroll", period, owner!);
+      assert.ok((payroll.rows as Array<Record<string, unknown>>).some((entry) => entry.name === "John Smith" && Number(entry.estimated_gross_cents) >= 4900));
+    });
     await t.test("password reset is one use and revokes sessions", async () => {
       const token = await createReset("owner@example.test", "reset-test");
       assert.ok(token);

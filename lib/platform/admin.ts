@@ -102,7 +102,22 @@ export async function adminData(
   }
   if (section === "schedule") {
     const week = p.get("week") || (await import("./types")).dateToday();
-    return { week, employees: await query("SELECT * FROM wl.employees WHERE active=true ORDER BY name"), shifts: await query("SELECT s.*,e.name,e.position FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text ORDER BY s.shift_date,s.start_minute", [week]), availability: await query("SELECT * FROM wl.employee_availability"), workload: await query("SELECT booking_date,count(*)::int bookings FROM wl.bookings WHERE booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND status NOT IN ('cancelled','no_show') GROUP BY booking_date", [week]) };
+    return { week, employees: await query("SELECT * FROM wl.employees WHERE active=true ORDER BY name"), shifts: await query("SELECT s.*,e.name,e.position FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text ORDER BY s.shift_date,s.start_minute", [week]), availability: await query("SELECT * FROM wl.employee_availability"), workload: await query("SELECT booking_date,count(*)::int bookings FROM wl.bookings WHERE booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND status NOT IN ('cancelled','no_show') GROUP BY booking_date", [week]), notifications: await query("SELECT n.*,e.name FROM wl.schedule_notifications n JOIN wl.employees e ON e.id=n.employee_id WHERE n.week_start=$1 ORDER BY n.created_at DESC", [week]), integrations: await integrationStatus() };
+  }
+  if (section === "hours") {
+    const end = p.get("end") || (await import("./types")).dateToday();
+    const start = p.get("start") || end;
+    return { start, end, rows: await query(`SELECT t.*,e.name,e.position, GREATEST(0,round(EXTRACT(EPOCH FROM (COALESCE(t.clock_out,now())-t.clock_in))/60)-t.break_minutes)::int worked_minutes FROM wl.time_entries t JOIN wl.employees e ON e.id=t.employee_id WHERE (t.clock_in AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date ORDER BY t.clock_in DESC`, [start,end]) };
+  }
+  if (section === "payroll") {
+    const end = p.get("end") || (await import("./types")).dateToday();
+    const start = p.get("start") || end;
+    return { start, end, rows: await query(`WITH worked AS (SELECT e.id,e.name,e.position,e.hourly_rate_cents,COALESCE(SUM(GREATEST(0,round(EXTRACT(EPOCH FROM (COALESCE(t.clock_out,now())-t.clock_in))/60)-t.break_minutes)),0)::int minutes FROM wl.employees e LEFT JOIN wl.time_entries t ON t.employee_id=e.id AND (t.clock_in AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date GROUP BY e.id) SELECT *,LEAST(minutes,2400)::int regular_minutes,GREATEST(minutes-2400,0)::int overtime_minutes,(LEAST(minutes,2400)*hourly_rate_cents/60 + GREATEST(minutes-2400,0)*hourly_rate_cents*1.5/60)::int estimated_gross_cents FROM worked WHERE minutes>0 ORDER BY name`, [start,end]) };
+  }
+  if (section === "my_schedule") {
+    const employee = (await query<{ id: string; name: string; position: string }>("SELECT id,name,position FROM wl.employees WHERE user_id=$1 AND active=true", [user.user_id]))[0];
+    if (!employee) throw new AppError("No employee profile is linked to this account.", 403);
+    return { employee, shifts: await query("SELECT * FROM wl.employee_shifts WHERE employee_id=$1 AND published=true AND shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') ORDER BY shift_date,start_minute", [employee.id]), entries: await query("SELECT *,GREATEST(0,round(EXTRACT(EPOCH FROM (COALESCE(clock_out,now())-clock_in))/60)-break_minutes)::int worked_minutes FROM wl.time_entries WHERE employee_id=$1 ORDER BY clock_in DESC LIMIT 50", [employee.id]) };
   }
   if (section === "gallery")
     return {
@@ -287,6 +302,7 @@ const actionSections: Record<string, string> = {
   delete_shift: "schedule",
   generate_schedule: "schedule",
   publish_schedule: "schedule",
+  approve_time: "hours",
 };
 export async function adminAction(action: string, raw: unknown, user: Session) {
   const section = actionSections[action];
@@ -294,10 +310,20 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
   if (action === "save_employee") {
-    const e = z.object({ id: uuid.optional(), name: z.string().trim().min(2).max(100), phone: z.string().max(30), email: z.union([z.email(), z.literal("")]), position: z.string().min(2).max(80), hourly_rate_cents: z.number().int().min(0), hire_date: z.string().max(10).nullable(), notes: txt, active: z.boolean(), availability: z.array(z.object({ weekday: z.number().int().min(0).max(6), available: z.boolean(), start_minute: z.number().int().min(0).max(1439), end_minute: z.number().int().min(1).max(1440) })).length(7) }).parse(data);
+    const e = z.object({ id: uuid.optional(), name: z.string().trim().min(2).max(100), phone: z.string().min(7).max(30), email: z.email(), password: z.string().max(128).optional(), position: z.string().min(2).max(80), hourly_rate_cents: z.number().int().min(0), max_weekly_minutes: z.number().int().min(60).max(10080).default(2400), hire_date: z.string().max(10).nullable(), notes: txt, active: z.boolean(), availability: z.array(z.object({ weekday: z.number().int().min(0).max(6), available: z.boolean(), start_minute: z.number().int().min(0).max(1439), end_minute: z.number().int().min(1).max(1440) })).length(7) }).parse(data);
     const id = e.id || randomUUID();
     await transaction(async (q) => {
-      await q("INSERT INTO wl.employees(id,name,email,phone,position,hourly_rate_cents,hire_date,notes,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(id) DO UPDATE SET name=$2,email=$3,phone=$4,position=$5,hourly_rate_cents=$6,hire_date=$7,notes=$8,active=$9,updated_at=now()", [id,e.name,e.email,e.phone,e.position,e.hourly_rate_cents,e.hire_date,e.notes,e.active]);
+      const existing = e.id ? (await q<{ user_id: string | null }>("SELECT user_id FROM wl.employees WHERE id=$1 FOR UPDATE", [id])).rows[0] : undefined;
+      if (e.id && !existing) throw new AppError("Employee not found.", 404);
+      let userId = existing?.user_id || null;
+      if (!userId) {
+        if (!e.password || e.password.length < 12) throw new AppError("Set an employee login password of at least 12 characters.");
+        userId = randomUUID();
+        await q("INSERT INTO wl.users(id,name,email,password_hash,role,active) VALUES($1,$2,$3,$4,'staff',$5)", [userId,e.name,e.email.toLowerCase(),passwordHash(e.password),e.active]);
+      } else {
+        await q("UPDATE wl.users SET name=$1,email=$2,active=$3,password_hash=CASE WHEN $4<>'' THEN $5 ELSE password_hash END,updated_at=now() WHERE id=$6", [e.name,e.email.toLowerCase(),e.active,e.password || "",e.password ? passwordHash(e.password) : "",userId]);
+      }
+      await q("INSERT INTO wl.employees(id,user_id,name,email,phone,position,hourly_rate_cents,max_weekly_minutes,hire_date,notes,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(id) DO UPDATE SET user_id=$2,name=$3,email=$4,phone=$5,position=$6,hourly_rate_cents=$7,max_weekly_minutes=$8,hire_date=$9,notes=$10,active=$11,updated_at=now()", [id,userId,e.name,e.email,e.phone,e.position,e.hourly_rate_cents,e.max_weekly_minutes,e.hire_date,e.notes,e.active]);
       for (const a of e.availability) await q("INSERT INTO wl.employee_availability(employee_id,weekday,available,start_minute,end_minute) VALUES($1,$2,$3,$4,$5) ON CONFLICT(employee_id,weekday) DO UPDATE SET available=$3,start_minute=$4,end_minute=$5",[id,a.weekday,a.available,a.start_minute,a.end_minute]);
     });
     return { id };
@@ -305,21 +331,39 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   if (action === "save_shift") {
     const shift = z.object({ id: uuid.optional(), employee_id: uuid, shift_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), start_minute: z.number().int().min(0).max(1439), end_minute: z.number().int().min(1).max(1440), break_minutes: z.number().int().min(0).max(720).default(0), status: z.enum(["scheduled","off","pto","sick"]).default("scheduled"), notes: txt.default("") }).parse(data);
     if (shift.status === "scheduled" && shift.end_minute <= shift.start_minute) throw new AppError("Shift end must follow its start.");
+    const employee = (await query<{ active: boolean; max_weekly_minutes: number }>("SELECT active,max_weekly_minutes FROM wl.employees WHERE id=$1", [shift.employee_id]))[0];
+    if (!employee?.active) throw new AppError("Choose an active employee.");
+    if (shift.status === "scheduled") {
+      const weekday = new Date(shift.shift_date + "T12:00:00Z").getUTCDay();
+      const availability = (await query<{ available: boolean; start_minute: number; end_minute: number }>("SELECT available,start_minute,end_minute FROM wl.employee_availability WHERE employee_id=$1 AND weekday=$2", [shift.employee_id,weekday]))[0];
+      if (!availability?.available || shift.start_minute < availability.start_minute || shift.end_minute > availability.end_minute) throw new AppError("This shift falls outside the employee's saved availability.");
+      const conflict = (await query<{ id: string }>("SELECT id FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date=$2 AND status='scheduled' AND id<>COALESCE($3::uuid,'00000000-0000-0000-0000-000000000000') AND start_minute<$5 AND end_minute>$4", [shift.employee_id,shift.shift_date,shift.id || null,shift.start_minute,shift.end_minute]))[0];
+      if (conflict) throw new AppError("This employee already has an overlapping shift.");
+      const weekStart = new Date(shift.shift_date + "T12:00:00Z"); weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
+      const week = weekStart.toISOString().slice(0,10);
+      const scheduled = (await query<{ minutes: number }>("SELECT COALESCE(SUM(end_minute-start_minute-break_minutes),0)::int minutes FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date BETWEEN $2::date::text AND ($2::date+6)::text AND status='scheduled' AND id<>COALESCE($3::uuid,'00000000-0000-0000-0000-000000000000')", [shift.employee_id,week,shift.id || null]))[0].minutes;
+      if (scheduled + shift.end_minute - shift.start_minute - shift.break_minutes > employee.max_weekly_minutes) throw new AppError("This shift exceeds the employee's weekly hour cap.");
+    }
     await query("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,break_minutes,status,notes,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(id) DO UPDATE SET employee_id=$2,shift_date=$3,start_minute=$4,end_minute=$5,break_minutes=$6,status=$7,notes=$8,updated_at=now()", [shift.id || randomUUID(),shift.employee_id,shift.shift_date,shift.start_minute,shift.end_minute,shift.break_minutes,shift.status,shift.notes,user.user_id]);
   }
   if (action === "delete_shift") await query("DELETE FROM wl.employee_shifts WHERE id=$1 AND published=false", [uuid.parse(data.id)]);
   if (action === "generate_schedule") {
     const g = z.object({ week: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), start_minute: z.number().int().min(0).max(1439).default(480), end_minute: z.number().int().min(1).max(1440).default(960) }).parse(data);
     if (g.end_minute <= g.start_minute) throw new AppError("Business hours are invalid.");
-    const employees = await query<{ id:string }>("SELECT id FROM wl.employees WHERE active=true");
+    const employees = await query<{ id:string; max_weekly_minutes: number }>("SELECT id,max_weekly_minutes FROM wl.employees WHERE active=true");
     const availability = await query<{employee_id:string;weekday:number;available:boolean;start_minute:number;end_minute:number}>("SELECT * FROM wl.employee_availability WHERE available=true");
-    await transaction(async q => { for (let day=0; day<7; day++) for (const e of employees) { const a=availability.find(x=>x.employee_id===e.id&&x.weekday===day); if (!a) continue; const date=(await q<{d:string}>("SELECT ($1::date+$2)::text d",[g.week,day])).rows[0].d; await q("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,status,created_by) SELECT $1,$2,$3,$4,$5,'scheduled',$6 WHERE NOT EXISTS(SELECT 1 FROM wl.employee_shifts WHERE employee_id=$2 AND shift_date=$3)",[randomUUID(),e.id,date,Math.max(g.start_minute,a.start_minute),Math.min(g.end_minute,a.end_minute),user.user_id]); } });
+    await transaction(async q => { const allocated = new Map<string, number>(); for (const e of employees) allocated.set(e.id, (await q<{minutes:number}>("SELECT COALESCE(SUM(end_minute-start_minute-break_minutes),0)::int minutes FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date BETWEEN $2::date::text AND ($2::date+6)::text AND status='scheduled'", [e.id,g.week])).rows[0].minutes); for (let day=0; day<7; day++) { const target = new Date(g.week + "T12:00:00Z"); target.setUTCDate(target.getUTCDate()+day); const date=target.toISOString().slice(0,10), weekday=target.getUTCDay(); for (const e of employees) { const a=availability.find(x=>x.employee_id===e.id&&x.weekday===weekday); const start=a ? Math.max(g.start_minute,a.start_minute) : 0, end=a ? Math.min(g.end_minute,a.end_minute) : 0, minutes=end-start; if (!a || end<=start || (allocated.get(e.id) || 0) + minutes > e.max_weekly_minutes) continue; const inserted=await q<{id:string}>("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,status,created_by) SELECT $1,$2,$3,$4,$5,'scheduled',$6 WHERE NOT EXISTS(SELECT 1 FROM wl.employee_shifts WHERE employee_id=$2 AND shift_date=$3) RETURNING id",[randomUUID(),e.id,date,start,end,user.user_id]); if (inserted.rows.length) allocated.set(e.id,(allocated.get(e.id) || 0)+minutes); } } });
   }
   if (action === "publish_schedule") {
     const week = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(data.week);
-    const shifts = await query<{employee_id:string;phone:string}>("SELECT s.employee_id,e.phone FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text AND s.status='scheduled'", [week]);
+    const shifts = await query<{employee_id:string;phone:string;name:string}>("SELECT s.employee_id,e.phone,e.name FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text AND s.status='scheduled'", [week]);
     if (!shifts.length) throw new AppError("Create draft shifts before publishing.");
-    await transaction(async q => { await q("UPDATE wl.employee_shifts SET published=true,updated_at=now() WHERE shift_date BETWEEN $1::date::text AND ($1::date+6)::text", [week]); for (const e of new Map(shifts.map(s=>[s.employee_id,s])).values()) await q("INSERT INTO wl.schedule_notifications(id,employee_id,week_start,channel,status,error) VALUES($1,$2,$3,'sms',$4,$5)",[randomUUID(),e.employee_id,week,e.phone ? 'pending' : 'skipped',e.phone ? '' : 'Employee phone number is missing']); });
+    const smsEnabled = (await integrationStatus()).sms;
+    await transaction(async q => { await q("UPDATE wl.employee_shifts SET published=true,updated_at=now() WHERE shift_date BETWEEN $1::date::text AND ($1::date+6)::text", [week]); for (const e of new Map(shifts.map(s=>[s.employee_id,s])).values()) { const configured = smsEnabled && Boolean(e.phone); const error = !e.phone ? "Employee phone number is missing" : !smsEnabled ? "SMS credentials are not configured" : ""; await q("INSERT INTO wl.schedule_notifications(id,employee_id,week_start,channel,status,error) VALUES($1,$2,$3,'sms',$4,$5)",[randomUUID(),e.employee_id,week,configured ? 'queued' : 'skipped',error]); if (configured) await enqueue(q,{key:`employee-schedule:${e.employee_id}:${week}`,channel:"sms",recipient:e.phone,purpose:"transactional",body:`West Loop Auto Spa: Hi ${e.name}, your schedule for the week of ${week} is published. Sign in to view your shifts: ${siteUrl()}/admin/my_schedule`}); } });
+  }
+  if (action === "approve_time") {
+    const id = uuid.parse(data.id);
+    await query("UPDATE wl.time_entries SET approved=true,edited_by=$1,edited_at=now() WHERE id=$2 AND clock_out IS NOT NULL", [user.user_id,id]);
   }
   if (action === "save_service") {
     const s = serviceSchema.parse(data),

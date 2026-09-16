@@ -13,6 +13,13 @@ export type Field = {
   max?: number;
   hint?: string;
 };
+const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const clockValue = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+const clockMinutes = (value: string) => {
+  const [hours, minutes] = value.split(":").map(Number);
+  return Math.max(0, Math.min(1440, hours * 60 + minutes));
+};
 export type EditorSpec = {
   title: string;
   action: string;
@@ -119,7 +126,7 @@ export function Editor({
     }
   }
   return (
-    <Modal title={spec.title} onClose={onClose}>
+    <Modal title={spec.title} onClose={onClose} wide={spec.fields.some((f) => f.type === "availability")}>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -164,6 +171,20 @@ export function Editor({
                   checked={!!v[f.key]}
                   onChange={(e) => setV({ ...v, [f.key]: e.target.checked })}
                 />
+              ) : f.type === "availability" ? (
+                <div className="availability-editor">
+                  {dayNames.map((day, weekday) => {
+                    const values = Array.isArray(v[f.key]) ? v[f.key] as Array<Record<string, unknown>> : [];
+                    const current = values.find((item) => Number(item.weekday) === weekday) || { weekday, available: false, start_minute: 480, end_minute: 1020 };
+                    const replace = (next: Record<string, unknown>) => setV({ ...v, [f.key]: dayNames.map((_, index) => index === weekday ? next : (values.find((item) => Number(item.weekday) === index) || { weekday: index, available: false, start_minute: 480, end_minute: 1020 })) });
+                    return <div className="availability-day" key={day}>
+                      <label><input type="checkbox" checked={Boolean(current.available)} onChange={(e) => replace({ ...current, available: e.target.checked })} /> {day}</label>
+                      <input aria-label={day + " start"} type="time" disabled={!current.available} value={clockValue(Number(current.start_minute))} onChange={(e) => replace({ ...current, start_minute: clockMinutes(e.target.value) })} />
+                      <span>to</span>
+                      <input aria-label={day + " end"} type="time" disabled={!current.available} value={clockValue(Number(current.end_minute))} onChange={(e) => replace({ ...current, end_minute: clockMinutes(e.target.value) })} />
+                    </div>;
+                  })}
+                </div>
               ) : f.type === "upload" ? (
                 <>
                   {!!v[f.key] && (
