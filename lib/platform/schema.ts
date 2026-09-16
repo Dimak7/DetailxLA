@@ -101,6 +101,10 @@ CREATE TABLE IF NOT EXISTS wl.employees (
  id uuid PRIMARY KEY, user_id uuid UNIQUE REFERENCES wl.users(id), phone text NOT NULL DEFAULT '', position text NOT NULL DEFAULT 'Other',
  hourly_rate_cents integer NOT NULL DEFAULT 0 CHECK(hourly_rate_cents >= 0), hire_date text, notes text NOT NULL DEFAULT '', avatar_url text NOT NULL DEFAULT '',
  active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS wl.employee_availability (
+ employee_id uuid NOT NULL REFERENCES wl.employees(id) ON DELETE CASCADE, weekday integer NOT NULL CHECK(weekday BETWEEN 0 AND 6),
+ available boolean NOT NULL DEFAULT false, start_minute integer NOT NULL DEFAULT 480 CHECK(start_minute BETWEEN 0 AND 1439), end_minute integer NOT NULL DEFAULT 1020 CHECK(end_minute BETWEEN 0 AND 1440),
+ PRIMARY KEY(employee_id,weekday), CHECK(end_minute > start_minute));
 CREATE TABLE IF NOT EXISTS wl.employee_shifts (
  id uuid PRIMARY KEY, employee_id uuid NOT NULL REFERENCES wl.employees(id), shift_date text NOT NULL,
  start_minute integer NOT NULL DEFAULT 0 CHECK(start_minute BETWEEN 0 AND 1439), end_minute integer NOT NULL DEFAULT 0 CHECK(end_minute BETWEEN 0 AND 1440),
@@ -117,6 +121,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS wl_one_active_clock ON wl.time_entries(employe
 CREATE TABLE IF NOT EXISTS wl.time_correction_requests (
  id uuid PRIMARY KEY, employee_id uuid NOT NULL REFERENCES wl.employees(id), time_entry_id uuid REFERENCES wl.time_entries(id), request text NOT NULL,
  status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','approved','rejected')), manager_note text NOT NULL DEFAULT '', reviewed_by uuid REFERENCES wl.users(id), reviewed_at timestamptz, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS wl.time_off_requests (
+ id uuid PRIMARY KEY, employee_id uuid NOT NULL REFERENCES wl.employees(id), start_date text NOT NULL, end_date text NOT NULL, reason text NOT NULL DEFAULT '',
+ status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','approved','denied')), reviewed_by uuid REFERENCES wl.users(id), reviewed_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), CHECK(end_date >= start_date));
+CREATE TABLE IF NOT EXISTS wl.schedule_notifications (
+ id uuid PRIMARY KEY, employee_id uuid NOT NULL REFERENCES wl.employees(id), week_start text NOT NULL, channel text NOT NULL DEFAULT 'sms', status text NOT NULL DEFAULT 'pending', provider_id text NOT NULL DEFAULT '', error text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.pay_periods (
  id uuid PRIMARY KEY, start_date text NOT NULL, end_date text NOT NULL, frequency text NOT NULL DEFAULT 'weekly' CHECK(frequency IN ('weekly','biweekly','semi_monthly')),
  status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','review','approved','paid')), overtime_threshold numeric NOT NULL DEFAULT 40, overtime_multiplier numeric NOT NULL DEFAULT 1.5,
