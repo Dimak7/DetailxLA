@@ -1145,7 +1145,17 @@ textarea.control {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
   min-height: 100vh;
-  background: #f3f5f0;
+  --ink: #f4f0e8;
+  --paper: #101111;
+  --white: #191a1a;
+  --muted: #aaa89f;
+  --line: #30312f;
+  --sage: #202320;
+  --gold: #c6a66b;
+  background:
+    radial-gradient(circle at 82% 0%, #3a302026, transparent 28%),
+    linear-gradient(135deg, #121313, #0b0c0c 62%);
+  color: var(--ink);
 }
 .admin-sidebar {
   background: #203e35;
