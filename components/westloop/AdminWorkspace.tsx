@@ -646,6 +646,12 @@ export function AdminWorkspace({
           {error}
         </div>
       )}
+      {section === "employees" && (
+        <section className="paper">
+          <div className="section-heading"><div><p className="eyebrow">TEAM</p><h2>{list.filter((r) => r.active).length} active employees</h2></div><button className="button" onClick={() => employeeEdit()}>Add employee +</button></div>
+          {table(["Employee", "Role", "Phone", "Status", "Rate", "This week", "Actions"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>, s(r.position), s(r.phone) || "Not set", status(r.active ? "active" : "inactive"), money(n(r.hourly_rate_cents)), (n(r.scheduled_minutes) / 60).toFixed(1) + "h", <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100 })}>Edit</button>]))}
+        </section>
+      )}
       {reportMode && rep && (
         <>
           <form className="toolbar">
