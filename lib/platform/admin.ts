@@ -286,6 +286,7 @@ const actionSections: Record<string, string> = {
   save_shift: "schedule",
   delete_shift: "schedule",
   generate_schedule: "schedule",
+  publish_schedule: "schedule",
 };
 export async function adminAction(action: string, raw: unknown, user: Session) {
   const section = actionSections[action];
@@ -313,6 +314,12 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     const employees = await query<{ id:string }>("SELECT id FROM wl.employees WHERE active=true");
     const availability = await query<{employee_id:string;weekday:number;available:boolean;start_minute:number;end_minute:number}>("SELECT * FROM wl.employee_availability WHERE available=true");
     await transaction(async q => { for (let day=0; day<7; day++) for (const e of employees) { const a=availability.find(x=>x.employee_id===e.id&&x.weekday===day); if (!a) continue; const date=(await q<{d:string}>("SELECT ($1::date+$2)::text d",[g.week,day])).rows[0].d; await q("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,status,created_by) SELECT $1,$2,$3,$4,$5,'scheduled',$6 WHERE NOT EXISTS(SELECT 1 FROM wl.employee_shifts WHERE employee_id=$2 AND shift_date=$3)",[randomUUID(),e.id,date,Math.max(g.start_minute,a.start_minute),Math.min(g.end_minute,a.end_minute),user.user_id]); } });
+  }
+  if (action === "publish_schedule") {
+    const week = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(data.week);
+    const shifts = await query<{employee_id:string;phone:string}>("SELECT s.employee_id,e.phone FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text AND s.status='scheduled'", [week]);
+    if (!shifts.length) throw new AppError("Create draft shifts before publishing.");
+    await transaction(async q => { await q("UPDATE wl.employee_shifts SET published=true,updated_at=now() WHERE shift_date BETWEEN $1::date::text AND ($1::date+6)::text", [week]); for (const e of new Map(shifts.map(s=>[s.employee_id,s])).values()) await q("INSERT INTO wl.schedule_notifications(id,employee_id,week_start,channel,status,error) VALUES($1,$2,$3,'sms',$4,$5)",[randomUUID(),e.employee_id,week,e.phone ? 'pending' : 'skipped',e.phone ? '' : 'Employee phone number is missing']); });
   }
   if (action === "save_service") {
     const s = serviceSchema.parse(data),
