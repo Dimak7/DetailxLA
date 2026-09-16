@@ -97,5 +97,35 @@ CREATE TABLE IF NOT EXISTS wl.gallery (
 CREATE TABLE IF NOT EXISTS wl.ad_spend (
  id uuid PRIMARY KEY, channel text NOT NULL, campaign text NOT NULL DEFAULT '', spend_date text NOT NULL,
  amount_cents integer NOT NULL CHECK(amount_cents >= 0), origin text NOT NULL DEFAULT 'manual');
+CREATE TABLE IF NOT EXISTS wl.employees (
+ id uuid PRIMARY KEY, user_id uuid UNIQUE REFERENCES wl.users(id), phone text NOT NULL DEFAULT '', position text NOT NULL DEFAULT 'Other',
+ hourly_rate_cents integer NOT NULL DEFAULT 0 CHECK(hourly_rate_cents >= 0), hire_date text, notes text NOT NULL DEFAULT '', avatar_url text NOT NULL DEFAULT '',
+ active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS wl.employee_shifts (
+ id uuid PRIMARY KEY, employee_id uuid NOT NULL REFERENCES wl.employees(id), shift_date text NOT NULL,
+ start_minute integer NOT NULL DEFAULT 0 CHECK(start_minute BETWEEN 0 AND 1439), end_minute integer NOT NULL DEFAULT 0 CHECK(end_minute BETWEEN 0 AND 1440),
+ break_minutes integer NOT NULL DEFAULT 0 CHECK(break_minutes BETWEEN 0 AND 720), status text NOT NULL DEFAULT 'scheduled' CHECK(status IN ('scheduled','off','pto','sick')),
+ notes text NOT NULL DEFAULT '', published boolean NOT NULL DEFAULT false, created_by uuid REFERENCES wl.users(id), updated_at timestamptz NOT NULL DEFAULT now(), created_at timestamptz NOT NULL DEFAULT now(),
+ CHECK((status <> 'scheduled') OR end_minute > start_minute));
+CREATE INDEX IF NOT EXISTS wl_employee_shifts_date ON wl.employee_shifts(shift_date,employee_id);
+CREATE TABLE IF NOT EXISTS wl.time_entries (
+ id uuid PRIMARY KEY, employee_id uuid NOT NULL REFERENCES wl.employees(id), shift_id uuid REFERENCES wl.employee_shifts(id),
+ clock_in timestamptz NOT NULL, clock_out timestamptz, break_started_at timestamptz, break_minutes integer NOT NULL DEFAULT 0 CHECK(break_minutes >= 0),
+ approved boolean NOT NULL DEFAULT false, notes text NOT NULL DEFAULT '', edited_by uuid REFERENCES wl.users(id), edited_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(),
+ CHECK(clock_out IS NULL OR clock_out > clock_in));
+CREATE UNIQUE INDEX IF NOT EXISTS wl_one_active_clock ON wl.time_entries(employee_id) WHERE clock_out IS NULL;
+CREATE TABLE IF NOT EXISTS wl.time_correction_requests (
+ id uuid PRIMARY KEY, employee_id uuid NOT NULL REFERENCES wl.employees(id), time_entry_id uuid REFERENCES wl.time_entries(id), request text NOT NULL,
+ status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','approved','rejected')), manager_note text NOT NULL DEFAULT '', reviewed_by uuid REFERENCES wl.users(id), reviewed_at timestamptz, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS wl.pay_periods (
+ id uuid PRIMARY KEY, start_date text NOT NULL, end_date text NOT NULL, frequency text NOT NULL DEFAULT 'weekly' CHECK(frequency IN ('weekly','biweekly','semi_monthly')),
+ status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','review','approved','paid')), overtime_threshold numeric NOT NULL DEFAULT 40, overtime_multiplier numeric NOT NULL DEFAULT 1.5,
+ created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(start_date,end_date), CHECK(end_date >= start_date));
+CREATE TABLE IF NOT EXISTS wl.payroll_records (
+ id uuid PRIMARY KEY, pay_period_id uuid NOT NULL REFERENCES wl.pay_periods(id), employee_id uuid NOT NULL REFERENCES wl.employees(id),
+ regular_minutes integer NOT NULL DEFAULT 0, overtime_minutes integer NOT NULL DEFAULT 0, pto_minutes integer NOT NULL DEFAULT 0, sick_minutes integer NOT NULL DEFAULT 0,
+ hourly_rate_cents integer NOT NULL, estimated_gross_cents integer NOT NULL DEFAULT 0, approved_at timestamptz, UNIQUE(pay_period_id,employee_id));
+CREATE TABLE IF NOT EXISTS wl.audit_logs (
+ id uuid PRIMARY KEY, actor_id uuid REFERENCES wl.users(id), entity_type text NOT NULL, entity_id uuid, action text NOT NULL, before_data jsonb NOT NULL DEFAULT '{}', after_data jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now());
 INSERT INTO wl.migrations(version) VALUES (1) ON CONFLICT DO NOTHING;
 `;

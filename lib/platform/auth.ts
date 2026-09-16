@@ -103,6 +103,11 @@ export const access: Record<string, Role[]> = {
   settings: ["owner", "admin"],
   team: ["owner"],
   payments: ["owner", "admin", "manager"],
+  employees: ["owner", "admin", "manager"],
+  schedule: ["owner", "admin", "manager"],
+  hours: ["owner", "admin", "manager"],
+  payroll: ["owner", "admin", "manager"],
+  my_schedule: ["owner", "admin", "manager", "staff"],
 };
 export async function requireSession(request: Request, section = "bookings") {
   const s = await requestSession(request);
