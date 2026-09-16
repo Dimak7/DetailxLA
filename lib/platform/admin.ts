@@ -100,6 +100,10 @@ export async function adminData(
       availability: await query("SELECT * FROM wl.employee_availability ORDER BY employee_id,weekday"),
     };
   }
+  if (section === "schedule") {
+    const week = p.get("week") || (await import("./types")).dateToday();
+    return { week, employees: await query("SELECT * FROM wl.employees WHERE active=true ORDER BY name"), shifts: await query("SELECT s.*,e.name,e.position FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text ORDER BY s.shift_date,s.start_minute", [week]), availability: await query("SELECT * FROM wl.employee_availability"), workload: await query("SELECT booking_date,count(*)::int bookings FROM wl.bookings WHERE booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND status NOT IN ('cancelled','no_show') GROUP BY booking_date", [week]) };
+  }
   if (section === "gallery")
     return {
       rows: await query("SELECT * FROM wl.gallery ORDER BY sort_order"),
