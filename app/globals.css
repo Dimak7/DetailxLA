@@ -943,14 +943,36 @@ button:disabled {
 input.control,
 select.control,
 textarea.control {
-  border: 1px solid #cbd2c5;
-  background: #fffefa;
-  color: var(--ink);
-  border-radius: 0;
+  border: 1px solid #4a514c;
+  background: #101211;
+  color: #f7f4ed;
+  border-radius: 6px;
   padding: 12px;
   min-width: 0;
   width: 100%;
   min-height: 46px;
+}
+.field input::placeholder,
+.field textarea::placeholder,
+input.control::placeholder,
+textarea.control::placeholder {
+  color: #9ba19a;
+  opacity: 1;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+input.control:focus,
+select.control:focus,
+textarea.control:focus {
+  border-color: var(--gold);
+  outline: 2px solid color-mix(in srgb, var(--gold) 55%, transparent);
+  outline-offset: 1px;
+}
+.field select option,
+select.control option {
+  background: #101211;
+  color: #f7f4ed;
 }
 .field textarea {
   min-height: 110px;

@@ -3,6 +3,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wordmark } from "./PublicShell";
 import type { Session } from "@/lib/platform/types";
+const sectionLabels: Record<string, string> = {
+  dashboard: "Overview",
+  calendar: "Calendar",
+  my_schedule: "My schedule",
+  hours: "Hours",
+  payroll: "Payroll",
+};
 export function AdminShell({
   user,
   sections,
@@ -26,9 +33,9 @@ export function AdminShell({
               <Link
                 key={s}
                 href={"/admin/" + s}
-                className={path === "/admin/" + s ? "active" : ""}
-              >
-                <span>{s[0].toUpperCase() + s.slice(1)}</span>
+              className={path === "/admin/" + s ? "active" : ""}
+            >
+                <span>{sectionLabels[s] || s[0].toUpperCase() + s.slice(1)}</span>
                 <span>{String(i + 1).padStart(2, "0")}</span>
               </Link>
             ))}

@@ -115,9 +115,26 @@ export async function adminData(
     return { start, end, rows: await query(`WITH worked AS (SELECT e.id,e.name,e.position,e.hourly_rate_cents,COALESCE(SUM(GREATEST(0,round(EXTRACT(EPOCH FROM (COALESCE(t.clock_out,now())-t.clock_in))/60)-t.break_minutes)),0)::int minutes FROM wl.employees e LEFT JOIN wl.time_entries t ON t.employee_id=e.id AND (t.clock_in AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date GROUP BY e.id) SELECT *,LEAST(minutes,2400)::int regular_minutes,GREATEST(minutes-2400,0)::int overtime_minutes,(LEAST(minutes,2400)*hourly_rate_cents/60 + GREATEST(minutes-2400,0)*hourly_rate_cents*1.5/60)::int estimated_gross_cents FROM worked WHERE minutes>0 ORDER BY name`, [start,end]) };
   }
   if (section === "my_schedule") {
-    const employee = (await query<{ id: string; name: string; position: string }>("SELECT id,name,position FROM wl.employees WHERE user_id=$1 AND active=true", [user.user_id]))[0];
+    const employee = (await query<{ id: string; name: string; position: string; user_id: string }>("SELECT id,name,position,user_id FROM wl.employees WHERE user_id=$1 AND active=true", [user.user_id]))[0];
     if (!employee) throw new AppError("No employee profile is linked to this account.", 403);
-    return { employee, shifts: await query("SELECT * FROM wl.employee_shifts WHERE employee_id=$1 AND published=true AND shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') ORDER BY shift_date,start_minute", [employee.id]), entries: await query("SELECT *,GREATEST(0,round(EXTRACT(EPOCH FROM (COALESCE(clock_out,now())-clock_in))/60)-break_minutes)::int worked_minutes FROM wl.time_entries WHERE employee_id=$1 ORDER BY clock_in DESC LIMIT 50", [employee.id]) };
+    return {
+      employee,
+      shifts: await query("SELECT * FROM wl.employee_shifts WHERE employee_id=$1 AND published=true AND shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') ORDER BY shift_date,start_minute", [employee.id]),
+      appointments: await query(
+        `SELECT b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.location,b.notes,
+          c.first_name||' '||c.last_name customer_name,c.phone,
+          concat_ws(' ',v.year,v.make,v.model) vehicle
+         FROM wl.bookings b
+         JOIN wl.customers c ON c.id=b.customer_id
+         JOIN wl.vehicles v ON v.id=b.vehicle_id
+         WHERE b.assigned_to=$1
+           AND b.booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')
+           AND b.status NOT IN ('cancelled','no_show')
+         ORDER BY b.booking_date,b.start_minute`,
+        [employee.user_id],
+      ),
+      entries: await query("SELECT *,GREATEST(0,round(EXTRACT(EPOCH FROM (COALESCE(clock_out,now())-clock_in))/60)-break_minutes)::int worked_minutes FROM wl.time_entries WHERE employee_id=$1 ORDER BY clock_in DESC LIMIT 50", [employee.id]),
+    };
   }
   if (section === "gallery")
     return {

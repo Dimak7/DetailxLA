@@ -706,6 +706,9 @@ export function AdminWorkspace({
             {(() => { const active = rows(data.entries).find((entry) => !entry.clock_out); return <div className="button-row">{!active ? <button className="button" disabled={busy} onClick={() => clock("in")}>Clock in</button> : <><button disabled={busy || Boolean(active.break_started_at)} onClick={() => clock("break_start")}>Start break</button><button disabled={busy || !active.break_started_at} onClick={() => clock("break_end")}>End break</button><button className="button" disabled={busy || Boolean(active.break_started_at)} onClick={() => clock("out")}>Clock out</button></>}</div>; })()}
             {table(["Date", "Shift", "Break", "Notes"], rows(data.shifts).map((r) => [s(r.shift_date), timeLabel(n(r.start_minute)) + " - " + timeLabel(n(r.end_minute)), n(r.break_minutes) + " min", s(r.notes) || "-"]))}
           </section>
+          <section className="paper"><div className="section-heading"><div><p className="eyebrow">ASSIGNED WORK</p><h2>Upcoming appointments</h2></div></div>
+            {table(["When", "Customer", "Vehicle", "Service", "Location"], rows(data.appointments).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))} - {timeLabel(n(r.start_minute) + n(r.duration_minutes))}</small></>, <><strong>{s(r.customer_name)}</strong><small>{s(r.phone)}</small></>, s(r.vehicle) || "Vehicle details pending", <><strong>{s(r.service_name)}</strong><small>{s(r.reference)}</small></>, <><strong>{s(r.location)}</strong><small>{s(r.notes) || "No access notes"}</small></>]))}
+          </section>
           <section className="paper"><h2>Recent time entries</h2>{table(["Clock in", "Clock out", "Break", "Worked"], rows(data.entries).map((r) => [stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "In progress", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h"]))}</section>
         </>
       )}
