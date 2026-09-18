@@ -1040,11 +1040,45 @@ select.control option {
 .shift-event strong, .shift-event small, .shift-event span { display: block; line-height: 1.25; }
 .shift-event small { color: #f1b9aa; font-size: 9px; }
 .shift-event span { font-size: 9px; margin-top: 3px; }
+.schedule-view-tabs, .day-picker { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0; }
+.schedule-view-tabs button, .day-picker button { border: 1px solid var(--line); background: #151716; color: var(--muted); padding: 8px 14px; font-size: 11px; }
+.schedule-view-tabs button.active, .day-picker button.active { border-color: #e1573e; background: #3c211e; color: #fff8f2; }
+.staffing-board { display: grid; grid-template-columns: repeat(7, minmax(154px, 1fr)); gap: 8px; overflow-x: auto; padding-bottom: 3px; }
+.staffing-day { display: grid; align-content: start; gap: 7px; min-height: 240px; padding: 10px; border: 1px solid var(--line); background: #151716; }
+.staffing-day-heading { display: grid; gap: 3px; padding: 0 0 8px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: #f7f4ed; text-align: left; }
+.staffing-day-heading strong { font-size: 12px; }
+.staffing-day-heading span { color: #d8c3a0; font-size: 10px; }
+.staffing-day-heading small { color: var(--muted); font-size: 9px; }
+.staffing-chips { display: grid; align-content: start; gap: 5px; }
+.staffing-chip, .staffing-more, .staffing-add { width: 100%; border: 1px solid #383b37; background: #202320; color: #f7f4ed; padding: 7px 8px; text-align: left; }
+.staffing-chip { display: flex; justify-content: space-between; gap: 7px; font-size: 10px; }
+.staffing-chip strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.staffing-chip span { color: #e6bdad; white-space: nowrap; font-size: 9px; }
+.staffing-more, .staffing-add { color: #d8c3a0; font-size: 10px; }
+.staffing-add { align-self: end; margin-top: auto; border-style: dashed; background: transparent; }
+.staffing-board-scroll, .day-timeline-scroll { overflow-x: auto; }
+.staffing-matrix { display: grid; grid-template-columns: minmax(150px, 1.25fr) repeat(7, minmax(105px, 1fr)); min-width: 890px; border: 1px solid var(--line); background: #101211; }
+.staffing-matrix-head, .staffing-person, .matrix-shift, .matrix-off { min-height: 52px; padding: 9px; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; }
+.staffing-matrix-head { color: #d8c3a0; font-size: 10px; }
+.staffing-person { display: grid; gap: 3px; color: #f7f4ed; font-size: 11px; }
+.staffing-person small { color: var(--muted); font-size: 9px; }
+.matrix-shift { background: #3c211e; color: #fff8f2; font-size: 10px; }
+.matrix-off { background: #151716; color: #777c75; font-size: 10px; }
+.day-timeline { display: grid; grid-template-columns: 64px minmax(220px, 1fr) minmax(220px, 1fr); min-width: 620px; border: 1px solid var(--line); background: #101211; }
+.day-time-heading, .day-track-heading { min-height: 48px; padding: 10px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); color: #d8c3a0; font-size: 10px; }
+.day-time-labels { display: grid; grid-template-rows: repeat(14, 60px); border-right: 1px solid var(--line); }
+.day-time-labels span { padding: 4px 7px; border-bottom: 1px solid #292d2a; color: var(--muted); font-size: 10px; }
+.day-track { position: relative; height: var(--timeline-height); border-right: 1px solid var(--line); background: repeating-linear-gradient(to bottom, transparent 0 59px, #292d2a 60px); cursor: crosshair; }
+.appointment-track { cursor: default; }
+.appointment-event { position: absolute; display: block; min-width: 0; overflow: hidden; padding: 7px; border: 1px solid #8f7153; border-left: 3px solid #d8a35d; border-radius: 5px; background: #33281e; color: #fff8e9; font-size: 9px; text-decoration: none; }
+.appointment-event strong, .appointment-event span { display: block; line-height: 1.25; }
+.appointment-event span { margin-top: 3px; color: #e4c28d; }
 @media (max-width: 620px) {
   .availability-day { grid-template-columns: 1fr 1fr; }
   .availability-day label { grid-column: 1 / -1; }
   .roster-grid { grid-template-columns: 1fr; }
   .staff-calendar { min-width: max-content; }
+  .staffing-board { grid-template-columns: repeat(7, minmax(170px, 1fr)); }
 }
 .check {
   display: flex;

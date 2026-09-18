@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { Fragment, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -71,12 +71,15 @@ export function AdminWorkspace({
     >(),
     [notice, setNotice] = useState(""),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [scheduleView, setScheduleView] = useState<"week" | "staff" | "day">("week"),
+    [scheduleDay, setScheduleDay] = useState("");
   const list = rows(data.rows),
     team = rows(data.team),
     employeeAvailability = rows(data.availability),
     scheduleEmployees = rows(data.employees),
     scheduleShifts = rows(data.shifts),
+    scheduleAppointments = rows(data.appointments),
     staff = user.role === "staff";
   const teamOptions = [
     { value: "", label: "Unassigned" },
@@ -98,6 +101,9 @@ export function AdminWorkspace({
     return day.toISOString().slice(0, 10);
   }) : [];
   const calendarStartMinute = 420, calendarHours = 14;
+  const selectedScheduleDay = rosterDays.includes(scheduleDay)
+    ? scheduleDay
+    : rosterDays[0] || "";
   const calendarLayouts = new Map(
     rosterDays.map((day) => [
       day,
@@ -108,13 +114,13 @@ export function AdminWorkspace({
       ),
     ]),
   );
-  const calendarColumns = [
-    "58px",
-    ...rosterDays.map((day) => {
-      const lanes = Math.max(1, ...(calendarLayouts.get(day) || []).map((shift) => shift.lanes));
-      return `minmax(${Math.max(160, lanes * 132)}px, 1fr)`;
-    }),
-  ].join(" ");
+  const scheduleDayLabel = (day: string, weekday: "short" | "long" = "short") =>
+    new Date(day + "T12:00:00Z").toLocaleDateString("en-US", {
+      weekday,
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
   async function run(name: string, d: R, message = "Saved.") {
     setBusy(true);
     setError("");
@@ -723,9 +729,18 @@ export function AdminWorkspace({
           <section className="paper">
             <div className="section-heading"><div><p className="eyebrow">WEEKLY ROSTER</p><h2>Schedule week of {s(data.week)}</h2></div><div className="button-row"><button className="button" disabled={busy || !scheduleEmployees.length} onClick={() => run("generate_schedule", { week: s(data.week), start_minute: 540, end_minute: 1020 }, "Draft shifts created from availability.")}>Generate week</button><button disabled={busy} onClick={() => run("publish_schedule", { week: s(data.week) }, "Schedule published. Notification status is recorded below.")}>Publish schedule</button><button onClick={() => shiftEdit()} disabled={!scheduleEmployees.length}>Add shift +</button></div></div>
             <form className="toolbar"><label className="field"><span>Week starts</span><input name="week" type="date" defaultValue={s(data.week)} /></label><button className="button">Load week</button></form>
-            <div className="staff-calendar-scroll"><div className="staff-calendar" style={{ gridTemplateColumns: calendarColumns }} role="grid" aria-label="Weekly staff calendar"><div className="calendar-axis">TIME</div>{rosterDays.map((day) => { const shifts = scheduleShifts.filter((shift) => s(shift.shift_date) === day && s(shift.status) === "scheduled"); const target = n(rows(data.staffing).find((item) => s(item.staffing_date) === day)?.required_staff); return <div className="calendar-head" key={day}><strong>{new Date(day + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", day: "numeric", timeZone: "UTC" })}</strong><button onClick={() => staffingEdit(day, target)}>Staff {shifts.length}/{target || "-"}</button></div>})}<div className="calendar-times">{Array.from({ length: calendarHours }, (_, hour) => <span key={hour}>{timeLabel(calendarStartMinute + hour * 60)}</span>)}</div>{rosterDays.map((day) => <div className="staff-calendar-day" key={day} onClick={(event) => { if (event.target === event.currentTarget) shiftEdit({ shift_date: day, start_minute: 540, end_minute: 1020 }); }}>{(calendarLayouts.get(day) || []).map(({ shift, lane, lanes }) => <button className="shift-event" key={s(shift.id)} style={{ top: `${Math.max(0, n(shift.start_minute) - calendarStartMinute)}px`, height: `${Math.max(38, n(shift.end_minute) - n(shift.start_minute))}px`, left: `calc(${(lane / lanes) * 100}% + 3px)`, width: `calc(${100 / lanes}% - 6px)` }} onClick={(event) => { event.stopPropagation(); shiftEdit(shift); }}><strong>{s(shift.name)}</strong><small>{s(shift.position)}</small><span>{timeLabel(n(shift.start_minute))} - {timeLabel(n(shift.end_minute))}</span></button>)}</div>)}</div></div>
+            <div className="schedule-view-tabs" role="tablist" aria-label="Schedule view">
+              {(["week", "staff", "day"] as const).map((view) => <button className={scheduleView === view ? "active" : ""} key={view} onClick={() => setScheduleView(view)} role="tab" aria-selected={scheduleView === view}>{title(view)}</button>)}
+            </div>
+            {scheduleView === "week" && <div className="staffing-board" aria-label="Weekly staffing board">
+              {rosterDays.map((day) => { const shifts = scheduleShifts.filter((shift) => s(shift.shift_date) === day && s(shift.status) === "scheduled"); const target = n(rows(data.staffing).find((item) => s(item.staffing_date) === day)?.required_staff); const jobs = rows(data.workload).find((item) => s(item.booking_date) === day); const visible = shifts.slice(0, 7); return <article className="staffing-day" key={day}><button className="staffing-day-heading" onClick={() => { setScheduleDay(day); setScheduleView("day"); }}><strong>{scheduleDayLabel(day)}</strong><span>{target ? `Staff ${shifts.length}/${target} ${shifts.length >= target ? "Ready" : "Needs staff"}` : `${shifts.length} staff scheduled`}</span><small>{s(jobs?.bookings) || "0"} appointments</small></button><div className="staffing-chips">{visible.map((shift) => <button className="staffing-chip" key={s(shift.id)} onClick={() => shiftEdit(shift)}><strong>{s(shift.name)}</strong><span>{timeLabel(n(shift.start_minute))} - {timeLabel(n(shift.end_minute))}</span></button>)}{shifts.length > visible.length && <button className="staffing-more" onClick={() => { setScheduleDay(day); setScheduleView("day"); }}>+ {shifts.length - visible.length} more</button>}</div><button className="staffing-add" onClick={() => shiftEdit({ shift_date: day, start_minute: 540, end_minute: 1020 })}>+ Add worker</button></article>})}
+            </div>}
+            {scheduleView === "staff" && <div className="staffing-board-scroll"><div className="staffing-matrix">
+              <div className="staffing-matrix-head">Employee</div>{rosterDays.map((day) => <div className="staffing-matrix-head" key={day}>{scheduleDayLabel(day)}</div>)}
+              {scheduleEmployees.map((employee) => <Fragment key={s(employee.id)}><div className="staffing-person"><strong>{s(employee.name)}</strong><small>{s(employee.position)}</small></div>{rosterDays.map((day) => { const shift = scheduleShifts.find((item) => s(item.employee_id) === s(employee.id) && s(item.shift_date) === day && s(item.status) === "scheduled"); const available = employeeAvailability.find((item) => s(item.employee_id) === s(employee.id) && n(item.weekday) === new Date(day + "T12:00:00Z").getUTCDay()); return <button className={shift ? "matrix-shift" : "matrix-off"} key={day} onClick={() => shift ? shiftEdit(shift) : shiftEdit({ employee_id: employee.id, shift_date: day, start_minute: available?.available ? n(available.start_minute) : 540, end_minute: available?.available ? n(available.end_minute) : 1020 })}>{shift ? `${timeLabel(n(shift.start_minute))} - ${timeLabel(n(shift.end_minute))}` : "Off"}</button>})}</Fragment>)}
+            </div></div>}
+            {scheduleView === "day" && <><div className="day-picker" aria-label="Choose schedule day">{rosterDays.map((day) => <button className={day === selectedScheduleDay ? "active" : ""} key={day} onClick={() => setScheduleDay(day)}>{scheduleDayLabel(day)}</button>)}</div><ScheduleDayTimeline day={selectedScheduleDay} shifts={calendarLayouts.get(selectedScheduleDay) || []} appointments={scheduleAppointments.filter((appointment) => s(appointment.booking_date) === selectedScheduleDay)} startMinute={calendarStartMinute} hours={calendarHours} onShiftEdit={shiftEdit} /></>}
           </section>
-          <section className="paper"><div className="section-heading"><div><p className="eyebrow">DAILY ROSTER</p><h2>Actual staff by day</h2></div></div><div className="roster-grid">{rosterDays.map((day) => { const shifts = scheduleShifts.filter((shift) => s(shift.shift_date) === day && s(shift.status) === "scheduled"); const jobs = rows(data.workload).find((item) => s(item.booking_date) === day); const target = n(rows(data.staffing).find((item) => s(item.staffing_date) === day)?.required_staff); return <article className="roster-day" key={day}><strong>{new Date(day + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}</strong><small>{target ? `${shifts.length} / ${target} staff scheduled` : `${shifts.length} staff scheduled`} · {s(jobs?.bookings) || "0"} jobs booked</small><button onClick={() => staffingEdit(day, target)}>Staff needed: {target || "Set target"}</button>{scheduleEmployees.map((employee) => { const shift = shifts.find((item) => s(item.employee_id) === s(employee.id)); const available = employeeAvailability.find((item) => s(item.employee_id) === s(employee.id) && n(item.weekday) === new Date(day + "T12:00:00Z").getUTCDay()); return <div className="roster-person" key={s(employee.id)}><span><strong>{s(employee.name)}</strong><small>{shift ? timeLabel(n(shift.start_minute)) + " - " + timeLabel(n(shift.end_minute)) : available?.available ? "Available, not scheduled" : "Not available"}</small></span>{shift ? <button onClick={() => shiftEdit(shift)}>Edit</button> : <button onClick={() => shiftEdit({ employee_id: employee.id, shift_date: day, start_minute: available?.available ? n(available.start_minute) : 540, end_minute: available?.available ? n(available.end_minute) : 1020 })}>Assign</button>}</div>})}</article>})}</div></section>
           <section className="paper"><div className="section-heading"><div><p className="eyebrow">BOOKING DEMAND</p><h2>Appointments this week</h2></div></div>{table(["Date", "Bookings"], rows(data.workload).map((r) => [s(r.booking_date), s(r.bookings)]))}</section>
           <section className="paper"><div className="section-heading"><div><p className="eyebrow">PUBLISH STATUS</p><h2>Employee notifications</h2></div></div>{table(["Employee", "Channel", "Status", "Details"], rows(data.notifications).map((r) => [s(r.name), s(r.channel).toUpperCase(), status(r.status), s(r.error) || "Queued for delivery"]))}{!(data.integrations as R | undefined)?.sms && <p className="small-note">SMS is not configured. Add the Twilio account SID, auth token, and sending number in Settings → Notifications before publishing a future schedule.</p>}</section>
         </>
@@ -1851,6 +1866,44 @@ export function AdminWorkspace({
       )}
     </>
   );
+}
+function ScheduleDayTimeline({
+  day,
+  shifts,
+  appointments,
+  startMinute,
+  hours,
+  onShiftEdit,
+}: {
+  day: string;
+  shifts: Array<{ shift: CalendarShift; lane: number; lanes: number }>;
+  appointments: R[];
+  startMinute: number;
+  hours: number;
+  onShiftEdit: (shift: R) => void;
+}) {
+  const bookingLayouts = layoutOverlappingShifts<CalendarShift>(
+    appointments.map((appointment) => ({
+      ...appointment,
+      start_minute: n(appointment.start_minute),
+      end_minute: n(appointment.start_minute) + n(appointment.duration_minutes),
+    })),
+  );
+  const eventStyle = (event: { start_minute: number; end_minute: number; lane: number; lanes: number }) => ({
+    top: `${Math.max(0, event.start_minute - startMinute)}px`,
+    height: `${Math.max(34, event.end_minute - event.start_minute)}px`,
+    left: `calc(${(event.lane / event.lanes) * 100}% + 3px)`,
+    width: `calc(${100 / event.lanes}% - 6px)`,
+  });
+  return <div className="day-timeline-scroll"><div className="day-timeline" style={{ "--timeline-height": `${hours * 60}px` } as CSSProperties}><div className="day-time-heading">{scheduleDate(day)}</div><div className="day-track-heading">Staff shifts</div><div className="day-track-heading">Appointments</div><div className="day-time-labels">{Array.from({ length: hours }, (_, hour) => <span key={hour}>{timeLabel(startMinute + hour * 60)}</span>)}</div><div className="day-track" onClick={() => onShiftEdit({ shift_date: day, start_minute: 540, end_minute: 1020 })}>{shifts.map(({ shift, lane, lanes }) => <button className="shift-event" key={s(shift.id)} style={eventStyle({ start_minute: shift.start_minute, end_minute: shift.end_minute, lane, lanes })} onClick={(event) => { event.stopPropagation(); onShiftEdit(shift); }}><strong>{s(shift.name)}</strong><span>{timeLabel(shift.start_minute)} - {timeLabel(shift.end_minute)}</span></button>)}</div><div className="day-track appointment-track">{bookingLayouts.map(({ shift, lane, lanes }) => <Link className="appointment-event" key={s(shift.id)} style={eventStyle({ start_minute: shift.start_minute, end_minute: shift.end_minute, lane, lanes })} href={`/admin/bookings?search=${encodeURIComponent(s(shift.reference))}`}><strong>{s(shift.service_name)}</strong><span>{timeLabel(shift.start_minute)} · {s(shift.customer_name)}</span></Link>)}</div></div></div>;
+}
+function scheduleDate(day: string) {
+  return new Date(day + "T12:00:00Z").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 function Calendar({
   records,
