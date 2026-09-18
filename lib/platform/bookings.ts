@@ -458,16 +458,30 @@ export async function updateBooking(
          ORDER BY start_minute LIMIT 1`,
         [assignedTo, date, id, start, end],
       )).rows;
-      const shift = (await q<{ id: string }>(
-        "SELECT id FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date=$2 AND status='scheduled' AND start_minute<=$3 AND end_minute>=$4 LIMIT 1",
-        [employee.id, date, start, end],
-      )).rows[0];
+      const dated = (await q<{ status: string; start_minute: number; end_minute: number }>(
+        "SELECT status,start_minute,end_minute FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date=$2 ORDER BY updated_at DESC",
+        [employee.id, date],
+      )).rows;
+      const override = dated.find((item) => item.status !== "scheduled");
+      const shift = !override && dated.find((item) => item.status === "scheduled" && item.start_minute <= start && item.end_minute >= end);
+      const weekday = new Date(date + "T12:00:00Z").getUTCDay();
+      const recurring = !dated.length ? (await q<{ available: boolean; start_minute: number; end_minute: number }>(
+        "SELECT available,start_minute,end_minute FROM wl.employee_availability WHERE employee_id=$1 AND weekday=$2",
+        [employee.id, weekday],
+      )).rows[0] : null;
+      const recurringCovers = recurring?.available && recurring.start_minute <= start && recurring.end_minute >= end;
       const warnings = [
         ...(conflicts.length ? [`${employee.name} already has ${conflicts[0].reference} at ${conflicts[0].start_minute} minutes.`] : []),
-        ...(!shift ? [`${employee.name} has no shift covering this appointment.`] : []),
+        ...(override ? [`${employee.name} has a ${override.status.toUpperCase()} date override.`] : []),
+        ...(!override && !shift && !recurringCovers ? [`${employee.name} is not scheduled for the appointment hours.`] : []),
       ];
       if (warnings.length && !data.assignment_override)
         throw new AppError(`Assignment warning: ${warnings.join(" ")} Review the schedule or select the manager override.`);
+      if (warnings.length && data.assignment_override)
+        await q(
+          "INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking',$3,'assignment_override',$4::jsonb)",
+          [randomUUID(), actor, id, JSON.stringify({ assigned_to: assignedTo, warnings, date, start })],
+        );
     }
     const next = (
       await q<Booking>(
