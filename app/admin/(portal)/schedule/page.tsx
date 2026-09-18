@@ -4,5 +4,5 @@ export default function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  return <AdminPage section="calendar" searchParams={searchParams} />;
+  return <AdminPage section="schedule" searchParams={searchParams} />;
 }
