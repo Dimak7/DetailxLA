@@ -115,6 +115,7 @@ export async function adminData(
   }
   if (section === "schedule") {
     const week = p.get("week") || (await import("./types")).dateToday();
+    await query("CREATE TABLE IF NOT EXISTS wl.daily_staffing_requirements (staffing_date text PRIMARY KEY, required_staff integer NOT NULL DEFAULT 0 CHECK(required_staff BETWEEN 0 AND 100), created_by uuid REFERENCES wl.users(id), updated_at timestamptz NOT NULL DEFAULT now())");
     return { week, employees: await query("SELECT * FROM wl.employees WHERE active=true ORDER BY name"), shifts: await query("SELECT s.*,e.name,e.position FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text ORDER BY s.shift_date,s.start_minute", [week]), availability: await query("SELECT * FROM wl.employee_availability"), workload: await query("SELECT booking_date,count(*)::int bookings FROM wl.bookings WHERE booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND status NOT IN ('cancelled','no_show') GROUP BY booking_date", [week]), staffing: await query("SELECT * FROM wl.daily_staffing_requirements WHERE staffing_date BETWEEN $1::date::text AND ($1::date+6)::text", [week]), notifications: await query("SELECT n.*,e.name FROM wl.schedule_notifications n JOIN wl.employees e ON e.id=s.employee_id WHERE n.week_start=$1 ORDER BY n.created_at DESC", [week]), integrations: await integrationStatus() };
   }
   if (section === "hours") {
