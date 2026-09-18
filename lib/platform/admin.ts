@@ -376,9 +376,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     const employee = (await query<{ active: boolean; max_weekly_minutes: number }>("SELECT active,max_weekly_minutes FROM wl.employees WHERE id=$1", [shift.employee_id]))[0];
     if (!employee?.active) throw new AppError("Choose an active employee.");
     if (shift.status === "scheduled") {
-      const weekday = new Date(shift.shift_date + "T12:00:00Z").getUTCDay();
-      const availability = (await query<{ available: boolean; start_minute: number; end_minute: number }>("SELECT available,start_minute,end_minute FROM wl.employee_availability WHERE employee_id=$1 AND weekday=$2", [shift.employee_id,weekday]))[0];
-      if (!availability?.available || shift.start_minute < availability.start_minute || shift.end_minute > availability.end_minute) throw new AppError("This shift falls outside the employee's saved availability.");
+      // Recurring availability is advisory. A manager's dated roster shift is the authoritative work schedule.
       const conflict = (await query<{ id: string }>("SELECT id FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date=$2 AND status='scheduled' AND id<>COALESCE($3::uuid,'00000000-0000-0000-0000-000000000000') AND start_minute<$5 AND end_minute>$4", [shift.employee_id,shift.shift_date,shift.id || null,shift.start_minute,shift.end_minute]))[0];
       if (conflict) throw new AppError("This employee already has an overlapping shift.");
       const weekStart = new Date(shift.shift_date + "T12:00:00Z"); weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
