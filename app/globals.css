@@ -570,8 +570,9 @@ button:disabled {
   gap: 20px;
 }
 .service-card {
-  background: var(--white);
-  border: 1px solid var(--line);
+  background: #f5f1e8;
+  border: 1px solid #d8cdbb;
+  color: #17211d;
   padding: 28px;
   display: flex;
   flex-direction: column;
@@ -586,6 +587,22 @@ button:disabled {
   font-size: 33px;
   font-weight: 500;
   margin: 16px 0 12px;
+}
+.service-card p,
+.service-card small,
+.service-card ul,
+.service-card details,
+.service-card a:not(.button) {
+  color: #485249;
+}
+.service-card .service-top .pill { color: #586258; }
+.service-card .service-book {
+  border-color: #d8cdbb;
+  color: #17211d !important;
+}
+.service-card:hover {
+  background: #fffdf7;
+  border-color: var(--gold);
 }
 .service-card p {
   font-size: 12px;
@@ -770,16 +787,18 @@ button:disabled {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, #12221fea, transparent);
+  background: linear-gradient(90deg, #080b0aeF 0%, #0b100dd9 47%, #0b100d30 100%);
 }
 .premium-panel > div {
   position: relative;
   z-index: 1;
   padding: 55px 0;
-  color: var(--paper);
+  color: #fffdf7;
+  max-width: 590px;
+  text-shadow: 0 2px 18px #000;
 }
 .premium-panel p {
-  color: #d2d8cd;
+  color: #f0eadd;
 }
 .reviews-section {
   text-align: center;
@@ -1064,6 +1083,13 @@ select.control option {
 .booking-main .field input, .booking-main .field select, .booking-main .field textarea { background: #0d0f0f; border: 1px solid #535b56; border-radius: 6px; color: #fffdf7; caret-color: var(--booking-accent); }
 .booking-main .field input::placeholder, .booking-main .field textarea::placeholder { color: #9fa49e; }
 .booking-main .field input:focus, .booking-main .field select:focus, .booking-main .field textarea:focus { outline: 2px solid var(--booking-accent); outline-offset: 2px; border-color: var(--booking-accent); }
+.booking-main .field input[type="date"] {
+  background: #fffdf7;
+  border-color: #d8cdbb;
+  color: #17211d;
+  color-scheme: light;
+}
+.booking-main .field input[type="date"]::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; }
 .booking-main .button { background: var(--booking-accent); border-color: var(--booking-accent); color: #101110; letter-spacing: .08em; }
 .booking-main .button.outline { background: transparent; border-color: #59615b; color: var(--booking-text); letter-spacing: normal; }
 .booking-main .button:disabled { opacity: .55; cursor: not-allowed; }
@@ -1202,13 +1228,25 @@ select.control option {
 .receipt {
   max-width: 760px;
   margin: 0 auto 80px;
+  background: #f8f4eb;
+  border: 1px solid #d8cdbb;
+  color: #17211d;
 }
 .receipt h2 {
   font-size: 42px;
+  color: #17211d;
 }
 .receipt .summary-row {
   padding: 17px 0;
+  border-color: #ded5c5;
 }
+.receipt .summary-row span,
+.receipt .small-note,
+.receipt .text-link {
+  color: #4b544d;
+}
+.receipt .summary-row strong { color: #17211d; }
+.receipt .status-pill { background: #e9dfcc; color: #17211d; }
 .status-pill {
   display: inline-block;
   padding: 4px 10px;

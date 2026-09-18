@@ -38,9 +38,9 @@ export function ServiceCards({
             <article className="service-card" key={s.id}>
               <div className="service-top">
                 <span className="service-index">
-                  {String(i + 1).padStart(2, "0")}
+                  {String(i + 1).padStart(2, "0")} - {s.category.toUpperCase()}
                 </span>
-                <span className="pill">{s.category}</span>
+                <span className="pill">EST. {s.duration_minutes / 60}H</span>
               </div>
               <h3>{s.name}</h3>
               <p>{s.description}</p>
