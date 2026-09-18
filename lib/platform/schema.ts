@@ -115,6 +115,9 @@ CREATE TABLE IF NOT EXISTS wl.employee_shifts (
  notes text NOT NULL DEFAULT '', published boolean NOT NULL DEFAULT false, created_by uuid REFERENCES wl.users(id), updated_at timestamptz NOT NULL DEFAULT now(), created_at timestamptz NOT NULL DEFAULT now(),
  CHECK((status <> 'scheduled') OR end_minute > start_minute));
 CREATE INDEX IF NOT EXISTS wl_employee_shifts_date ON wl.employee_shifts(shift_date,employee_id);
+CREATE TABLE IF NOT EXISTS wl_daily_staffing_requirements (
+ staffing_date text PRIMARY KEY, required_staff integer NOT NULL DEFAULT 0 CHECK(required_staff BETWEEN 0 AND 100),
+ created_by uuid REFERENCES wl.users(id), updated_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.time_entries (
  id uuid PRIMARY KEY, employee_id uuid NOT NULL REFERENCES wl.employees(id), shift_id uuid REFERENCES wl.employee_shifts(id),
  clock_in timestamptz NOT NULL, clock_out timestamptz, break_started_at timestamptz, break_minutes integer NOT NULL DEFAULT 0 CHECK(break_minutes >= 0),

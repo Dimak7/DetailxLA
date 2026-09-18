@@ -115,7 +115,7 @@ export async function adminData(
   }
   if (section === "schedule") {
     const week = p.get("week") || (await import("./types")).dateToday();
-    return { week, employees: await query("SELECT * FROM wl.employees WHERE active=true ORDER BY name"), shifts: await query("SELECT s.*,e.name,e.position FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text ORDER BY s.shift_date,s.start_minute", [week]), availability: await query("SELECT * FROM wl.employee_availability"), workload: await query("SELECT booking_date,count(*)::int bookings FROM wl.bookings WHERE booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND status NOT IN ('cancelled','no_show') GROUP BY booking_date", [week]), notifications: await query("SELECT n.*,e.name FROM wl.schedule_notifications n JOIN wl.employees e ON e.id=n.employee_id WHERE n.week_start=$1 ORDER BY n.created_at DESC", [week]), integrations: await integrationStatus() };
+    return { week, employees: await query("SELECT * FROM wl.employees WHERE active=true ORDER BY name"), shifts: await query("SELECT s.*,e.name,e.position FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text ORDER BY s.shift_date,s.start_minute", [week]), availability: await query("SELECT * FROM wl.employee_availability"), workload: await query("SELECT booking_date,count(*)::int bookings FROM wl.bookings WHERE booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND status NOT IN ('cancelled','no_show') GROUP BY booking_date", [week]), staffing: await query("SELECT * FROM wl.daily_staffing_requirements WHERE staffing_date BETWEEN $1::date::text AND ($1::date+6)::text", [week]), notifications: await query("SELECT n.*,e.name FROM wl.schedule_notifications n JOIN wl.employees e ON e.id=s.employee_id WHERE n.week_start=$1 ORDER BY n.created_at DESC", [week]), integrations: await integrationStatus() };
   }
   if (section === "hours") {
     const end = p.get("end") || (await import("./types")).dateToday();
@@ -337,12 +337,19 @@ const actionSections: Record<string, string> = {
   generate_schedule: "schedule",
   publish_schedule: "schedule",
   approve_time: "hours",
+  save_staffing_requirement: "schedule",
 };
 export async function adminAction(action: string, raw: unknown, user: Session) {
   const section = actionSections[action];
   if (!section || !access[section]?.includes(user.role))
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
+  if (action === "save_staffing_requirement") {
+    const requirement = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), required_staff: z.number().int().min(0).max(100) }).parse(data);
+    if (!validDate(requirement.date)) throw new AppError("Choose a valid staffing date.");
+    await query("INSERT INTO wl.daily_staffing_requirements(staffing_date,required_staff,created_by) VALUES($1,$2,$3) ON CONFLICT(staffing_date) DO UPDATE SET required_staff=$2,created_by=$3,updated_at=now()", [requirement.date,requirement.required_staff,user.user_id]);
+    return requirement;
+  }
   if (action === "save_employee") {
     const e = z.object({ id: uuid.optional(), name: z.string().trim().min(2).max(100), phone: z.string().min(7).max(30), email: z.email(), password: z.string().max(128).optional(), position: z.string().min(2).max(80), hourly_rate_cents: z.number().int().min(0), max_weekly_minutes: z.number().int().min(60).max(10080).default(2400), hire_date: z.string().max(10).nullable(), notes: txt, active: z.boolean(), availability: z.array(z.object({ weekday: z.number().int().min(0).max(6), available: z.boolean(), start_minute: z.number().int().min(0).max(1439), end_minute: z.number().int().min(1).max(1440) })).length(7) }).parse(data);
     const id = e.id || randomUUID();
