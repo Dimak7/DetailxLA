@@ -1073,6 +1073,9 @@ select.control option {
 .appointment-event { position: absolute; display: block; min-width: 0; overflow: hidden; padding: 7px; border: 1px solid #8f7153; border-left: 3px solid #d8a35d; border-radius: 5px; background: #33281e; color: #fff8e9; font-size: 9px; text-decoration: none; }
 .appointment-event strong, .appointment-event span { display: block; line-height: 1.25; }
 .appointment-event span { margin-top: 3px; color: #e4c28d; }
+.inventory-status { display: inline-block; padding: 4px 7px; border: 1px solid #3f4a42; background: #1b2922; color: #a9d6af; font-size: 9px; text-transform: uppercase; }
+.inventory-status.low_stock { border-color: #765b35; background: #34291b; color: #e8c47e; }
+.inventory-status.out_of_stock { border-color: #803f38; background: #351d1b; color: #f0aaa0; }
 @media (max-width: 620px) {
   .availability-day { grid-template-columns: 1fr 1fr; }
   .availability-day label { grid-column: 1 / -1; }

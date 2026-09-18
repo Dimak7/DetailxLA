@@ -2,19 +2,19 @@ import { query } from "./db";
 import { dateToday, channels, type Row } from "./types";
 import { validDate } from "./bookings";
 import { AppError } from "./auth";
+import { expenseSummary } from "./finance";
 export function reportRange(params: URLSearchParams) {
   const today = dateToday(),
     range = params.get("range") || "30";
-  const start =
-    params.get("from") ||
-    (range === "year"
-      ? today.slice(0, 4) + "-01-01"
-      : dateToday(
-          new Date(
-            Date.now() - (Math.max(1, Number(range) || 30) - 1) * 86400000,
-          ),
-        ));
-  const end = params.get("to") || today;
+  const offset = (days: number) => dateToday(new Date(Date.now() - days * 86400000));
+  const todayDate = new Date(today + "T12:00:00Z");
+  const weekStart = new Date(todayDate); weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
+  const monthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1));
+  const previousMonthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth() - 1, 1));
+  const previousMonthEnd = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 0));
+  const preset = range === "yesterday" ? { start: offset(1), end: offset(1) } : range === "week" ? { start: dateToday(weekStart), end: today } : range === "month" ? { start: dateToday(monthStart), end: today } : range === "last_month" ? { start: dateToday(previousMonthStart), end: dateToday(previousMonthEnd) } : range === "year" ? { start: today.slice(0, 4) + "-01-01", end: today } : { start: offset(Math.max(1, Number(range) || 30) - 1), end: today };
+  const start = params.get("from") || preset.start;
+  const end = params.get("to") || preset.end;
   if (!validDate(start) || !validDate(end) || start > end)
     throw new AppError("Choose a valid reporting range.");
   return { start, end };
@@ -36,6 +36,7 @@ export async function report(params: URLSearchParams) {
     performance,
     series,
     topServices,
+    labor,
   ] = await Promise.all([
     query<Row>(
       `SELECT count(*)::int total,count(*) FILTER(WHERE status='completed')::int completed,count(*) FILTER(WHERE status='cancelled')::int cancelled,count(*) FILTER(WHERE status='no_show')::int no_show,count(*) FILTER(WHERE booking_date>=$3 AND status IN ('new','confirmed'))::int upcoming FROM wl.bookings WHERE ${time}`,
@@ -76,7 +77,14 @@ export async function report(params: URLSearchParams) {
       `SELECT b.service_name,SUM(p.amount_cents-p.refunded_cents)::int revenue,count(DISTINCT b.id)::int bookings FROM wl.payments p JOIN wl.bookings b ON b.id=p.booking_id WHERE ${payments} GROUP BY b.service_name ORDER BY revenue DESC`,
       values,
     ),
+    query<Row>(
+      `SELECT COALESCE(SUM(GREATEST(0,round(EXTRACT(EPOCH FROM (t.clock_out-t.clock_in))/60)-t.break_minutes)*e.hourly_rate_cents/60),0)::int cost
+       FROM wl.time_entries t JOIN wl.employees e ON e.id=t.employee_id
+       WHERE t.clock_out IS NOT NULL AND (t.clock_in AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date`,
+      values,
+    ),
   ]);
+  const expenses = await expenseSummary(start, end);
   const channelSpend = await query<{ channel: string; total: number }>(
     "SELECT channel,SUM(amount_cents)::int total FROM wl.ad_spend WHERE spend_date BETWEEN $1 AND $2 GROUP BY channel",
     values,
@@ -113,12 +121,25 @@ export async function report(params: URLSearchParams) {
     totalBookings = Number(
       events.find((e) => e.name === "booking_completed")?.sessions || 0,
     );
+  const financialSeries = new Map<string, { day: string; revenue: number; expenses: number }>();
+  for (const row of series) financialSeries.set(String(row.day), { day: String(row.day), revenue: Number(row.revenue), expenses: 0 });
+  for (const row of expenses.byDay) {
+    const current = financialSeries.get(row.day) || { day: row.day, revenue: 0, expenses: 0 };
+    current.expenses = row.amount_cents;
+    financialSeries.set(row.day, current);
+  }
   return {
     start,
     end,
     bookings: bookings[0],
     customers: customers[0],
     revenue,
+    expenses: expenses.total_cents,
+    net_operating_profit: revenue - expenses.total_cents,
+    operating_margin: revenue ? ((revenue - expenses.total_cents) / revenue) * 100 : null,
+    expense_summary: expenses,
+    financial_series: [...financialSeries.values()].sort((a, b) => a.day.localeCompare(b.day)).map((row) => ({ ...row, net_operating_profit: row.revenue - row.expenses })),
+    labor_cost: Number(labor[0].cost),
     windows: windows[0],
     average_order: Number(paymentsTotal[0].paid_bookings)
       ? revenue / Number(paymentsTotal[0].paid_bookings)

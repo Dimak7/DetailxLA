@@ -142,5 +142,23 @@ CREATE TABLE IF NOT EXISTS wl.payroll_records (
  hourly_rate_cents integer NOT NULL, estimated_gross_cents integer NOT NULL DEFAULT 0, approved_at timestamptz, UNIQUE(pay_period_id,employee_id));
 CREATE TABLE IF NOT EXISTS wl.audit_logs (
  id uuid PRIMARY KEY, actor_id uuid REFERENCES wl.users(id), entity_type text NOT NULL, entity_id uuid, action text NOT NULL, before_data jsonb NOT NULL DEFAULT '{}', after_data jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS wl.expenses (
+ id uuid PRIMARY KEY, expense_date text NOT NULL, amount_cents integer NOT NULL CHECK(amount_cents >= 0), category text NOT NULL,
+ vendor text NOT NULL DEFAULT '', description text NOT NULL DEFAULT '', payment_method text NOT NULL DEFAULT '', recurrence text NOT NULL DEFAULT 'one_time' CHECK(recurrence IN ('one_time','weekly','monthly','yearly')),
+ recurring_start text, recurring_end text, receipt_url text NOT NULL DEFAULT '', notes text NOT NULL DEFAULT '', created_by uuid REFERENCES wl.users(id), updated_by uuid REFERENCES wl.users(id),
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS wl_expenses_date ON wl.expenses(expense_date);
+CREATE INDEX IF NOT EXISTS wl_expenses_category_date ON wl.expenses(category,expense_date);
+CREATE TABLE IF NOT EXISTS wl.inventory_items (
+ id uuid PRIMARY KEY, name text NOT NULL, sku text NOT NULL DEFAULT '', category text NOT NULL DEFAULT 'Other', quantity numeric NOT NULL DEFAULT 0 CHECK(quantity >= 0),
+ unit text NOT NULL DEFAULT 'units', unit_cost_cents integer NOT NULL DEFAULT 0 CHECK(unit_cost_cents >= 0), supplier text NOT NULL DEFAULT '', minimum_stock numeric NOT NULL DEFAULT 0 CHECK(minimum_stock >= 0),
+ reorder_quantity numeric NOT NULL DEFAULT 0 CHECK(reorder_quantity >= 0), last_purchase_date text, notes text NOT NULL DEFAULT '', active boolean NOT NULL DEFAULT true,
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+CREATE UNIQUE INDEX IF NOT EXISTS wl_inventory_sku_unique ON wl.inventory_items(sku) WHERE sku<>'';
+CREATE INDEX IF NOT EXISTS wl_inventory_active ON wl.inventory_items(active,category);
+CREATE TABLE IF NOT EXISTS wl.inventory_movements (
+ id uuid PRIMARY KEY, item_id uuid NOT NULL REFERENCES wl.inventory_items(id) ON DELETE CASCADE, movement_type text NOT NULL CHECK(movement_type IN ('purchase','usage','adjustment','return','waste','correction')),
+ quantity numeric NOT NULL CHECK(quantity<>0), unit_cost_cents integer, occurred_on text NOT NULL, notes text NOT NULL DEFAULT '', expense_id uuid UNIQUE REFERENCES wl.expenses(id), created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS wl_inventory_movements_item_date ON wl.inventory_movements(item_id,occurred_on DESC);
 INSERT INTO wl.migrations(version) VALUES (1) ON CONFLICT DO NOTHING;
 `;

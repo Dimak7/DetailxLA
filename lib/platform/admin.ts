@@ -9,7 +9,8 @@ import {
   validDate,
   bookingById,
 } from "./bookings";
-import { report } from "./reporting";
+import { report, reportRange } from "./reporting";
+import { expenseSummary, inventorySummary } from "./finance";
 import { audiences, queueCampaign, unsubscribeToken } from "./campaigns";
 import { enqueue, enqueueBooking } from "./outbox";
 import { createCheckout } from "../integrations/payments";
@@ -89,7 +90,17 @@ export async function adminData(
            AND b.assigned_to IS NULL AND b.status NOT IN ('cancelled','no_show')
          ORDER BY b.booking_date,b.start_minute LIMIT 12`,
       ),
+      inventory: await inventorySummary(),
     };
+  if (section === "reports") return { report: await report(p), inventory: await inventorySummary() };
+  if (section === "expenses") {
+    const { start, end } = reportRange(p);
+    return { start, end, summary: await expenseSummary(start, end), rows: await query("SELECT * FROM wl.expenses WHERE (expense_date BETWEEN $1 AND $2 OR (recurrence<>'one_time' AND COALESCE(recurring_start,expense_date)<=$2 AND COALESCE(recurring_end,$2)>=$1)) AND (vendor||' '||category||' '||description) ILIKE $3 ORDER BY expense_date DESC,created_at DESC LIMIT 200", [start,end,"%" + search + "%"]) };
+  }
+  if (section === "inventory") {
+    const selected = p.get("id") || "";
+    return { summary: await inventorySummary(), rows: await query("SELECT *,CASE WHEN quantity<=0 THEN 'out_of_stock' WHEN quantity<=minimum_stock THEN 'low_stock' ELSE 'in_stock' END stock_status FROM wl.inventory_items WHERE (name||' '||sku||' '||category||' '||supplier) ILIKE $1 ORDER BY active DESC,name LIMIT 300", ["%" + search + "%"]), movements: selected ? await query("SELECT m.*,i.name item_name,u.name user_name FROM wl.inventory_movements m JOIN wl.inventory_items i ON i.id=m.item_id LEFT JOIN wl.users u ON u.id=m.created_by WHERE m.item_id=$1 ORDER BY m.occurred_on DESC,m.created_at DESC LIMIT 100", [selected]) : [] };
+  }
   if (section === "settings")
     return {
       settings: await settings(),
@@ -339,12 +350,44 @@ const actionSections: Record<string, string> = {
   publish_schedule: "schedule",
   approve_time: "hours",
   save_staffing_requirement: "schedule",
+  save_expense: "expenses",
+  delete_expense: "expenses",
+  save_inventory_item: "inventory",
+  record_inventory_movement: "inventory",
 };
 export async function adminAction(action: string, raw: unknown, user: Session) {
   const section = actionSections[action];
   if (!section || !access[section]?.includes(user.role))
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
+  if (action === "save_expense") {
+    const expense = z.object({ id: uuid.optional(), expense_date: z.string(), amount_cents: z.number().int().min(0).max(100000000), category: z.string().trim().min(2).max(80), vendor: z.string().max(160).default(""), description: txt.default(""), payment_method: z.string().max(80).default(""), recurrence: z.enum(["one_time","weekly","monthly","yearly"]).default("one_time"), recurring_start: z.string().nullable().default(null), recurring_end: z.string().nullable().default(null), receipt_url: asset.default(""), notes: txt.default("") }).parse(data);
+    if (!validDate(expense.expense_date) || (expense.recurring_start && !validDate(expense.recurring_start)) || (expense.recurring_end && !validDate(expense.recurring_end))) throw new AppError("Choose valid expense dates.");
+    if (expense.recurring_end && (expense.recurring_start || expense.expense_date) > expense.recurring_end) throw new AppError("Recurring end date must follow its start.");
+    const id = expense.id || randomUUID();
+    await transaction(async (q) => { const before = expense.id ? (await q<Row>("SELECT * FROM wl.expenses WHERE id=$1 FOR UPDATE", [id])).rows[0] || {} : {}; await q("INSERT INTO wl.expenses(id,expense_date,amount_cents,category,vendor,description,payment_method,recurrence,recurring_start,recurring_end,receipt_url,notes,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13) ON CONFLICT(id) DO UPDATE SET expense_date=$2,amount_cents=$3,category=$4,vendor=$5,description=$6,payment_method=$7,recurrence=$8,recurring_start=$9,recurring_end=$10,receipt_url=$11,notes=$12,updated_by=$13,updated_at=now()", [id,expense.expense_date,expense.amount_cents,expense.category,expense.vendor,expense.description,expense.payment_method,expense.recurrence,expense.recurrence === "one_time" ? null : expense.recurring_start || expense.expense_date,expense.recurrence === "one_time" ? null : expense.recurring_end,expense.receipt_url,expense.notes,user.user_id]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'expense',$3,$4,$5::jsonb,$6::jsonb)",[randomUUID(),user.user_id,id,expense.id ? "updated" : "created",JSON.stringify(before),JSON.stringify(expense)]); });
+    return { id };
+  }
+  if (action === "delete_expense") {
+    const id = uuid.parse(data.id);
+    await transaction(async (q) => { const before = (await q<Row>("DELETE FROM wl.expenses WHERE id=$1 RETURNING *", [id])).rows[0]; if (!before) throw new AppError("Expense not found.",404); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data) VALUES($1,$2,'expense',$3,'deleted',$4::jsonb)",[randomUUID(),user.user_id,id,JSON.stringify(before)]); });
+  }
+  if (action === "save_inventory_item") {
+    const item = z.object({ id: uuid.optional(), name: z.string().trim().min(2).max(160), sku: z.string().trim().max(80).default(""), category: z.string().trim().min(2).max(80), unit: z.string().trim().min(1).max(40), unit_cost_cents: z.number().int().min(0).max(100000000), supplier: z.string().max(160).default(""), minimum_stock: z.number().min(0).max(1000000), reorder_quantity: z.number().min(0).max(1000000), last_purchase_date: z.string().nullable().default(null), notes: txt.default(""), active: z.boolean().default(true), opening_quantity: z.number().min(0).max(1000000).default(0) }).parse(data);
+    if (item.last_purchase_date && !validDate(item.last_purchase_date)) throw new AppError("Choose a valid purchase date.");
+    const id = item.id || randomUUID();
+    await transaction(async (q) => { const before = item.id ? (await q<Row>("SELECT * FROM wl.inventory_items WHERE id=$1 FOR UPDATE",[id])).rows[0] : undefined; if (item.id && !before) throw new AppError("Inventory item not found.",404); await q("INSERT INTO wl.inventory_items(id,name,sku,category,quantity,unit,unit_cost_cents,supplier,minimum_stock,reorder_quantity,last_purchase_date,notes,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(id) DO UPDATE SET name=$2,sku=$3,category=$4,unit=$6,unit_cost_cents=$7,supplier=$8,minimum_stock=$9,reorder_quantity=$10,last_purchase_date=$11,notes=$12,active=$13,updated_at=now()",[id,item.name,item.sku,item.category,item.id ? Number(before?.quantity || 0) : item.opening_quantity,item.unit,item.unit_cost_cents,item.supplier,item.minimum_stock,item.reorder_quantity,item.last_purchase_date,item.notes,item.active]); if (!item.id && item.opening_quantity) await q("INSERT INTO wl.inventory_movements(id,item_id,movement_type,quantity,occurred_on,notes,created_by) VALUES($1,$2,'correction',$3,$4,'Opening balance',$5)",[randomUUID(),id,item.opening_quantity,item.last_purchase_date || new Date().toISOString().slice(0,10),user.user_id]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'inventory_item',$3,$4,$5::jsonb,$6::jsonb)",[randomUUID(),user.user_id,id,item.id ? "updated" : "created",JSON.stringify(before || {}),JSON.stringify(item)]); });
+    return { id };
+  }
+  if (action === "record_inventory_movement") {
+    const movement = z.object({ item_id: uuid, movement_type: z.enum(["purchase","usage","adjustment","return","waste","correction"]), direction: z.enum(["in","out"]), quantity: z.number().positive().max(1000000), occurred_on: z.string(), unit_cost_cents: z.number().int().min(0).max(100000000).nullable().default(null), notes: txt.default(""), create_expense: z.boolean().default(false), expense_amount_cents: z.number().int().min(0).max(100000000).default(0), supplier: z.string().max(160).default("") }).parse(data);
+    if (!validDate(movement.occurred_on)) throw new AppError("Choose a valid movement date.");
+    if (movement.create_expense && movement.movement_type !== "purchase") throw new AppError("Only purchases can create an expense.");
+    const delta = movement.direction === "in" ? movement.quantity : -movement.quantity;
+    const id = randomUUID();
+    await transaction(async (q) => { const item = (await q<Row>("SELECT * FROM wl.inventory_items WHERE id=$1 FOR UPDATE",[movement.item_id])).rows[0]; if (!item?.active) throw new AppError("Choose an active inventory item."); if (Number(item.quantity) + delta < 0) throw new AppError("This movement would make inventory negative."); let expenseId: string | null = null; if (movement.create_expense) { expenseId=randomUUID(); await q("INSERT INTO wl.expenses(id,expense_date,amount_cents,category,vendor,description,payment_method,created_by,updated_by) VALUES($1,$2,$3,'Supplies',$4,$5,'Inventory purchase',$6,$6)",[expenseId,movement.occurred_on,movement.expense_amount_cents || Math.round(movement.quantity * Number(movement.unit_cost_cents || item.unit_cost_cents)),movement.supplier || item.supplier,`Inventory purchase: ${item.name}`,user.user_id]); } await q("INSERT INTO wl.inventory_movements(id,item_id,movement_type,quantity,unit_cost_cents,occurred_on,notes,expense_id,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",[id,movement.item_id,movement.movement_type,delta,movement.unit_cost_cents,movement.occurred_on,movement.notes,expenseId,user.user_id]); await q("UPDATE wl.inventory_items SET quantity=quantity+$2,unit_cost_cents=COALESCE($3,unit_cost_cents),supplier=CASE WHEN $4<>'' THEN $4 ELSE supplier END,last_purchase_date=CASE WHEN $5='purchase' THEN $6 ELSE last_purchase_date END,updated_at=now() WHERE id=$1",[movement.item_id,delta,movement.unit_cost_cents,movement.supplier,movement.movement_type,movement.occurred_on]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'inventory_movement',$3,'created',$4::jsonb)",[randomUUID(),user.user_id,id,JSON.stringify({ ...movement, delta, expense_id: expenseId })]); });
+    return { id };
+  }
   if (action === "save_staffing_requirement") {
     const requirement = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), required_staff: z.number().int().min(0).max(100) }).parse(data);
     if (!validDate(requirement.date)) throw new AppError("Choose a valid staffing date.");

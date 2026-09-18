@@ -423,6 +423,15 @@ export function AdminWorkspace({
     const availability = Array.isArray(r.availability) ? r.availability : Array.from({ length: 7 }, (_, weekday) => ({ weekday, available: weekday > 0 && weekday < 6, start_minute: 480, end_minute: 1020 }));
     edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", hourly_rate_cents: 20, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : "Login password (12+ characters)", "password", { required: !r.user_id }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"] }), f("hourly_rate_cents", "Hourly pay ($)", "money"), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, hire_date: d.hire_date || null }));
   }
+  function expenseEdit(r: R = {}) {
+    edit(r.id ? "Edit expense" : "Add expense", "save_expense", { expense_date: dateToday(), amount_cents: 0, category: "Supplies", vendor: "", description: "", payment_method: "Card", recurrence: "one_time", recurring_start: "", recurring_end: "", receipt_url: "", notes: "", ...r, ...(r.amount_cents != null ? { amount_cents: n(r.amount_cents) / 100 } : {}) }, [f("expense_date", "Date", "date", { required: true }), f("amount_cents", "Amount ($)", "money", { required: true }), f("category", "Category", "select", { options: ["Rent", "Utilities", "Payroll", "Chemicals", "Equipment", "Supplies", "Insurance", "Advertising", "Software", "Vehicle", "Repairs", "Taxes / Fees", "Other"] }), f("vendor", "Vendor"), f("payment_method", "Payment method", "select", { options: ["Card", "Cash", "ACH", "Check", "Other"] }), f("recurrence", "Frequency", "select", { options: [{ value: "one_time", label: "One-time" }, { value: "weekly", label: "Weekly" }, { value: "monthly", label: "Monthly" }, { value: "yearly", label: "Yearly" }] }), f("recurring_start", "Recurring start", "date"), f("recurring_end", "Recurring end (optional)", "date"), f("receipt_url", "Receipt", "upload"), f("description", "Description", "textarea", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, recurring_start: d.recurring_start || null, recurring_end: d.recurring_end || null }));
+  }
+  function inventoryEdit(r: R = {}) {
+    edit(r.id ? "Edit inventory item" : "Add inventory item", "save_inventory_item", { name: "", sku: "", category: "Chemicals", opening_quantity: 0, unit: "units", unit_cost_cents: 0, supplier: "", minimum_stock: 0, reorder_quantity: 0, last_purchase_date: "", notes: "", active: true, ...r, ...(r.unit_cost_cents != null ? { unit_cost_cents: n(r.unit_cost_cents) / 100 } : {}) }, [f("name", "Product name", "text", { required: true }), f("sku", "SKU"), f("category", "Category", "select", { options: ["Chemicals", "Equipment", "Supplies", "Accessories", "Other"] }), ...(!r.id ? [f("opening_quantity", "Opening quantity", "number", { min: 0 })] : []), f("unit", "Unit", "select", { options: ["units", "bottles", "gallons", "ounces", "packs", "towels", "pairs"] }), f("unit_cost_cents", "Cost per unit ($)", "money"), f("supplier", "Supplier"), f("minimum_stock", "Minimum stock", "number", { min: 0 }), f("reorder_quantity", "Reorder quantity", "number", { min: 0 }), f("last_purchase_date", "Last purchase", "date"), f("active", "Active item", "checkbox"), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, last_purchase_date: d.last_purchase_date || null }));
+  }
+  function movementEdit(item: R) {
+    edit("Record movement: " + s(item.name), "record_inventory_movement", { item_id: item.id, movement_type: "purchase", direction: "in", quantity: 1, occurred_on: dateToday(), unit_cost_cents: n(item.unit_cost_cents) / 100, supplier: s(item.supplier), notes: "", create_expense: true, expense_amount_cents: 0 }, [f("movement_type", "Movement type", "select", { options: ["purchase", "usage", "adjustment", "return", "waste", "correction"] }), f("direction", "Direction", "select", { options: [{ value: "in", label: "Add stock" }, { value: "out", label: "Remove stock" }] }), f("quantity", "Quantity", "number", { min: 0.0001, required: true }), f("occurred_on", "Date", "date", { required: true }), f("unit_cost_cents", "Unit cost ($)", "money"), f("supplier", "Supplier"), f("create_expense", "Record purchase as operating expense", "checkbox"), f("expense_amount_cents", "Expense amount ($)", "money", { hint: "Leave at zero to calculate quantity x unit cost." }), f("notes", "Notes", "textarea", { wide: true })]);
+  }
   function shiftEdit(r: R = {}) {
     const time = (value: unknown) => { const minutes = n(value); return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`; };
     edit(r.id ? "Edit daily shift" : "Add worker to daily roster", "save_shift", { employee_id: scheduleEmployees[0]?.id || "", shift_date: s(data.week) || dateToday(), start_minute: "09:00", end_minute: "17:00", break_minutes: 30, status: "scheduled", notes: "", ...r, ...(r.start_minute != null ? { start_minute: time(r.start_minute), end_minute: time(r.end_minute) } : {}) }, [f("employee_id", "Employee", "select", { required: true, options: scheduleEmployees.map((employee) => ({ value: s(employee.id), label: s(employee.name) + " - " + s(employee.position) })) }), f("shift_date", "Shift date", "date", { required: true }), f("start_minute", "Start time", "time", { required: true }), f("end_minute", "End time", "time", { required: true }), f("break_minutes", "Unpaid break (minutes)", "number", { min: 0, max: 720 }), f("status", "Status", "select", { options: ["scheduled", "off", "pto", "sick"] }), f("notes", "Manager notes", "textarea", { wide: true })], (d) => ({ ...d, start_minute: n(String(d.start_minute).split(":")[0]) * 60 + n(String(d.start_minute).split(":")[1]), end_minute: n(String(d.end_minute).split(":")[0]) * 60 + n(String(d.end_minute).split(":")[1]) }));
@@ -706,6 +715,8 @@ export function AdminWorkspace({
             Create campaign +
           </button>
         )}
+        {section === "expenses" && <button className="button" onClick={() => expenseEdit()}>Add expense +</button>}
+        {section === "inventory" && <button className="button" onClick={() => inventoryEdit()}>Add inventory item +</button>}
       </div>
       {notice && (
         <div className="success-message" role="status">
@@ -780,6 +791,8 @@ export function AdminWorkspace({
           <section className="paper"><h2>Recent time entries</h2>{table(["Clock in", "Clock out", "Break", "Worked"], rows(data.entries).map((r) => [stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "In progress", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h"]))}</section>
         </>
       )}
+      {section === "expenses" && (() => { const summary = data.summary as R; const categoryRows = rows(summary?.byCategory); return <><section className="paper"><form className="toolbar"><label className="field"><span>Period</span><select name="range" defaultValue={params.get("range") || "30"}><option value="1">Today</option><option value="7">This week</option><option value="30">This month</option><option value="90">Last 90 days</option><option value="year">This year</option></select></label><label className="field"><span>From</span><input name="from" type="date" defaultValue={params.get("from") || ""} /></label><label className="field"><span>To</span><input name="to" type="date" defaultValue={params.get("to") || ""} /></label><label className="field"><span>Search</span><input name="search" defaultValue={params.get("search") || ""} placeholder="Vendor, category..." /></label><button className="button">Apply</button></form><div className="stats-grid">{[["Operating expenses", money(n(summary?.total_cents)), `${s(data.start)} to ${s(data.end)}`],["Recurring", money(n(summary?.recurring_cents)), "Occurrences in selected period"],["One-time", money(n(summary?.one_time_cents)), "Recorded in selected period"],["Categories", s(categoryRows.length), "Real expense categories"]].map(([label,value,hint]) => <div className="stat" key={label}><p>{label}</p><strong>{value}</strong><small>{hint}</small></div>)}</div></section><div className="admin-grid"><section className="paper"><h2>Expense by category</h2>{categoryRows.length ? categoryRows.map((row) => <div className="summary-row" key={s(row.category)}><span>{s(row.category)} <small>({s(row.count)})</small></span><strong>{money(n(row.amount_cents))}</strong></div>) : <div className="empty-state"><h3>No expenses yet</h3><p>Start tracking operating expenses to see true operating costs.</p><button className="button" onClick={() => expenseEdit()}>Add expense +</button></div>}</section><section className="paper"><h2>Expense reporting</h2><p className="small-note">Recurring items are calculated for the selected period without creating duplicate records. Expense totals include recorded operating expenses, including linked inventory purchases once.</p><Link className="text-link" href={`/admin/reports?from=${encodeURIComponent(s(data.start))}&to=${encodeURIComponent(s(data.end))}`}>Open profitability report ↗</Link></section></div><section className="paper"><div className="section-heading"><div><p className="eyebrow">OPERATING COSTS</p><h2>Expense records</h2></div></div>{table(["Date","Vendor","Category","Amount","Frequency","Receipt","Actions"], list.map((row) => [s(row.expense_date),<><strong>{s(row.vendor) || "No vendor"}</strong><small>{s(row.description)}</small></>,s(row.category),money(n(row.amount_cents)),title(s(row.recurrence)),row.receipt_url ? <a className="text-link" href={s(row.receipt_url)} target="_blank">View</a> : "-",<><button onClick={() => expenseEdit(row)}>Edit</button><button className="link-button" onClick={() => run("delete_expense", { id: row.id }, "Expense deleted.")}>Delete</button></>]))}</section></> })()}
+      {section === "inventory" && (() => { const summary = data.summary as R; return <><section className="paper"><form className="toolbar"><label className="field"><span>Search inventory</span><input name="search" defaultValue={params.get("search") || ""} placeholder="Product, SKU, supplier..." /></label><button className="button">Search</button></form><div className="stats-grid">{[["Inventory items",s(summary?.items),"Active products"],["Inventory value",money(n(summary?.value_cents)),"Quantity x cost basis"],["Low stock",s(summary?.low_stock),"At or below minimum"],["Out of stock",s(summary?.out_of_stock),"Requires attention"]].map(([label,value,hint]) => <div className="stat" key={label}><p>{label}</p><strong>{value}</strong><small>{hint}</small></div>)}</div></section><section className="paper"><div className="section-heading"><div><p className="eyebrow">STOCK CONTROL</p><h2>Inventory</h2></div></div>{table(["Product","Stock","Status","Value","Supplier","Actions"], list.map((item) => [<><strong>{s(item.name)}</strong><small>{s(item.sku) || s(item.category)}</small></>,`${s(item.quantity)} ${s(item.unit)}`,<span className={`inventory-status ${s(item.stock_status)}`}>{title(s(item.stock_status))}</span>,money(n(item.quantity) * n(item.unit_cost_cents)),s(item.supplier) || "-",<><button className="button" onClick={() => movementEdit(item)}>Record movement</button><button onClick={() => inventoryEdit(item)}>Edit</button><Link className="text-link" href={`/admin/inventory?id=${s(item.id)}`}>History</Link></>]))}</section>{params.get("id") && <section className="paper"><div className="section-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2>Inventory movement history</h2></div></div>{table(["Date","Item","Type","Change","Recorded by","Notes"], rows(data.movements).map((movement) => [s(movement.occurred_on),s(movement.item_name),title(s(movement.movement_type)),`${n(movement.quantity) > 0 ? "+" : ""}${s(movement.quantity)}`,s(movement.user_name) || "System",s(movement.notes) || "-"]))}</section>}</> })()}
       {reportMode && rep && (
         <>
           <form className="toolbar">
@@ -788,8 +801,11 @@ export function AdminWorkspace({
               <select name="range" defaultValue={params.get("range") || "30"}>
                 {[
                   ["1", "Today"],
-                  ["7", "7 days"],
-                  ["30", "30 days"],
+                  ["yesterday", "Yesterday"],
+                  ["week", "This week"],
+                  ["month", "This month"],
+                  ["last_month", "Last month"],
+                  ["30", "Last 30 days"],
                   ["90", "90 days"],
                   ["year", "This year"],
                 ].map(([v, l]) => (
@@ -824,6 +840,9 @@ export function AdminWorkspace({
           <div className="stats-grid">
             {[
               ["Net revenue", money(rep.revenue), "Selected period"],
+              ["Operating expenses", money(rep.expenses), "Recorded expenses in period"],
+              ["Net operating profit", money(rep.net_operating_profit), "Revenue less operating expenses"],
+              ["Operating margin", rep.operating_margin == null ? "No paid revenue" : rep.operating_margin.toFixed(1) + "%", "Not tax or full accounting profit"],
               ["Bookings", s(rep.bookings.total), "Created in period"],
               ["New leads", s(rep.leads), "Recorded enquiries & bookings"],
               [
@@ -890,6 +909,10 @@ export function AdminWorkspace({
               </div>
               <div className="admin-grid">
                 <section className="paper">
+                  <h2>Financial trend</h2>
+                  {rep.financial_series.length ? <>{table(["Date", "Revenue", "Expenses", "Net operating profit"], rep.financial_series.map((row) => [s(row.day), money(n(row.revenue)), money(n(row.expenses)), money(n(row.net_operating_profit))]))}<p className="small-note">Revenue is verified payments less refunds. Operating expenses include recorded expenses only; labor is shown separately when time entries exist.</p></> : <div className="empty-state"><p>No financial activity in this period.</p></div>}
+                </section>
+                <section className="paper">
                   <h2>Today's schedule</h2>
                   {table(
                     ["Time", "Customer", "Service", "Detailer", "Status"],
@@ -936,6 +959,8 @@ export function AdminWorkspace({
                         : "No customers"}
                     </strong>
                   </div>
+                  <div className="summary-row"><span>Recorded labor cost</span><strong>{money(rep.labor_cost)}</strong></div>
+                  <div className="summary-row"><span>Inventory alerts</span><strong>{s((data.inventory as R | undefined)?.low_stock)} low · {s((data.inventory as R | undefined)?.out_of_stock)} out</strong></div>
                 </section>
               </div>
             </>

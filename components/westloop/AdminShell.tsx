@@ -9,6 +9,9 @@ const sectionLabels: Record<string, string> = {
   my_schedule: "My schedule",
   hours: "Hours",
   payroll: "Payroll",
+  expenses: "Expenses",
+  inventory: "Inventory",
+  reports: "Reports",
 };
 export function AdminShell({
   user,
