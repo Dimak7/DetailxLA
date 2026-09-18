@@ -90,6 +90,11 @@ export function AdminWorkspace({
     })),
   ];
   const rep = data.report as Report | undefined;
+  const rosterDays = s(data.week) ? Array.from({ length: 7 }, (_, offset) => {
+    const day = new Date(s(data.week) + "T12:00:00Z");
+    day.setUTCDate(day.getUTCDate() + offset);
+    return day.toISOString().slice(0, 10);
+  }) : [];
   async function run(name: string, d: R, message = "Saved.") {
     setBusy(true);
     setError("");
@@ -696,6 +701,7 @@ export function AdminWorkspace({
             <form className="toolbar"><label className="field"><span>Week starts</span><input name="week" type="date" defaultValue={s(data.week)} /></label><button className="button">Load week</button></form>
             {table(["Date", "Employee", "Shift", "Break", "Status", "Published", "Actions"], scheduleShifts.map((r) => [s(r.shift_date), <><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, timeLabel(n(r.start_minute)) + " - " + timeLabel(n(r.end_minute)), n(r.break_minutes) + " min", status(r.status), r.published ? "Yes" : "Draft", <><button onClick={() => shiftEdit(r)}>Edit</button>{!r.published && <button disabled={busy} onClick={() => run("delete_shift", { id: r.id }, "Draft shift removed.")}>Delete</button>}</>]))}
           </section>
+          <section className="paper"><div className="section-heading"><div><p className="eyebrow">DAILY ROSTER</p><h2>Actual staff by day</h2></div></div><div className="roster-grid">{rosterDays.map((day) => { const shifts = scheduleShifts.filter((shift) => s(shift.shift_date) === day && s(shift.status) === "scheduled"); const jobs = rows(data.workload).find((item) => s(item.booking_date) === day); return <article className="roster-day" key={day}><strong>{new Date(day + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}</strong><small>{shifts.length} staff scheduled · {s(jobs?.bookings) || "0"} jobs booked</small>{scheduleEmployees.map((employee) => { const shift = shifts.find((item) => s(item.employee_id) === s(employee.id)); const available = employeeAvailability.find((item) => s(item.employee_id) === s(employee.id) && n(item.weekday) === new Date(day + "T12:00:00Z").getUTCDay()); return <div className="roster-person" key={s(employee.id)}><span><strong>{s(employee.name)}</strong><small>{shift ? timeLabel(n(shift.start_minute)) + " - " + timeLabel(n(shift.end_minute)) : available?.available ? "Available, not scheduled" : "Not available"}</small></span>{shift ? <button onClick={() => shiftEdit(shift)}>Edit</button> : <button onClick={() => shiftEdit({ employee_id: employee.id, shift_date: day, start_minute: available?.available ? n(available.start_minute) : 540, end_minute: available?.available ? n(available.end_minute) : 1020 })}>Assign</button>}</div>})}</article>})}</div></section>
           <section className="paper"><div className="section-heading"><div><p className="eyebrow">BOOKING DEMAND</p><h2>Appointments this week</h2></div></div>{table(["Date", "Bookings"], rows(data.workload).map((r) => [s(r.booking_date), s(r.bookings)]))}</section>
           <section className="paper"><div className="section-heading"><div><p className="eyebrow">PUBLISH STATUS</p><h2>Employee notifications</h2></div></div>{table(["Employee", "Channel", "Status", "Details"], rows(data.notifications).map((r) => [s(r.name), s(r.channel).toUpperCase(), status(r.status), s(r.error) || "Queued for delivery"]))}{!(data.integrations as R | undefined)?.sms && <p className="small-note">SMS is not configured. Add the Twilio account SID, auth token, and sending number in Settings → Notifications before publishing a future schedule.</p>}</section>
         </>
