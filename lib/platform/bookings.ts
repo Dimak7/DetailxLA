@@ -395,6 +395,7 @@ export async function updateBooking(
     notes?: string;
     internal_notes?: string;
     assigned_to?: string | null;
+    assignment_override?: boolean;
     price_cents?: number | null;
   },
   actor: string,
@@ -441,15 +442,33 @@ export async function updateBooking(
         s,
         b.id,
       );
-    if (
-      data.assigned_to &&
-      !(
-        await q("SELECT id FROM wl.users WHERE id=$1 AND active=true", [
-          data.assigned_to,
-        ])
-      ).rows.length
-    )
-      throw new AppError("Choose an active staff member.");
+    const assignedTo = data.assigned_to === undefined ? b.assigned_to : data.assigned_to;
+    if (assignedTo && assignedTo !== b.assigned_to) {
+      const employee = (await q<{ id: string; name: string }>(
+        "SELECT e.id,e.name FROM wl.employees e JOIN wl.users u ON u.id=e.user_id WHERE e.user_id=$1 AND e.active=true AND u.active=true",
+        [assignedTo],
+      )).rows[0];
+      if (!employee) throw new AppError("Choose an active detailer from Employees.");
+      const end = start + b.duration_minutes;
+      const conflicts = (await q<{ reference: string; start_minute: number; duration_minutes: number }>(
+        `SELECT reference,start_minute,duration_minutes FROM wl.bookings
+         WHERE assigned_to=$1 AND booking_date=$2 AND id<>$3
+           AND status NOT IN ('cancelled','no_show')
+           AND start_minute<$5 AND start_minute+duration_minutes>$4
+         ORDER BY start_minute LIMIT 1`,
+        [assignedTo, date, id, start, end],
+      )).rows;
+      const shift = (await q<{ id: string }>(
+        "SELECT id FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date=$2 AND status='scheduled' AND start_minute<=$3 AND end_minute>=$4 LIMIT 1",
+        [employee.id, date, start, end],
+      )).rows[0];
+      const warnings = [
+        ...(conflicts.length ? [`${employee.name} already has ${conflicts[0].reference} at ${conflicts[0].start_minute} minutes.`] : []),
+        ...(!shift ? [`${employee.name} has no shift covering this appointment.`] : []),
+      ];
+      if (warnings.length && !data.assignment_override)
+        throw new AppError(`Assignment warning: ${warnings.join(" ")} Review the schedule or select the manager override.`);
+    }
     const next = (
       await q<Booking>(
         `UPDATE wl.bookings SET status=$1,booking_date=$2,start_minute=$3,notes=$4,internal_notes=$5,assigned_to=$6,price_cents=$7,updated_at=now() WHERE id=$8 RETURNING *`,

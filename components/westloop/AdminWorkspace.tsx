@@ -82,6 +82,13 @@ export function AdminWorkspace({
       .filter((t) => t.active)
       .map((t) => ({ value: s(t.id), label: s(t.name) })),
   ];
+  const detailerOptions = [
+    { value: "", label: "No detailer assigned" },
+    ...scheduleEmployees.map((employee) => ({
+      value: s(employee.user_id),
+      label: `${s(employee.name)} - ${s(employee.position)}`,
+    })),
+  ];
   const rep = data.report as Report | undefined;
   async function run(name: string, d: R, message = "Saved.") {
     setBusy(true);
@@ -208,8 +215,12 @@ export function AdminWorkspace({
                   label: timeLabel(i * 30),
                 })),
               }),
-              f("assigned_to", "Assigned to", "nullable-select", {
-                options: teamOptions,
+              f("assigned_to", "Assigned detailer", "nullable-select", {
+                options: detailerOptions,
+                hint: "Only active employee accounts are listed.",
+              }),
+              f("assignment_override", "Manager override for a shift or job conflict", "checkbox", {
+                hint: "Use only after reviewing the visible assignment warning.",
               }),
               f("price_cents", "Agreed service price ($)", "text", {
                 hint: "Leave empty for consultation pricing. Price changes should be approved by the customer.",
@@ -217,7 +228,7 @@ export function AdminWorkspace({
             ]
           : []),
         f("notes", "Customer notes", "textarea", { wide: true }),
-        f("internal_notes", "Internal notes", "textarea", { wide: true }),
+        ...(!staff ? [f("internal_notes", "Internal notes", "textarea", { wide: true })] : []),
       ],
       (d) => ({
         ...d,
@@ -551,6 +562,7 @@ export function AdminWorkspace({
         "Appointment",
         "Customer / vehicle",
         "Date & time",
+        "Assignment",
         "Status",
         ...(!staff ? ["Estimate"] : []),
         "Actions",
@@ -580,6 +592,9 @@ export function AdminWorkspace({
             {timeLabel(n(r.start_minute))} CT · {n(r.duration_minutes) / 60}h
           </small>
         </>,
+        !staff ? (
+          r.assigned_to ? <><strong>{s(scheduleEmployees.find((e) => s(e.user_id) === s(r.assigned_to))?.name) || "Assigned"}</strong><small>Detailer assigned</small></> : <><strong>Unassigned</strong><small>Assign a detailer</small></>
+        ) : null,
         status(r.status),
         ...(!staff
           ? [money(r.price_cents == null ? null : n(r.price_cents))]
@@ -601,7 +616,7 @@ export function AdminWorkspace({
             </button>
           )}
         </>,
-      ]),
+      ].filter((cell) => cell !== null)),
     );
   }
   const profile = data.profile as {
@@ -700,14 +715,22 @@ export function AdminWorkspace({
           {table(["Employee", "Regular", "Overtime", "Rate", "Estimated gross"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, (n(r.regular_minutes) / 60).toFixed(2) + "h", (n(r.overtime_minutes) / 60).toFixed(2) + "h", money(n(r.hourly_rate_cents)), money(n(r.estimated_gross_cents))]))}
         </section>
       )}
-      {section === "my_schedule" && (
+      {section === "my_schedule" && !data.employee && (
+        <section className="paper empty-state">
+          <p className="eyebrow">EMPLOYEE WORKSPACE</p>
+          <h2>This login is not linked to a detailer profile.</h2>
+          <p>Your manager can link this account from Employees. Once linked, your published shifts, assigned jobs, and time clock will appear here.</p>
+          {user.role !== "staff" && <Link className="button" href="/admin/employees">Open employees</Link>}
+        </section>
+      )}
+      {section === "my_schedule" && !!data.employee && (
         <>
           <section className="paper"><div className="section-heading"><div><p className="eyebrow">MY WORKSPACE</p><h2>{s((data.employee as R | undefined)?.name)}'s schedule</h2></div></div>
             {(() => { const active = rows(data.entries).find((entry) => !entry.clock_out); return <div className="button-row">{!active ? <button className="button" disabled={busy} onClick={() => clock("in")}>Clock in</button> : <><button disabled={busy || Boolean(active.break_started_at)} onClick={() => clock("break_start")}>Start break</button><button disabled={busy || !active.break_started_at} onClick={() => clock("break_end")}>End break</button><button className="button" disabled={busy || Boolean(active.break_started_at)} onClick={() => clock("out")}>Clock out</button></>}</div>; })()}
             {table(["Date", "Shift", "Break", "Notes"], rows(data.shifts).map((r) => [s(r.shift_date), timeLabel(n(r.start_minute)) + " - " + timeLabel(n(r.end_minute)), n(r.break_minutes) + " min", s(r.notes) || "-"]))}
           </section>
           <section className="paper"><div className="section-heading"><div><p className="eyebrow">ASSIGNED WORK</p><h2>Upcoming appointments</h2></div></div>
-            {table(["When", "Customer", "Vehicle", "Service", "Location"], rows(data.appointments).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))} - {timeLabel(n(r.start_minute) + n(r.duration_minutes))}</small></>, <><strong>{s(r.customer_name)}</strong><small>{s(r.phone)}</small></>, s(r.vehicle) || "Vehicle details pending", <><strong>{s(r.service_name)}</strong><small>{s(r.reference)}</small></>, <><strong>{s(r.location)}</strong><small>{s(r.notes) || "No access notes"}</small></>]))}
+            {table(["When", "Customer", "Vehicle", "Service", "Location", "Status", "Actions"], rows(data.appointments).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))} - {timeLabel(n(r.start_minute) + n(r.duration_minutes))}</small></>, <><strong>{s(r.customer_name)}</strong><small>{s(r.phone)}</small></>, s(r.vehicle) || "Vehicle details pending", <><strong>{s(r.service_name)}</strong><small>{s(r.reference)} · {money(r.price_cents == null ? null : n(r.price_cents))}</small></>, <><strong>{s(r.location)}</strong><small>{s(r.notes) || "No access notes"}</small></>, status(r.status), <><button onClick={() => bookingEdit(r)}>View job</button>{r.status === "in_progress" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "completed" }, "Job marked complete.")}>Complete job</button> : r.status !== "completed" && r.status !== "cancelled" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "in_progress" }, "Job started.")}>Start job</button> : null}</>]))}
           </section>
           <section className="paper"><h2>Recent time entries</h2>{table(["Clock in", "Clock out", "Break", "Worked"], rows(data.entries).map((r) => [stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "In progress", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h"]))}</section>
         </>
@@ -813,15 +836,23 @@ export function AdminWorkspace({
                   </div>
                 ))}
               </div>
+              <div className="stats-grid">
+                {[
+                  ["Today's jobs", s((data.operations as R | undefined)?.today_jobs), "Scheduled visits"],
+                  ["Available detailers", s((data.operations as R | undefined)?.active_detailers), "Active employee profiles"],
+                  ["Unassigned jobs", s((data.operations as R | undefined)?.unassigned_jobs), "Need a detailer"],
+                ].map(([k, v, h]) => <div className="stat" key={k}><p>{k}</p><strong>{v}</strong><small>{h}</small></div>)}
+              </div>
               <div className="admin-grid">
                 <section className="paper">
-                  <h2>Today's appointments</h2>
+                  <h2>Today's schedule</h2>
                   {table(
-                    ["Time", "Customer", "Service", "Status"],
+                    ["Time", "Customer", "Service", "Detailer", "Status"],
                     rows(data.today).map((r) => [
                       timeLabel(n(r.start_minute)),
                       s(r.customer_name),
                       s(r.service_name),
+                      s(r.detailer_name) || "Unassigned",
                       status(r.status),
                     ]),
                   )}
@@ -831,6 +862,10 @@ export function AdminWorkspace({
                   >
                     Open calendar ↗
                   </Link>
+                </section>
+                <section className="paper">
+                  <h2>Unassigned jobs</h2>
+                  {table(["When", "Customer", "Service", "Action"], rows(data.unassigned).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))}</small></>, s(r.customer_name), s(r.service_name), <Link className="text-link" href="/admin/bookings">Assign detailer ↗</Link>]))}
                 </section>
                 <section className="paper">
                   <h2>Booking health</h2>

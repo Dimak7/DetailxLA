@@ -204,17 +204,13 @@ test("Relational platform integration", async (t) => {
             ),
           /assigned/,
         );
-        await updateBooking(
-          booking.booking.id,
-          { assigned_to: staff.user_id },
-          owner!.user_id,
+        await assert.rejects(
+          () => updateBooking(booking.booking.id, { assigned_to: staff.user_id }, owner!.user_id),
+          /active detailer/,
         );
         const d = await adminData("bookings", new URLSearchParams(), staff);
         assert.ok("rows" in d);
-        assert.equal(
-          (d.rows as Record<string, unknown>[])[0].price_cents,
-          undefined,
-        );
+        assert.equal((d.rows as Record<string, unknown>[]).length, 0);
       },
     );
     await t.test("all admin sections query real relational data", async () => {
@@ -399,6 +395,12 @@ test("Relational platform integration", async (t) => {
       const john = await sessionFromToken(johnToken);
       assert.ok(john);
       assert.equal((await query<{ user_id: string }>("SELECT user_id FROM wl.employees WHERE id=$1", [employeeId]))[0].user_id, john!.user_id);
+      await updateBooking(booking.booking.id, { assigned_to: john!.user_id, assignment_override: true }, owner!.user_id);
+      const assignedSchedule = await adminData("my_schedule", new URLSearchParams(), john!);
+      assert.ok((assignedSchedule.appointments as unknown[]).length > 0);
+      await updateBooking(booking.booking.id, { status: "in_progress" }, john!.user_id, true);
+      await updateBooking(booking.booking.id, { status: "completed" }, john!.user_id, true);
+      assert.equal((await query<{ status: string }>("SELECT status FROM wl.bookings WHERE id=$1", [booking.booking.id]))[0].status, "completed");
       await adminAction("generate_schedule", { week, start_minute: 540, end_minute: 1020 }, owner!);
       const draft = (await query<{ id: string; employee_id: string; shift_date: string; start_minute: number; end_minute: number; break_minutes: number; status: string }>("SELECT * FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date=$2", [employeeId, week]))[0];
       assert.ok(draft);

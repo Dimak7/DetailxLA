@@ -73,8 +73,21 @@ export async function adminData(
         "SELECT c.*,(SELECT count(*)::int FROM wl.messages m WHERE m.campaign_id=c.id AND m.status='sent') sent,(SELECT count(*)::int FROM wl.messages m WHERE m.campaign_id=c.id AND m.status IN ('failed','uncertain')) failed FROM wl.campaigns c ORDER BY created_at DESC LIMIT 100",
       ),
       today: await query(
-        "SELECT b.id,b.reference,b.service_name,b.start_minute,b.status,c.first_name||' '||c.last_name customer_name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE booking_date=$1 ORDER BY start_minute",
+        "SELECT b.id,b.reference,b.service_name,b.start_minute,b.duration_minutes,b.status,b.assigned_to,c.first_name||' '||c.last_name customer_name,u.name detailer_name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id LEFT JOIN wl.users u ON u.id=b.assigned_to WHERE booking_date=$1 ORDER BY start_minute",
         [(await import("./types")).dateToday()],
+      ),
+      operations: await query(
+        `SELECT
+          (SELECT count(*)::int FROM wl.employees WHERE active=true) active_detailers,
+          (SELECT count(*)::int FROM wl.bookings WHERE booking_date=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND status NOT IN ('cancelled','no_show')) today_jobs,
+          (SELECT count(*)::int FROM wl.bookings WHERE booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND assigned_to IS NULL AND status NOT IN ('cancelled','no_show')) unassigned_jobs`,
+      ),
+      unassigned: await query(
+        `SELECT b.id,b.reference,b.booking_date,b.start_minute,b.service_name,c.first_name||' '||c.last_name customer_name
+         FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id
+         WHERE b.booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')
+           AND b.assigned_to IS NULL AND b.status NOT IN ('cancelled','no_show')
+         ORDER BY b.booking_date,b.start_minute LIMIT 12`,
       ),
     };
   if (section === "settings")
@@ -116,12 +129,13 @@ export async function adminData(
   }
   if (section === "my_schedule") {
     const employee = (await query<{ id: string; name: string; position: string; user_id: string }>("SELECT id,name,position,user_id FROM wl.employees WHERE user_id=$1 AND active=true", [user.user_id]))[0];
-    if (!employee) throw new AppError("No employee profile is linked to this account.", 403);
+    // A manager account may not be a detailer. Return a useful empty state instead of crashing the portal route.
+    if (!employee) return { employee: null, shifts: [], appointments: [], entries: [] };
     return {
       employee,
       shifts: await query("SELECT * FROM wl.employee_shifts WHERE employee_id=$1 AND published=true AND shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') ORDER BY shift_date,start_minute", [employee.id]),
       appointments: await query(
-        `SELECT b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.location,b.notes,
+        `SELECT b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.price_cents,b.location,b.notes,
           c.first_name||' '||c.last_name customer_name,c.phone,
           concat_ws(' ',v.year,v.make,v.model) vehicle
          FROM wl.bookings b
@@ -273,6 +287,9 @@ export async function adminData(
       rows,
       total: count,
       team,
+      employees: await query(
+        "SELECT e.id employee_id,e.user_id,e.name,e.position,e.phone FROM wl.employees e JOIN wl.users u ON u.id=e.user_id WHERE e.active=true AND u.active=true ORDER BY e.name",
+      ),
       blocks: await query(
         "SELECT * FROM wl.blocks ORDER BY booking_date DESC LIMIT 200",
       ),
@@ -421,6 +438,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         notes: txt.optional(),
         internal_notes: txt.optional(),
         assigned_to: z.union([uuid, z.null()]).optional(),
+        assignment_override: z.boolean().default(false),
         price_cents: z.number().int().min(0).nullable().optional(),
       })
       .parse(data);
