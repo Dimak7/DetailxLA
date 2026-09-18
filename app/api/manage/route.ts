@@ -21,6 +21,13 @@ export async function GET(request: Request) {
       const csv = [["Employee", "Position", "Regular hours", "Overtime hours", "Hourly rate", "Estimated gross"], ...rows.map((row) => [row.name, row.position, (Number(row.regular_minutes || 0) / 60).toFixed(2), (Number(row.overtime_minutes || 0) / 60).toFixed(2), (Number(row.hourly_rate_cents || 0) / 100).toFixed(2), (Number(row.estimated_gross_cents || 0) / 100).toFixed(2)])].map((row) => row.map(value).join(",")).join("\r\n");
       return new NextResponse(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="west-loop-payroll-${p.get("start") || "period"}-to-${p.get("end") || "period"}.csv"`, "Cache-Control": "no-store" } });
     }
+    if (["expenses", "inventory"].includes(section) && p.get("export") === "csv") {
+      const rows = Array.isArray((data as { rows?: unknown[] }).rows) ? (data as { rows: Array<Record<string, unknown>> }).rows : [];
+      const columns = section === "expenses" ? ["expense_date", "vendor", "category", "amount_cents", "payment_method", "recurrence", "description", "notes"] : ["name", "sku", "category", "quantity", "unit", "unit_cost_cents", "supplier", "minimum_stock", "reorder_quantity", "active"];
+      const value = (input: unknown) => `"${String(input ?? "").replaceAll('"', '""')}"`;
+      const csv = [columns, ...rows.map((row) => columns.map((column) => column.endsWith("_cents") ? (Number(row[column] || 0) / 100).toFixed(2) : row[column]))].map((row) => row.map(value).join(",")).join("\r\n");
+      return new NextResponse(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="west-loop-${section}-${p.get("from") || "export"}.csv"`, "Cache-Control": "no-store" } });
+    }
     return NextResponse.json(data);
   } catch (e) {
     return apiError(e);
