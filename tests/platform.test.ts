@@ -228,6 +228,8 @@ test("Relational platform integration", async (t) => {
         "analytics",
         "settings",
         "payments",
+        "employees",
+        "schedule",
       ])
         assert.ok(await adminData(section, new URLSearchParams(), owner!));
     });
