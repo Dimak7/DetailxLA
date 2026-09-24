@@ -54,3 +54,23 @@ test("explicit tip allocations do not change the 30 percent commission pool", as
     assert.equal(Number(josh.tips_cents) + Number(mark.tips_cents), 5000);
   } finally { await closeDatabase(); }
 });
+
+test("scheduled shifts become payable only when the period has no actual clocked hours", async () => {
+  try {
+    const employee = randomUUID();
+    await query("INSERT INTO wl.employees(id,name,email,phone,position,active) VALUES($1,'Scheduled Detailer','scheduled@test.local','+15550000020','Detailer',true)", [employee]);
+    await query("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,break_minutes,status) VALUES($1,$2,'2026-09-22',540,1020,0,'scheduled')", [randomUUID(), employee]);
+    const fallback = (await payrollSummary("2026-09-22", "2026-09-22")).find((row) => row.id === employee)!;
+    assert.equal(Number(fallback.scheduled_minutes), 480);
+    assert.equal(Number(fallback.actual_minutes), 0);
+    assert.equal(Number(fallback.minutes), 480);
+    assert.equal(String(fallback.paid_hours_source), "scheduled_fallback");
+    assert.equal(Number(fallback.hourly_earnings_cents), 8000);
+    await query("INSERT INTO wl.time_entries(id,employee_id,clock_in,clock_out,break_minutes) VALUES($1,$2,'2026-09-22T15:00:00Z','2026-09-22T18:00:00Z',0)", [randomUUID(), employee]);
+    const actual = (await payrollSummary("2026-09-22", "2026-09-22")).find((row) => row.id === employee)!;
+    assert.equal(Number(actual.actual_minutes), 180);
+    assert.equal(Number(actual.minutes), 180);
+    assert.equal(String(actual.paid_hours_source), "actual_clocked");
+    assert.equal(Number(actual.hourly_earnings_cents), 3000);
+  } finally { await closeDatabase(); }
+});

@@ -51,6 +51,13 @@ const stamp = (v: unknown) =>
         minute: "2-digit",
       })
     : "Not yet";
+const workspaceSections = [
+  { name: "Bookings", items: ["calendar", "bookings", "schedule", "services"] },
+  { name: "CRM", items: ["customers", "leads", "reviews"] },
+  { name: "Team", items: ["employees", "schedule", "hours", "payroll", "performance", "my_schedule"] },
+  { name: "Marketing", items: ["marketing", "messages", "gallery"] },
+  { name: "Operations", items: ["inventory", "expenses", "payments", "reports", "analytics"] },
+];
 export function AdminWorkspace({
   section,
   data,
@@ -678,6 +685,7 @@ export function AdminWorkspace({
     consents: R[];
   } | null;
   const reportMode = !!rep;
+  const workspace = workspaceSections.find((group) => group.items.includes(section));
   return (
     <>
       <div className="admin-heading">
@@ -725,6 +733,7 @@ export function AdminWorkspace({
         {section === "expenses" && <button className="button" onClick={() => expenseEdit()}>Add expense +</button>}
         {section === "inventory" && <button className="button" onClick={() => inventoryEdit()}>Add inventory item +</button>}
       </div>
+      {workspace && <nav className="workspace-tabs" aria-label={workspace.name + " sections"}>{workspace.items.filter((item) => item !== "my_schedule" || user.role !== "staff" || true).map((item) => <Link className={item === section ? "active" : ""} href={"/admin/" + item} key={item}>{title(item)}</Link>)}</nav>}
       {notice && (
         <div className="success-message" role="status">
           {notice}
@@ -774,8 +783,8 @@ export function AdminWorkspace({
         <section className="paper">
           <div className="section-heading"><div><p className="eyebrow">PAYROLL ESTIMATE</p><h2>Worked hours and estimated gross pay</h2></div><div className="button-row"><button onClick={() => compensationEdit()}>Configure pay</button><button onClick={() => payRuleEdit()}>Service rule +</button><a className="button" href={`/api/manage?section=payroll&export=csv&start=${encodeURIComponent(s(data.start))}&end=${encodeURIComponent(s(data.end))}`}>Export CSV</a></div></div>
           <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
-          <p className="small-note">Paid hours are completed clock entries; scheduled hours remain visible in Employees. Detailers use $10/hr + a shared 30% completed-job commission pool + allocated tips. This is an internal estimate, not a payroll processor.</p>
-          {table(["Employee", "Paid hours", "Hourly rate", "Hourly pay", "Commissionable revenue", "Commission", "Tips", "Adjustments", "Total pay"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)} · {s(r.position).toLowerCase() === "detailer" ? "Standard Detailer plan" : title(s(r.compensation_model))}</small></>, (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_rate_cents)), money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents))]))}
+          <p className="small-note">Paid hours use completed clock entries when present. If none exist for an employee in this period, scheduled shift hours are used as the payable fallback. Detailers use $10/hr + a shared 30% completed-job commission pool + allocated tips.</p>
+          {table(["Employee", "Scheduled", "Actual", "Paid hours", "Hourly pay", "Commissionable revenue", "Commission", "Tips", "Adjustments", "Total pay"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)} · {s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small></>, (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents))]))}
           <h3>Service-specific rules</h3>{table(["Employee", "Service", "Rule", "Value", "Status", "Action"], rows(data.rules).map((rule) => [s(rule.employee_name),s(rule.service_name) || "All services",title(s(rule.rule_type)),s(rule.rule_type) === "commission_percent" ? (n(rule.value) / 100).toFixed(2) + "%" : money(n(rule.value)),s(rule.active) === "true" || rule.active ? "Active" : "Inactive",<button onClick={() => payRuleEdit(rule)}>Edit</button>]))}
         </section>
       )}

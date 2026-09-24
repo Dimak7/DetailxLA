@@ -28,14 +28,13 @@ const sectionLabels: Record<string, string> = {
   settings: "Settings",
 };
 const navigationGroups = [
-  { label: "Dashboard", sections: ["dashboard"] },
-  { label: "Bookings & Schedule", sections: ["calendar", "bookings", "services"] },
-  { label: "Customers & CRM", sections: ["customers", "leads", "reviews"] },
-  { label: "Employees & Payroll", sections: ["employees", "schedule", "hours", "payroll", "performance", "my_schedule"] },
-  { label: "Marketing", sections: ["marketing", "messages", "gallery"] },
-  { label: "Inventory", sections: ["inventory"] },
-  { label: "Expenses & Finance", sections: ["expenses", "payments", "reports", "analytics"] },
-  { label: "Settings", sections: ["settings"] },
+  { label: "Dashboard", target: "dashboard" },
+  { label: "Bookings", target: "bookings" },
+  { label: "CRM", target: "customers" },
+  { label: "Team", target: "employees" },
+  { label: "Marketing", target: "marketing" },
+  { label: "Operations", target: "inventory" },
+  { label: "Settings", target: "settings" },
 ];
 export function AdminShell({
   user,
@@ -54,16 +53,7 @@ export function AdminShell({
           <Wordmark />
         </Link>
         <nav aria-label="Business workspace">
-          {navigationGroups.map((group) => {
-            const visible = group.sections.filter((section) => sections.includes(section));
-            if (!visible.length) return null;
-            return <div className="admin-nav-group" key={group.label}>
-              <p>{group.label}</p>
-              {visible.map((section) => <Link key={section} href={"/admin/" + section} className={path === "/admin/" + section ? "active" : ""}>
-                <span>{sectionLabels[section]}</span>
-              </Link>)}
-            </div>;
-          })}
+          {navigationGroups.filter((group) => sections.includes(group.target)).map((group) => <Link key={group.target} href={"/admin/" + group.target} className={path === "/admin/" + group.target ? "active" : ""}><span>{group.label}</span></Link>)}
         </nav>
         <div className="admin-user">
           {user.name}

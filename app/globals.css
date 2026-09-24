@@ -1360,19 +1360,9 @@ select.control option {
   display: grid;
   gap: 3px;
 }
-.admin-nav-group {
-  display: grid;
-  gap: 3px;
-  margin: 0 0 12px;
-}
-.admin-nav-group > p {
-  margin: 10px 12px 3px;
-  color: #b6c5b8;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .11em;
-  text-transform: uppercase;
-}
+.workspace-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 22px; }
+.workspace-tabs a { border: 1px solid #ffffff2c; border-radius: 999px; color: #d7d7d1; font-size: 12px; padding: 7px 12px; white-space: nowrap; }
+.workspace-tabs a.active { background: #e4b977; border-color: #e4b977; color: #151515; }
 .admin-sidebar nav a {
   padding: 10px 14px;
   font-size: 12px;
@@ -2259,12 +2249,6 @@ td small {
     gap: 4px;
     margin: 0 -5.5%;
     padding: 0 5% 8px;
-  }
-  .admin-nav-group {
-    display: contents;
-  }
-  .admin-nav-group > p {
-    display: none;
   }
   .admin-sidebar nav a {
     white-space: nowrap;
