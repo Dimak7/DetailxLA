@@ -159,6 +159,8 @@ ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS trim text NOT NULL DEFAULT '';
 ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS color text NOT NULL DEFAULT '';
 ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS license_plate text NOT NULL DEFAULT '';
 ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS vin text NOT NULL DEFAULT '';
+ALTER TABLE wl.bookings ADD COLUMN IF NOT EXISTS tip_cents integer NOT NULL DEFAULT 0 CHECK(tip_cents >= 0);
+ALTER TABLE wl.employee_job_assignments ADD COLUMN IF NOT EXISTS tip_override_cents integer CHECK(tip_override_cents >= 0);
 CREATE TABLE IF NOT EXISTS wl.audit_logs (
  id uuid PRIMARY KEY, actor_id uuid REFERENCES wl.users(id), entity_type text NOT NULL, entity_id uuid, action text NOT NULL, before_data jsonb NOT NULL DEFAULT '{}', after_data jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.expenses (

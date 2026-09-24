@@ -358,6 +358,8 @@ const actionSections: Record<string, string> = {
   save_pay_rule: "payroll",
   save_employee_compensation: "payroll",
   assign_job_employee: "payroll",
+  save_job_assignments: "payroll",
+  record_job_tip: "payroll",
   save_pay_period: "payroll",
   lock_pay_period: "payroll",
 };
@@ -375,12 +377,24 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   }
   if (action === "save_employee_compensation") {
     const compensation = z.object({ employee_id: uuid, compensation_model: z.enum(["hourly","commission","hourly_commission","flat_job"]), default_commission_bps: z.number().int().min(0).max(10000), flat_job_pay_cents: z.number().int().min(0).max(100000000) }).parse(data);
+    const employee = (await query<Row>("SELECT position FROM wl.employees WHERE id=$1", [compensation.employee_id]))[0];
+    if (!employee) throw new AppError("Employee not found.", 404);
+    if (String(employee.position).toLowerCase() === "detailer") throw new AppError("Detailers use the standard $10/hr + 30% commission + 100% tips plan.");
     await query("UPDATE wl.employees SET compensation_model=$2,default_commission_bps=$3,flat_job_pay_cents=$4,updated_at=now() WHERE id=$1",[compensation.employee_id,compensation.compensation_model,compensation.default_commission_bps,compensation.flat_job_pay_cents]);
     await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'employee_compensation',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,compensation.employee_id,JSON.stringify(compensation)]);
   }
   if (action === "assign_job_employee") {
     const assignment = z.object({ booking_id: uuid, employee_id: uuid, pool_share_bps: z.number().int().min(0).max(10000).default(10000), commission_override_cents: z.number().int().min(0).nullable().default(null), notes: txt.default("") }).parse(data);
     await transaction(async q => { const booking = (await q<Row>("SELECT id,status FROM wl.bookings WHERE id=$1 FOR UPDATE",[assignment.booking_id])).rows[0]; if (!booking) throw new AppError("Booking not found.",404); await q("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps,commission_override_cents,notes,assigned_by) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(booking_id,employee_id) DO UPDATE SET pool_share_bps=$4,commission_override_cents=$5,notes=$6,assigned_by=$7",[randomUUID(),assignment.booking_id,assignment.employee_id,assignment.pool_share_bps,assignment.commission_override_cents,assignment.notes,user.user_id]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'job_assignment',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,assignment.booking_id,JSON.stringify(assignment)]); });
+  }
+  if (action === "save_job_assignments") {
+    const input = z.object({ booking_id: uuid, assignments: z.array(z.object({ employee_id: uuid, pool_share_bps: z.number().int().min(0).max(10000), tip_override_cents: z.number().int().min(0).nullable().default(null), notes: txt.default("") })).min(1).max(20) }).parse(data);
+    if (input.assignments.reduce((total, assignment) => total + assignment.pool_share_bps, 0) !== 10000) throw new AppError("Employee job splits must total exactly 100%.");
+    if (new Set(input.assignments.map((assignment) => assignment.employee_id)).size !== input.assignments.length) throw new AppError("Each employee can appear only once on a job.");
+    await transaction(async q => { const booking=(await q<Row>("SELECT tip_cents FROM wl.bookings WHERE id=$1 FOR UPDATE",[input.booking_id])).rows[0]; if (!booking) throw new AppError("Booking not found.",404); const hasExplicit=input.assignments.some((assignment) => assignment.tip_override_cents !== null); const explicit=input.assignments.reduce((total, assignment) => total + (assignment.tip_override_cents || 0),0); if (hasExplicit && explicit !== Number(booking.tip_cents)) throw new AppError("Explicit tip allocations must total the job tip."); await q("DELETE FROM wl.employee_job_assignments WHERE booking_id=$1",[input.booking_id]); for (const assignment of input.assignments) await q("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps,tip_override_cents,notes,assigned_by) VALUES($1,$2,$3,$4,$5,$6,$7)",[randomUUID(),input.booking_id,assignment.employee_id,assignment.pool_share_bps,assignment.tip_override_cents,assignment.notes,user.user_id]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'job_assignment',$3,'replaced',$4::jsonb)",[randomUUID(),user.user_id,input.booking_id,JSON.stringify(input)]); });
+  }
+  if (action === "record_job_tip") {
+    const tip=z.object({ booking_id: uuid, tip_cents: z.number().int().min(0).max(100000000) }).parse(data); await query("UPDATE wl.bookings SET tip_cents=$2,updated_at=now() WHERE id=$1",[tip.booking_id,tip.tip_cents]); await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_tip',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,tip.booking_id,JSON.stringify(tip)]);
   }
   if (action === "save_pay_period") {
     const period = z.object({ id: uuid.optional(), start_date: z.string(), end_date: z.string(), frequency: z.enum(["weekly","biweekly","semi_monthly"]).default("weekly") }).parse(data);
