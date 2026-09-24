@@ -25,13 +25,13 @@ export async function payrollSummary(start: string, end: string) {
        WHERE b.status='completed' AND b.booking_date BETWEEN $1::text AND $2::text AND NOT EXISTS(SELECT 1 FROM wl.employee_job_assignments a WHERE a.booking_id=b.id)
      ), commission AS (
        SELECT a.employee_id,COUNT(*)::int jobs,COALESCE(SUM(CASE WHEN (SELECT SUM(ax.pool_share_bps) FROM assigned ax WHERE ax.booking_id=a.booking_id)<>10000 THEN 0 WHEN a.commission_override_cents IS NOT NULL THEN a.commission_override_cents
-         WHEN lower(e.position)='detailer' THEN ((CASE WHEN j.payment_count>0 THEN j.paid ELSE COALESCE(j.price_cents,0) END)::bigint*3000*a.pool_share_bps::bigint/100000000)::int
+         WHEN lower(e.position)='detailer' THEN (COALESCE(j.price_cents,j.paid,0)::bigint*3000*a.pool_share_bps::bigint/100000000)::int
          WHEN COALESCE(r.rule_type, CASE WHEN e.compensation_model='flat_job' THEN 'flat_job' ELSE 'commission_percent' END)='flat_job' THEN (COALESCE(r.value,e.flat_job_pay_cents)::bigint*a.pool_share_bps::bigint/10000)::int
-         WHEN e.compensation_model IN ('commission','hourly_commission') THEN ((CASE WHEN j.payment_count>0 THEN j.paid ELSE COALESCE(j.price_cents,0) END)::bigint*COALESCE(r.value,e.default_commission_bps)::bigint*a.pool_share_bps::bigint/100000000)::int
+         WHEN e.compensation_model IN ('commission','hourly_commission') THEN (COALESCE(j.price_cents,j.paid,0)::bigint*COALESCE(r.value,e.default_commission_bps)::bigint*a.pool_share_bps::bigint/100000000)::int
          ELSE 0 END),0)::int commission_cents,COALESCE(SUM(CASE
            WHEN (SELECT count(*) FROM assigned ax WHERE ax.booking_id=a.booking_id AND ax.tip_override_cents IS NOT NULL)>0 THEN COALESCE(a.tip_override_cents,0)
            ELSE j.tip_cents/(SELECT count(*) FROM assigned ax WHERE ax.booking_id=a.booking_id) + CASE WHEN a.employee_id=(SELECT ax.employee_id FROM assigned ax WHERE ax.booking_id=a.booking_id ORDER BY ax.employee_id LIMIT 1) THEN j.tip_cents%(SELECT count(*) FROM assigned ax WHERE ax.booking_id=a.booking_id) ELSE 0 END
-         END),0)::int tips_cents,COALESCE(SUM((CASE WHEN j.payment_count>0 THEN j.paid ELSE COALESCE(j.price_cents,0) END)*a.pool_share_bps/10000),0)::int attributed_revenue
+         END),0)::int tips_cents,COALESCE(SUM(COALESCE(j.price_cents,j.paid,0)*a.pool_share_bps/10000),0)::int attributed_revenue
        FROM assigned a JOIN job_value j ON j.id=a.booking_id JOIN wl.employees e ON e.id=a.employee_id
        LEFT JOIN wl.employee_pay_rules r ON r.employee_id=e.id AND r.service_id=j.service_id AND r.active=true AND ((r.rule_type='flat_job' AND e.compensation_model='flat_job') OR (r.rule_type='commission_percent' AND e.compensation_model<>'flat_job'))
        GROUP BY a.employee_id

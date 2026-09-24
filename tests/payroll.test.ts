@@ -74,3 +74,30 @@ test("scheduled shifts become payable only when the period has no actual clocked
     assert.equal(Number(actual.hourly_earnings_cents), 3000);
   } finally { await closeDatabase(); }
 });
+
+test("completed $100 jobs use their final price for one shared detailer commission pool", async () => {
+  try {
+    const service = (await query<{ id: string }>("SELECT id FROM wl.services LIMIT 1"))[0];
+    const customer = randomUUID(), vehicle = randomUUID(), single = randomUUID(), mark = randomUUID(), josh = randomUUID();
+    await query("INSERT INTO wl.customers(id,first_name,last_name,email,phone) VALUES($1,'Commission','Customer',$2,'+15550000030')", [customer, "commission-" + customer + "@test.local"]);
+    await query("INSERT INTO wl.vehicles(id,customer_id,make,model,year,type) VALUES($1,$2,'Test','Car',2024,'Car')", [vehicle, customer]);
+    await query("INSERT INTO wl.employees(id,name,email,phone,position,active) VALUES($1,'Mark Single','mark-single@test.local','+15550000031','Detailer',true),($2,'Mark Split','mark-split@test.local','+15550000032','Detailer',true),($3,'Josh Split','josh-split@test.local','+15550000033','Detailer',true)", [single, mark, josh]);
+    const booking = async (reference: string) => { const id = randomUUID(); await query("INSERT INTO wl.bookings(id,request_key,request_hash,reference,customer_id,vehicle_id,service_id,service_name,service_snapshot,booking_date,start_minute,duration_minutes,status,price_cents) VALUES($1,$2,'hash',$3,$4,$5,$6,'Full Detail','{}','2026-09-23',600,120,'completed',10000)", [id, randomUUID(), reference, customer, vehicle, service.id]); return id; };
+    const one = await booking("COM-ONE");
+    await query("INSERT INTO wl.payments(id,booking_id,customer_id,amount_cents,status,kind) VALUES($1,$2,$3,2000,'paid','deposit')", [randomUUID(), one, customer]);
+    await query("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps) VALUES($1,$2,$3,10000)", [randomUUID(), one, single]);
+    const split = await booking("COM-SPLIT");
+    await query("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps) VALUES($1,$2,$3,7000),($4,$2,$5,3000)", [randomUUID(), split, mark, randomUUID(), josh]);
+    const rows = await payrollSummary("2026-09-23", "2026-09-23");
+    const singleRow = rows.find((row) => row.id === single)!;
+    const markRow = rows.find((row) => row.id === mark)!;
+    const joshRow = rows.find((row) => row.id === josh)!;
+    assert.equal(Number(singleRow.attributed_revenue), 10000);
+    assert.equal(Number(singleRow.commission_cents), 3000);
+    assert.equal(Number(markRow.attributed_revenue), 7000);
+    assert.equal(Number(markRow.commission_cents), 2100);
+    assert.equal(Number(joshRow.attributed_revenue), 3000);
+    assert.equal(Number(joshRow.commission_cents), 900);
+    assert.equal(Number(markRow.commission_cents) + Number(joshRow.commission_cents), 3000);
+  } finally { await closeDatabase(); }
+});
