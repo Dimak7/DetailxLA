@@ -11,6 +11,7 @@ import {
 } from "./bookings";
 import { report, reportRange } from "./reporting";
 import { expenseSummary, inventorySummary } from "./finance";
+import { payrollSummary } from "./payroll";
 import { audiences, queueCampaign, unsubscribeToken } from "./campaigns";
 import { enqueue, enqueueBooking } from "./outbox";
 import { createCheckout } from "../integrations/payments";
@@ -137,7 +138,7 @@ export async function adminData(
   if (section === "payroll") {
     const end = p.get("end") || (await import("./types")).dateToday();
     const start = p.get("start") || end;
-    return { start, end, rows: await query(`WITH worked AS (SELECT e.id,e.name,e.position,e.hourly_rate_cents,COALESCE(SUM(GREATEST(0,round(EXTRACT(EPOCH FROM (COALESCE(t.clock_out,now())-t.clock_in))/60)-t.break_minutes)),0)::int minutes FROM wl.employees e LEFT JOIN wl.time_entries t ON t.employee_id=e.id AND (t.clock_in AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date GROUP BY e.id) SELECT *,LEAST(minutes,2400)::int regular_minutes,GREATEST(minutes-2400,0)::int overtime_minutes,(LEAST(minutes,2400)*hourly_rate_cents/60 + GREATEST(minutes-2400,0)*hourly_rate_cents*1.5/60)::int estimated_gross_cents FROM worked WHERE minutes>0 ORDER BY name`, [start,end]) };
+    return { start, end, rows: await payrollSummary(start,end), periods: await query("SELECT * FROM wl.pay_periods ORDER BY start_date DESC LIMIT 30"), employees: await query("SELECT id,name,position,compensation_model,default_commission_bps,flat_job_pay_cents FROM wl.employees ORDER BY name"), services: await query("SELECT id,name FROM wl.services WHERE active=true ORDER BY name"), rules: await query("SELECT r.*,e.name employee_name,s.name service_name FROM wl.employee_pay_rules r JOIN wl.employees e ON e.id=r.employee_id LEFT JOIN wl.services s ON s.id=r.service_id ORDER BY e.name,s.name") };
   }
   if (section === "my_schedule") {
     const employee = (await query<{ id: string; name: string; position: string; user_id: string }>("SELECT id,name,position,user_id FROM wl.employees WHERE user_id=$1 AND active=true", [user.user_id]))[0];
@@ -354,12 +355,41 @@ const actionSections: Record<string, string> = {
   delete_expense: "expenses",
   save_inventory_item: "inventory",
   record_inventory_movement: "inventory",
+  save_pay_rule: "payroll",
+  save_employee_compensation: "payroll",
+  assign_job_employee: "payroll",
+  save_pay_period: "payroll",
+  lock_pay_period: "payroll",
 };
 export async function adminAction(action: string, raw: unknown, user: Session) {
   const section = actionSections[action];
   if (!section || !access[section]?.includes(user.role))
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
+  if (action === "save_pay_rule") {
+    const rule = z.object({ id: uuid.optional(), employee_id: uuid, service_id: uuid.nullable(), rule_type: z.enum(["commission_percent","flat_job"]), value: z.number().int().min(0).max(100000000), active: z.boolean().default(true) }).parse(data);
+    const id = rule.id || randomUUID();
+    await query("INSERT INTO wl.employee_pay_rules(id,employee_id,service_id,rule_type,value,active) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(employee_id,service_id,rule_type) DO UPDATE SET value=$5,active=$6,updated_at=now()",[id,rule.employee_id,rule.service_id,rule.rule_type,rule.value,rule.active]);
+    await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'employee_pay_rule',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,id,JSON.stringify(rule)]);
+    return { id };
+  }
+  if (action === "save_employee_compensation") {
+    const compensation = z.object({ employee_id: uuid, compensation_model: z.enum(["hourly","commission","hourly_commission","flat_job"]), default_commission_bps: z.number().int().min(0).max(10000), flat_job_pay_cents: z.number().int().min(0).max(100000000) }).parse(data);
+    await query("UPDATE wl.employees SET compensation_model=$2,default_commission_bps=$3,flat_job_pay_cents=$4,updated_at=now() WHERE id=$1",[compensation.employee_id,compensation.compensation_model,compensation.default_commission_bps,compensation.flat_job_pay_cents]);
+    await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'employee_compensation',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,compensation.employee_id,JSON.stringify(compensation)]);
+  }
+  if (action === "assign_job_employee") {
+    const assignment = z.object({ booking_id: uuid, employee_id: uuid, pool_share_bps: z.number().int().min(0).max(10000).default(10000), commission_override_cents: z.number().int().min(0).nullable().default(null), notes: txt.default("") }).parse(data);
+    await transaction(async q => { const booking = (await q<Row>("SELECT id,status FROM wl.bookings WHERE id=$1 FOR UPDATE",[assignment.booking_id])).rows[0]; if (!booking) throw new AppError("Booking not found.",404); await q("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps,commission_override_cents,notes,assigned_by) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(booking_id,employee_id) DO UPDATE SET pool_share_bps=$4,commission_override_cents=$5,notes=$6,assigned_by=$7",[randomUUID(),assignment.booking_id,assignment.employee_id,assignment.pool_share_bps,assignment.commission_override_cents,assignment.notes,user.user_id]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'job_assignment',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,assignment.booking_id,JSON.stringify(assignment)]); });
+  }
+  if (action === "save_pay_period") {
+    const period = z.object({ id: uuid.optional(), start_date: z.string(), end_date: z.string(), frequency: z.enum(["weekly","biweekly","semi_monthly"]).default("weekly") }).parse(data);
+    if (!validDate(period.start_date) || !validDate(period.end_date) || period.end_date < period.start_date) throw new AppError("Choose a valid payroll period.");
+    const id = period.id || randomUUID(); await query("INSERT INTO wl.pay_periods(id,start_date,end_date,frequency,created_by) VALUES($1,$2,$3,$4,$5) ON CONFLICT(start_date,end_date) DO NOTHING",[id,period.start_date,period.end_date,period.frequency,user.user_id]); return { id };
+  }
+  if (action === "lock_pay_period") {
+    const id = uuid.parse(data.id); await transaction(async q => { const period=(await q<Row>("SELECT * FROM wl.pay_periods WHERE id=$1 FOR UPDATE",[id])).rows[0]; if (!period) throw new AppError("Payroll period not found.",404); if (period.status==='locked') throw new AppError("Payroll period is already locked."); const rows=await payrollSummary(String(period.start_date),String(period.end_date)); for(const row of rows) await q("INSERT INTO wl.payroll_records(id,pay_period_id,employee_id,regular_minutes,overtime_minutes,hourly_rate_cents,estimated_gross_cents,approved_at) VALUES($1,$2,$3,$4,0,$5,$6,now()) ON CONFLICT(pay_period_id,employee_id) DO UPDATE SET regular_minutes=$4,hourly_rate_cents=$5,estimated_gross_cents=$6,approved_at=now()",[randomUUID(),id,row.id,Number(row.minutes),Number(row.hourly_rate_cents),Number(row.total_earnings_cents)]); await q("UPDATE wl.pay_periods SET status='paid' WHERE id=$1",[id]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data) VALUES($1,$2,'pay_period',$3,'locked',$4::jsonb)",[randomUUID(),user.user_id,id,JSON.stringify(period)]); });
+  }
   if (action === "save_expense") {
     const expense = z.object({ id: uuid.optional(), expense_date: z.string(), amount_cents: z.number().int().min(0).max(100000000), category: z.string().trim().min(2).max(80), vendor: z.string().max(160).default(""), description: txt.default(""), payment_method: z.string().max(80).default(""), recurrence: z.enum(["one_time","weekly","monthly","yearly"]).default("one_time"), recurring_start: z.string().nullable().default(null), recurring_end: z.string().nullable().default(null), receipt_url: asset.default(""), notes: txt.default("") }).parse(data);
     if (!validDate(expense.expense_date) || (expense.recurring_start && !validDate(expense.recurring_start)) || (expense.recurring_end && !validDate(expense.recurring_end))) throw new AppError("Choose valid expense dates.");

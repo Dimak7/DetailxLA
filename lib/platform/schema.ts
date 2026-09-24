@@ -104,6 +104,12 @@ CREATE TABLE IF NOT EXISTS wl.employees (
 ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '';
 ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS email text NOT NULL DEFAULT '';
 ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS max_weekly_minutes integer NOT NULL DEFAULT 2400 CHECK(max_weekly_minutes BETWEEN 60 AND 10080);
+ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS first_name text NOT NULL DEFAULT '';
+ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS last_name text NOT NULL DEFAULT '';
+ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS profile_photo_url text NOT NULL DEFAULT '';
+ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS compensation_model text NOT NULL DEFAULT 'hourly' CHECK(compensation_model IN ('hourly','commission','hourly_commission','flat_job'));
+ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS default_commission_bps integer NOT NULL DEFAULT 0 CHECK(default_commission_bps BETWEEN 0 AND 10000);
+ALTER TABLE wl.employees ADD COLUMN IF NOT EXISTS flat_job_pay_cents integer NOT NULL DEFAULT 0 CHECK(flat_job_pay_cents >= 0);
 CREATE TABLE IF NOT EXISTS wl.employee_availability (
  employee_id uuid NOT NULL REFERENCES wl.employees(id) ON DELETE CASCADE, weekday integer NOT NULL CHECK(weekday BETWEEN 0 AND 6),
  available boolean NOT NULL DEFAULT false, start_minute integer NOT NULL DEFAULT 480 CHECK(start_minute BETWEEN 0 AND 1439), end_minute integer NOT NULL DEFAULT 1020 CHECK(end_minute BETWEEN 0 AND 1440),
@@ -140,6 +146,19 @@ CREATE TABLE IF NOT EXISTS wl.payroll_records (
  id uuid PRIMARY KEY, pay_period_id uuid NOT NULL REFERENCES wl.pay_periods(id), employee_id uuid NOT NULL REFERENCES wl.employees(id),
  regular_minutes integer NOT NULL DEFAULT 0, overtime_minutes integer NOT NULL DEFAULT 0, pto_minutes integer NOT NULL DEFAULT 0, sick_minutes integer NOT NULL DEFAULT 0,
  hourly_rate_cents integer NOT NULL, estimated_gross_cents integer NOT NULL DEFAULT 0, approved_at timestamptz, UNIQUE(pay_period_id,employee_id));
+CREATE TABLE IF NOT EXISTS wl.employee_pay_rules (
+ id uuid PRIMARY KEY, employee_id uuid NOT NULL REFERENCES wl.employees(id), service_id uuid REFERENCES wl.services(id), rule_type text NOT NULL CHECK(rule_type IN ('commission_percent','flat_job')), value integer NOT NULL CHECK(value>=0), active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(employee_id,service_id,rule_type));
+CREATE TABLE IF NOT EXISTS wl.employee_job_assignments (
+ id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.bookings(id), employee_id uuid NOT NULL REFERENCES wl.employees(id), pool_share_bps integer NOT NULL DEFAULT 10000 CHECK(pool_share_bps BETWEEN 0 AND 10000), commission_override_cents integer, notes text NOT NULL DEFAULT '', assigned_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(booking_id,employee_id));
+CREATE INDEX IF NOT EXISTS wl_employee_job_assignments_employee ON wl.employee_job_assignments(employee_id,booking_id);
+CREATE TABLE IF NOT EXISTS wl.payroll_adjustments (
+ id uuid PRIMARY KEY, pay_period_id uuid NOT NULL REFERENCES wl.pay_periods(id), employee_id uuid NOT NULL REFERENCES wl.employees(id), kind text NOT NULL CHECK(kind IN ('bonus','deduction','correction')), amount_cents integer NOT NULL, reason text NOT NULL, created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS wl.crm_tags (id uuid PRIMARY KEY, name text NOT NULL UNIQUE, color text NOT NULL DEFAULT '#c6a66b', created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS wl.customer_tags (customer_id uuid NOT NULL REFERENCES wl.customers(id) ON DELETE CASCADE, tag_id uuid NOT NULL REFERENCES wl.crm_tags(id) ON DELETE CASCADE, created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(customer_id,tag_id));
+ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS trim text NOT NULL DEFAULT '';
+ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS color text NOT NULL DEFAULT '';
+ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS license_plate text NOT NULL DEFAULT '';
+ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS vin text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS wl.audit_logs (
  id uuid PRIMARY KEY, actor_id uuid REFERENCES wl.users(id), entity_type text NOT NULL, entity_id uuid, action text NOT NULL, before_data jsonb NOT NULL DEFAULT '{}', after_data jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.expenses (
