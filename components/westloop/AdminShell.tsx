@@ -34,6 +34,7 @@ const navigationGroups = [
   { label: "Team", target: "employees" },
   { label: "Marketing", target: "marketing" },
   { label: "Operations", target: "inventory" },
+  { label: "Reports", target: "reports" },
   { label: "Settings", target: "settings" },
 ];
 export function AdminShell({
@@ -76,7 +77,7 @@ export function AdminShell({
           <div><span className="admin-breadcrumb">WEST LOOP AUTO SPA / BUSINESS WORKSPACE</span><strong>{sectionLabels[currentSection] || "Dashboard"}</strong></div>
           <div className="admin-top-actions">
             <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label="Search bookings and customers" placeholder="Search bookings, customers..." /><button>Search</button></form>
-            {sections.includes("bookings") && <Link className="admin-quick-add" href="/admin/bookings?new=booking">+ Add</Link>}
+            {sections.includes("bookings") && <details className="admin-quick-menu"><summary>+ Add</summary><div><Link href="/admin/bookings?new=booking">New booking</Link><Link href="/admin/customers">New customer</Link><Link href="/admin/employees">New employee</Link><Link href="/admin/expenses">New expense</Link><Link href="/admin/inventory">New inventory item</Link></div></details>}
             <Link href="/" target="_blank">View website ↗</Link>
           </div>
         </div>

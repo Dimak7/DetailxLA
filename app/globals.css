@@ -1326,22 +1326,20 @@ select.control option {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
   min-height: 100vh;
-  --ink: #f4f0e8;
-  --paper: #101111;
-  --white: #191a1a;
-  --muted: #aaa89f;
-  --line: #30312f;
-  --sage: #202320;
-  --gold: #c6a66b;
-  background:
-    radial-gradient(circle at 82% 0%, #3a302026, transparent 28%),
-    linear-gradient(135deg, #121313, #0b0c0c 62%);
+  --ink: #1f2933;
+  --paper: #f5f6f7;
+  --white: #ffffff;
+  --muted: #66727f;
+  --line: #dce1e5;
+  --sage: #e9efec;
+  --gold: #1f5d4b;
+  background: #f5f6f7;
   color: var(--ink);
 }
 .admin-sidebar {
-  background: #203e35;
-  color: #e8ede4;
-  padding: 28px 21px;
+  background: #1f2933;
+  color: #eef3f0;
+  padding: 24px 15px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -1349,7 +1347,7 @@ select.control option {
 }
 .admin-sidebar .wordmark {
   font-size: 12px;
-  margin-bottom: 40px;
+  margin: 0 8px 32px;
 }
 .admin-sidebar .monogram {
   width: 33px;
@@ -1361,18 +1359,18 @@ select.control option {
   gap: 3px;
 }
 .workspace-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 22px; }
-.workspace-tabs a { border: 1px solid #ffffff2c; border-radius: 999px; color: #d7d7d1; font-size: 12px; padding: 7px 12px; white-space: nowrap; }
-.workspace-tabs a.active { background: #e4b977; border-color: #e4b977; color: #151515; }
+.workspace-tabs a { border: 1px solid #d9e0e4; border-radius: 4px; color: #53606d; font-size: 12px; padding: 7px 12px; white-space: nowrap; }
+.workspace-tabs a.active { background: #e7f0ec; border-color: #b8d0c5; color: #1f5d4b; font-weight: 700; }
 .admin-sidebar nav a {
   padding: 10px 14px;
   font-size: 12px;
   display: flex;
   justify-content: space-between;
-  border-radius: 4px;
+  border-radius: 5px;
 }
 .admin-sidebar nav a.active {
-  background: #ffffff15;
-  border: 1px solid #ffffff22;
+  background: #ffffff18;
+  border: 1px solid #ffffff2a;
 }
 .admin-sidebar nav a:hover {
   background: #ffffff12;
@@ -1395,7 +1393,7 @@ select.control option {
   font-size: 11px;
 }
 .admin-main {
-  padding: 35px 4%;
+  padding: 24px 3.5%;
   min-width: 0;
 }
 .admin-topbar {
@@ -1404,19 +1402,24 @@ select.control option {
   align-items: center;
   gap: 20px;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 22px;
+  padding-bottom: 17px;
   font-size: 11px;
   color: var(--muted);
 }
 .admin-topbar > div:first-child { display: grid; gap: 4px; }
-.admin-topbar strong { color: var(--ink); font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
+.admin-topbar strong { color: var(--ink); font-size: 16px; font-weight: 650; letter-spacing: -.02em; }
 .admin-breadcrumb { color: var(--muted); font-size: 9px; letter-spacing: .08em; }
 .admin-top-actions { align-items: center; display: flex; gap: 10px; }
 .admin-global-search { display: flex; }
-.admin-global-search input { background: #151616; border: 1px solid var(--line); border-radius: 4px 0 0 4px; color: var(--ink); font: inherit; font-size: 11px; min-height: 34px; padding: 0 10px; width: min(245px, 20vw); }
-.admin-global-search button, .admin-quick-add { background: #282a29; border: 1px solid var(--line); color: var(--ink); font-size: 10px; min-height: 34px; padding: 0 11px; }
+.admin-global-search input { background: #fff; border: 1px solid var(--line); border-radius: 4px 0 0 4px; color: var(--ink); font: inherit; font-size: 11px; min-height: 34px; padding: 0 10px; width: min(245px, 20vw); }
+.admin-global-search button { background: #fff; border: 1px solid var(--line); color: var(--ink); font-size: 10px; min-height: 34px; padding: 0 11px; }
 .admin-global-search button { border-left: 0; border-radius: 0 4px 4px 0; }
-.admin-quick-add { align-content: center; background: var(--gold); border-color: var(--gold); border-radius: 4px; color: #1a1712; font-weight: 700; }
+.admin-quick-menu { position: relative; }
+.admin-quick-menu summary { align-content: center; background: var(--gold); border: 1px solid var(--gold); border-radius: 4px; color: #fff; cursor: pointer; font-size: 11px; font-weight: 700; list-style: none; min-height: 34px; padding: 0 11px; }
+.admin-quick-menu summary::-webkit-details-marker { display: none; }
+.admin-quick-menu > div { background: #fff; border: 1px solid var(--line); box-shadow: 0 10px 28px #18242c20; display: grid; min-width: 160px; padding: 5px; position: absolute; right: 0; top: 39px; z-index: 30; }
+.admin-quick-menu a { border-radius: 3px; color: var(--ink); font-size: 11px; padding: 8px 9px; }
+.admin-quick-menu a:hover { background: #f0f4f2; }
 .admin-heading {
   display: flex;
   justify-content: space-between;
@@ -1449,7 +1452,7 @@ select.control option {
   padding: 20px;
   border-radius: 5px;
   margin-bottom: 16px;
-  box-shadow: 0 1px 0 #ffffff08 inset;
+  box-shadow: 0 1px 2px #17212b08;
 }
 .admin-main .button {
   border-radius: 4px;
@@ -1481,7 +1484,7 @@ select.control option {
 }
 .stat {
   padding: 17px;
-  background: var(--white);
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 6px;
   min-width: 0;
@@ -1514,7 +1517,7 @@ select.control option {
   border: 1px solid var(--line);
   border-radius: 5px;
   margin: 15px 0 23px;
-  background: var(--white);
+  background: #fff;
 }
 table {
   border-collapse: collapse;
@@ -1526,19 +1529,19 @@ th {
   font-size: 10px;
   font-weight: 500;
   color: var(--muted);
-  background: #141515;
+  background: #f7f9fa;
   padding: 11px 14px;
   white-space: nowrap;
 }
 td {
   padding: 12px 14px;
-  border-top: 1px solid #2d2e2c;
+  border-top: 1px solid #edf0f2;
   max-width: 290px;
   overflow-wrap: anywhere;
   vertical-align: top;
 }
 tbody tr { transition: background-color .15s ease; }
-tbody tr:hover { background: #ffffff06; }
+tbody tr:hover { background: #f6faf8; }
 td button {
   font-size: 11px;
   border: 1px solid var(--line);
@@ -1558,7 +1561,7 @@ td small {
   font-size: 10px;
   margin-top: 3px;
 }
-.status-pill { background: #ffffff0c; border: 1px solid #ffffff19; border-radius: 999px; color: #d8d5cb; font-size: 9px; font-weight: 700; letter-spacing: .04em; padding: 4px 7px; text-transform: uppercase; white-space: nowrap; }
+.status-pill { background: #eff4f2; border: 1px solid #d7e4dd; border-radius: 999px; color: #315d4a; font-size: 9px; font-weight: 700; letter-spacing: .04em; padding: 4px 7px; text-transform: uppercase; white-space: nowrap; }
 .modal-backdrop {
   position: fixed;
   inset: 0;
