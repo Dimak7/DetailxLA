@@ -46,6 +46,7 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   const path = usePathname();
+  const currentSection = path.split("/").filter(Boolean).at(-1) || "dashboard";
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
@@ -72,10 +73,12 @@ export function AdminShell({
       </aside>
       <main id="main" className="admin-main">
         <div className="admin-topbar">
-          <span>WEST LOOP AUTO SPA / BUSINESS WORKSPACE</span>
-          <Link href="/" target="_blank">
-            View website ↗
-          </Link>
+          <div><span className="admin-breadcrumb">WEST LOOP AUTO SPA / BUSINESS WORKSPACE</span><strong>{sectionLabels[currentSection] || "Dashboard"}</strong></div>
+          <div className="admin-top-actions">
+            <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label="Search bookings and customers" placeholder="Search bookings, customers..." /><button>Search</button></form>
+            {sections.includes("bookings") && <Link className="admin-quick-add" href="/admin/bookings?new=booking">+ Add</Link>}
+            <Link href="/" target="_blank">View website ↗</Link>
+          </div>
         </div>
         {children}
       </main>

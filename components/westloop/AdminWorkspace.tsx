@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -88,6 +88,9 @@ export function AdminWorkspace({
     scheduleShifts = rows(data.shifts),
     scheduleAppointments = rows(data.appointments),
     staff = user.role === "staff";
+  useEffect(() => {
+    if (params.get("new") === "booking" && ["bookings", "calendar"].includes(section) && !staff) setCreating(true);
+  }, [params, section, staff]);
   const teamOptions = [
     { value: "", label: "Unassigned" },
     ...team
