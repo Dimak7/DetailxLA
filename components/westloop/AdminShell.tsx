@@ -4,15 +4,39 @@ import { usePathname } from "next/navigation";
 import { Wordmark } from "./PublicShell";
 import type { Session } from "@/lib/platform/types";
 const sectionLabels: Record<string, string> = {
-  dashboard: "Overview",
+  dashboard: "Dashboard",
   calendar: "Calendar",
+  bookings: "Bookings",
+  services: "Services",
+  customers: "Customers",
+  leads: "Leads",
+  employees: "Employees",
+  schedule: "Schedule",
   my_schedule: "My schedule",
   hours: "Hours",
   payroll: "Payroll",
+  performance: "Performance",
+  marketing: "Campaigns",
+  messages: "Messages",
+  reviews: "Reviews",
+  gallery: "Gallery",
   expenses: "Expenses",
+  payments: "Payments",
   inventory: "Inventory",
   reports: "Reports",
+  analytics: "Analytics",
+  settings: "Settings",
 };
+const navigationGroups = [
+  { label: "Dashboard", sections: ["dashboard"] },
+  { label: "Bookings & Schedule", sections: ["calendar", "bookings", "services"] },
+  { label: "Customers & CRM", sections: ["customers", "leads", "reviews"] },
+  { label: "Employees & Payroll", sections: ["employees", "schedule", "hours", "payroll", "performance", "my_schedule"] },
+  { label: "Marketing", sections: ["marketing", "messages", "gallery"] },
+  { label: "Inventory", sections: ["inventory"] },
+  { label: "Expenses & Finance", sections: ["expenses", "payments", "reports", "analytics"] },
+  { label: "Settings", sections: ["settings"] },
+];
 export function AdminShell({
   user,
   sections,
@@ -30,18 +54,16 @@ export function AdminShell({
           <Wordmark />
         </Link>
         <nav aria-label="Business workspace">
-          {sections
-            .filter((s) => s !== "team")
-            .map((s, i) => (
-              <Link
-                key={s}
-                href={"/admin/" + s}
-              className={path === "/admin/" + s ? "active" : ""}
-            >
-                <span>{sectionLabels[s] || s[0].toUpperCase() + s.slice(1)}</span>
-                <span>{String(i + 1).padStart(2, "0")}</span>
-              </Link>
-            ))}
+          {navigationGroups.map((group) => {
+            const visible = group.sections.filter((section) => sections.includes(section));
+            if (!visible.length) return null;
+            return <div className="admin-nav-group" key={group.label}>
+              <p>{group.label}</p>
+              {visible.map((section) => <Link key={section} href={"/admin/" + section} className={path === "/admin/" + section ? "active" : ""}>
+                <span>{sectionLabels[section]}</span>
+              </Link>)}
+            </div>;
+          })}
         </nav>
         <div className="admin-user">
           {user.name}

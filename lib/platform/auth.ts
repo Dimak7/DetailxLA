@@ -107,6 +107,7 @@ export const access: Record<string, Role[]> = {
   schedule: ["owner", "admin", "manager"],
   hours: ["owner", "admin", "manager"],
   payroll: ["owner", "admin", "manager"],
+  performance: ["owner", "admin", "manager"],
   expenses: ["owner", "admin"],
   inventory: ["owner", "admin"],
   reports: ["owner", "admin"],

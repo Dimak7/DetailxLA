@@ -1360,6 +1360,19 @@ select.control option {
   display: grid;
   gap: 3px;
 }
+.admin-nav-group {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 12px;
+}
+.admin-nav-group > p {
+  margin: 10px 12px 3px;
+  color: #b6c5b8;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
 .admin-sidebar nav a {
   padding: 10px 14px;
   font-size: 12px;
@@ -2246,6 +2259,12 @@ td small {
     gap: 4px;
     margin: 0 -5.5%;
     padding: 0 5% 8px;
+  }
+  .admin-nav-group {
+    display: contents;
+  }
+  .admin-nav-group > p {
+    display: none;
   }
   .admin-sidebar nav a {
     white-space: nowrap;

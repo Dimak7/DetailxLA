@@ -140,6 +140,11 @@ export async function adminData(
     const start = p.get("start") || end;
     return { start, end, rows: await payrollSummary(start,end), periods: await query("SELECT * FROM wl.pay_periods ORDER BY start_date DESC LIMIT 30"), employees: await query("SELECT id,name,position,compensation_model,default_commission_bps,flat_job_pay_cents FROM wl.employees ORDER BY name"), services: await query("SELECT id,name FROM wl.services WHERE active=true ORDER BY name"), rules: await query("SELECT r.*,e.name employee_name,s.name service_name FROM wl.employee_pay_rules r JOIN wl.employees e ON e.id=r.employee_id LEFT JOIN wl.services s ON s.id=r.service_id ORDER BY e.name,s.name") };
   }
+  if (section === "performance") {
+    const end = p.get("end") || (await import("./types")).dateToday();
+    const start = p.get("start") || end;
+    return { start, end, rows: await payrollSummary(start, end) };
+  }
   if (section === "my_schedule") {
     const employee = (await query<{ id: string; name: string; position: string; user_id: string }>("SELECT id,name,position,user_id FROM wl.employees WHERE user_id=$1 AND active=true", [user.user_id]))[0];
     // A manager account may not be a detailer. Return a useful empty state instead of crashing the portal route.

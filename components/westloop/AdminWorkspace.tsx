@@ -779,6 +779,17 @@ export function AdminWorkspace({
           <h3>Service-specific rules</h3>{table(["Employee", "Service", "Rule", "Value", "Status", "Action"], rows(data.rules).map((rule) => [s(rule.employee_name),s(rule.service_name) || "All services",title(s(rule.rule_type)),s(rule.rule_type) === "commission_percent" ? (n(rule.value) / 100).toFixed(2) + "%" : money(n(rule.value)),s(rule.active) === "true" || rule.active ? "Active" : "Inactive",<button onClick={() => payRuleEdit(rule)}>Edit</button>]))}
         </section>
       )}
+      {section === "performance" && (
+        <section className="paper">
+          <div className="section-heading"><div><p className="eyebrow">EMPLOYEE PERFORMANCE</p><h2>Factual production metrics</h2></div></div>
+          <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
+          <p className="small-note">Metrics are derived from completed jobs, attributed revenue, allocated tips, and completed clock entries. They are operational facts, not employee scores.</p>
+          {table(["Employee", "Paid hours", "Completed jobs", "Revenue attributed", "Commission", "Tips", "Hourly pay", "Total pay", "Revenue / hour", "Average job"], list.map((r) => {
+            const hours = n(r.minutes) / 60, jobs = n(r.jobs_completed), revenue = n(r.attributed_revenue);
+            return [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, hours.toFixed(2) + "h", s(jobs), money(revenue), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.hourly_earnings_cents)), money(n(r.total_earnings_cents)), hours ? money(Math.round(revenue / hours)) : "No paid hours", jobs ? money(Math.round(revenue / jobs)) : "No completed jobs"];
+          }))}
+        </section>
+      )}
       {section === "my_schedule" && !data.employee && (
         <section className="paper empty-state">
           <p className="eyebrow">EMPLOYEE WORKSPACE</p>
