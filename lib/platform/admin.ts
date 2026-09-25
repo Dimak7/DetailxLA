@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { query, transaction } from "./db";
+import { query, transaction, type Query } from "./db";
 import { access, AppError, addUser, passwordHash, receiptToken } from "./auth";
 import { settings, saveSettings, integrationStatus, siteUrl } from "./settings";
 import {
@@ -46,6 +46,38 @@ export const serviceSchema = z.object({
   sort_order: z.number().int().min(0),
   image_url: asset,
 });
+
+/** Keep the booking amount, payroll basis, and customer-facing total in sync with job adjustments. */
+async function syncBookingFinancialTotal(q: Query, bookingId: string) {
+  const booking = (await q<Row>(
+    "SELECT id,service_name,price_cents FROM wl.bookings WHERE id=$1 FOR UPDATE",
+    [bookingId],
+  )).rows[0];
+  if (!booking) throw new AppError("Booking not found.", 404);
+
+  const base = (await q<Row>(
+    "SELECT id FROM wl.booking_line_items WHERE booking_id=$1 AND kind='base_service' LIMIT 1",
+    [bookingId],
+  )).rows[0];
+  // Capture the agreed amount before the first adjustment so later totals remain auditable.
+  if (!base)
+    await q(
+      "INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,'base_service',$3,1,$4)",
+      [randomUUID(), bookingId, String(booking.service_name), Number(booking.price_cents || 0)],
+    );
+
+  const totals = (await q<Row>(
+    `SELECT
+      COALESCE((SELECT SUM(quantity*unit_price_cents) FROM wl.booking_line_items WHERE booking_id=$1),0)::int gross_cents,
+      COALESCE((SELECT SUM(amount_cents) FROM wl.booking_discounts WHERE booking_id=$1),0)::int discount_cents`,
+    [bookingId],
+  )).rows[0];
+  const grossCents = Number(totals.gross_cents || 0);
+  const discountCents = Number(totals.discount_cents || 0);
+  const netCents = Math.max(0, grossCents - discountCents);
+  await q("UPDATE wl.bookings SET price_cents=$2,updated_at=now() WHERE id=$1", [bookingId, netCents]);
+  return { grossCents, discountCents, netCents };
+}
 export async function adminData(
   section: string,
   p: URLSearchParams,
@@ -378,16 +410,27 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   if (action === "save_booking_line_item") {
     const item = z.object({ id: uuid.optional(), booking_id: uuid, kind: z.enum(["base_service","upsell"]), name: z.string().trim().min(2).max(160), quantity: z.number().int().min(1).max(1000).default(1), unit_price_cents: z.number().int().min(0).max(100000000) }).parse(data);
     const id = item.id || randomUUID();
-    await query("INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET kind=$3,name=$4,quantity=$5,unit_price_cents=$6", [id,item.booking_id,item.kind,item.name,item.quantity,item.unit_price_cents,user.user_id]);
-    await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_line_item',$3,'saved',$4::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify(item)]);
-    return { id };
+    return transaction(async (q) => {
+      await syncBookingFinancialTotal(q, item.booking_id);
+      await q("INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET kind=$3,name=$4,quantity=$5,unit_price_cents=$6", [id,item.booking_id,item.kind,item.name,item.quantity,item.unit_price_cents,user.user_id]);
+      const totals = await syncBookingFinancialTotal(q, item.booking_id);
+      await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_line_item',$3,'saved',$4::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify({ ...item, ...totals })]);
+      return { id, ...totals };
+    });
   }
   if (action === "save_booking_discount") {
-    const discount = z.object({ id: uuid.optional(), booking_id: uuid, kind: z.enum(["fixed","percent"]), value: z.number().int().min(0).max(10000), amount_cents: z.number().int().min(0).max(100000000), reason: txt.default(""), code: z.string().trim().max(80).default("") }).parse(data);
+    const discount = z.object({ id: uuid.optional(), booking_id: uuid, kind: z.enum(["fixed","percent"]), value: z.number().int().min(0).max(100000000), reason: txt.default(""), code: z.string().trim().max(80).default("") }).parse(data);
+    if (discount.kind === "percent" && discount.value > 10000) throw new AppError("A percentage discount cannot exceed 100%.");
     const id = discount.id || randomUUID();
-    await query("INSERT INTO wl.booking_discounts(id,booking_id,kind,value,amount_cents,reason,code,applied_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(id) DO UPDATE SET kind=$3,value=$4,amount_cents=$5,reason=$6,code=$7", [id,discount.booking_id,discount.kind,discount.value,discount.amount_cents,discount.reason,discount.code,user.user_id]);
-    await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_discount',$3,'saved',$4::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify(discount)]);
-    return { id };
+    return transaction(async (q) => {
+      const before = await syncBookingFinancialTotal(q, discount.booking_id);
+      // Percentages are sent as basis points (2,500 = 25%) and calculated only on the server.
+      const amountCents = discount.kind === "percent" ? Math.round(before.grossCents * discount.value / 10000) : discount.value;
+      await q("INSERT INTO wl.booking_discounts(id,booking_id,kind,value,amount_cents,reason,code,applied_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(id) DO UPDATE SET kind=$3,value=$4,amount_cents=$5,reason=$6,code=$7", [id,discount.booking_id,discount.kind,discount.value,amountCents,discount.reason,discount.code,user.user_id]);
+      const totals = await syncBookingFinancialTotal(q, discount.booking_id);
+      await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_discount',$3,'saved',$4::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify({ ...discount, amount_cents: amountCents, ...totals })]);
+      return { id, amount_cents: amountCents, ...totals };
+    });
   }
   if (action === "save_pay_rule") {
     const rule = z.object({ id: uuid.optional(), employee_id: uuid, service_id: uuid.nullable(), rule_type: z.enum(["commission_percent","flat_job"]), value: z.number().int().min(0).max(100000000), active: z.boolean().default(true) }).parse(data);

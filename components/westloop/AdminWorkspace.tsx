@@ -285,6 +285,26 @@ export function AdminWorkspace({
       }),
     );
   }
+  function upsellEdit(r: R) {
+    edit("Add upsell to " + s(r.reference), "save_booking_line_item", { booking_id: r.id, kind: "upsell", name: "", quantity: 1, unit_price_cents: 0 }, [
+      f("name", "Upsell name", "text", { required: true, hint: "Example: Engine bay detail or pet-hair removal" }),
+      f("quantity", "Quantity", "number", { min: 1, max: 1000 }),
+      f("unit_price_cents", "Price per item ($)", "money", { min: 0 }),
+    ]);
+  }
+  function discountEdit(r: R) {
+    edit("Apply discount to " + s(r.reference), "save_booking_discount", { booking_id: r.id, kind: "fixed", value: 0, reason: "", code: "" }, [
+      f("kind", "Discount type", "select", { options: [{ value: "fixed", label: "Fixed dollar amount" }, { value: "percent", label: "Percentage" }] }),
+      f("value", "Amount ($) or percentage (%)", "number", { min: 0, hint: "The final discount is calculated securely from the current job total." }),
+      f("reason", "Reason", "text", { required: true }),
+      f("code", "Discount code (optional)", "text"),
+    ], (d) => ({ ...d, value: Math.round(Number(d.value || 0) * 100) }));
+  }
+  function tipEdit(r: R) {
+    edit("Record tip for " + s(r.reference), "record_job_tip", { booking_id: r.id, tip_cents: n(r.tip_cents) / 100 }, [
+      f("tip_cents", "Customer tip ($)", "money", { min: 0, hint: "Tips are included in the assigned detailers' payroll." }),
+    ]);
+  }
   function customerEdit(r: R) {
     edit("Customer details", "save_customer", r, [
       f("first_name", "First name", "text", { required: true }),
@@ -625,7 +645,7 @@ export function AdminWorkspace({
         "Date & time",
         "Assignment",
         "Status",
-        ...(!staff ? ["Estimate"] : []),
+        ...(!staff ? ["Job total"] : []),
         "Actions",
       ],
       values.map((r) => [
@@ -658,10 +678,13 @@ export function AdminWorkspace({
         ) : null,
         status(r.status),
         ...(!staff
-          ? [money(r.price_cents == null ? null : n(r.price_cents))]
+          ? [<><strong>{money(r.price_cents == null ? null : n(r.price_cents))}</strong><small>{n(r.tip_cents) ? "Tip " + money(n(r.tip_cents)) : "No tip recorded"}</small></>]
           : []),
         <>
           <button onClick={() => bookingEdit(r)}>Manage</button>
+          {!staff && <button onClick={() => upsellEdit(r)}>Add upsell</button>}
+          {!staff && <button onClick={() => discountEdit(r)}>Discount</button>}
+          {!staff && <button onClick={() => tipEdit(r)}>Tip</button>}
           {!staff && r.status === "completed" && (
             <button
               disabled={busy}

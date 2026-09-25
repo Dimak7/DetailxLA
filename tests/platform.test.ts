@@ -21,6 +21,7 @@ import { settings, saveSettings, secret } from "../lib/platform/settings";
 import { queueCampaign, optOut } from "../lib/platform/campaigns";
 import { report } from "../lib/platform/reporting";
 import { processOutbox } from "../lib/platform/worker";
+import { jobFinancials } from "../lib/platform/job-financials";
 import {
   verifyStripeEvent,
   handleStripeEvent,
@@ -113,6 +114,32 @@ test("Relational platform integration", async (t) => {
         assert.ok(await verifyReceipt(booking.booking.id, booking.token));
       },
     );
+    await t.test("job upsells and discounts calculate an auditable booking total", async () => {
+      await adminAction("save_booking_line_item", {
+        booking_id: booking.booking.id,
+        kind: "upsell",
+        name: "Engine bay detail",
+        quantity: 1,
+        unit_price_cents: 4500,
+      }, owner!);
+      // The API deliberately ignores a client-provided dollar amount for a percentage discount.
+      const result = await adminAction("save_booking_discount", {
+        booking_id: booking.booking.id,
+        kind: "percent",
+        value: 2500,
+        amount_cents: 1,
+        reason: "Returning customer",
+        code: "WELCOME25",
+      }, owner!) as unknown as { amount_cents: number; netCents: number };
+      assert.equal(result.amount_cents, 4125);
+      assert.equal(result.netCents, 12375);
+      const financials = await jobFinancials(booking.booking.id);
+      assert.equal(financials?.base_service_cents, 12000);
+      assert.equal(financials?.upsell_cents, 4500);
+      assert.equal(financials?.discount_cents, 4125);
+      assert.equal(financials?.net_service_cents, 12375);
+      assert.equal((await query<{ price_cents: number }>("SELECT price_cents FROM wl.bookings WHERE id=$1", [booking.booking.id]))[0].price_cents, 12375);
+    });
     await t.test(
       "idempotent retries and concurrent overlap protection",
       async () => {
