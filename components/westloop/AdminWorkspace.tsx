@@ -888,12 +888,15 @@ export function AdminWorkspace({
             <button className="button">Apply dates</button>
           </form>
           <p className="small-note">
-            {rep.start} through {rep.end} · Central Time. Revenue uses verified
-            payments less refunds, never unpaid booking estimates.
+            {rep.start} through {rep.end} · Central Time. Net sales are completed work; collections are verified payments less refunds.
           </p>
           <div className="stats-grid">
             {[
-              ["Net revenue", money(rep.revenue), "Selected period"],
+              ["Net sales", money(rep.net_sales), "Completed work, excluding tips"],
+              ["Payments collected", money(rep.payments_collected), "Verified Stripe, Square, or manual payments less refunds"],
+              ["Outstanding", money(rep.outstanding), "Completed work not yet fully collected"],
+              ["Refunds", money(rep.refunds), "Money returned in selected period"],
+              ["Tips", money(rep.tips), "Separate from service sales"],
               ["Operating expenses", money(rep.expenses), "Recorded expenses in period"],
               ["Net operating profit", money(rep.net_operating_profit), "Revenue less operating expenses"],
               ["Operating margin", rep.operating_margin == null ? "No paid revenue" : rep.operating_margin.toFixed(1) + "%", "Not tax or full accounting profit"],

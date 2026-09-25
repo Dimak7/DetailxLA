@@ -485,7 +485,7 @@ export async function updateBooking(
     }
     const next = (
       await q<Booking>(
-        `UPDATE wl.bookings SET status=$1,booking_date=$2,start_minute=$3,notes=$4,internal_notes=$5,assigned_to=$6,price_cents=$7,updated_at=now() WHERE id=$8 RETURNING *`,
+        `UPDATE wl.bookings SET status=$1,booking_date=$2,start_minute=$3,notes=$4,internal_notes=$5,assigned_to=$6,price_cents=$7,completed_at=CASE WHEN $1='completed' AND completed_at IS NULL THEN now() WHEN $1<>'completed' THEN NULL ELSE completed_at END,updated_at=now() WHERE id=$8 RETURNING *`,
         [
           status,
           date,

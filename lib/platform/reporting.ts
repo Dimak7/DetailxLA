@@ -30,6 +30,7 @@ export async function report(params: URLSearchParams) {
     bookings,
     customers,
     paymentsTotal,
+    salesTotal,
     events,
     leads,
     spend,
@@ -48,6 +49,14 @@ export async function report(params: URLSearchParams) {
     ),
     query<Row>(
       `SELECT COALESCE(SUM(p.amount_cents-p.refunded_cents),0)::int revenue,count(DISTINCT p.booking_id)::int paid_bookings,count(DISTINCT p.customer_id)::int paying_customers FROM wl.payments p WHERE ${payments}`,
+      values,
+    ),
+    query<Row>(
+      `SELECT COALESCE(SUM(b.price_cents),0)::int net_sales,COALESCE(SUM(b.tip_cents),0)::int tips,
+        COALESCE(SUM((SELECT SUM(quantity*unit_price_cents) FROM wl.booking_line_items li WHERE li.booking_id=b.id AND li.kind='upsell')),0)::int upsells,
+        COALESCE(SUM((SELECT SUM(amount_cents) FROM wl.booking_discounts d WHERE d.booking_id=b.id)),0)::int discounts,
+        COALESCE(SUM(GREATEST(0,b.price_cents-COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded')),0))),0)::int outstanding,
+        count(*)::int completed_jobs FROM wl.bookings b WHERE b.status='completed' AND (COALESCE(b.completed_at,b.updated_at) AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date`,
       values,
     ),
     query<Row>(
@@ -117,6 +126,7 @@ export async function report(params: URLSearchParams) {
     [dateToday()],
   );
   const revenue = Number(paymentsTotal[0].revenue),
+    netSales = Number(salesTotal[0].net_sales),
     visits = Number(events.find((e) => e.name === "page_view")?.sessions || 0),
     totalBookings = Number(
       events.find((e) => e.name === "booking_completed")?.sessions || 0,
@@ -134,6 +144,14 @@ export async function report(params: URLSearchParams) {
     bookings: bookings[0],
     customers: customers[0],
     revenue,
+    net_sales: netSales,
+    payments_collected: revenue,
+    outstanding: Number(salesTotal[0].outstanding),
+    refunds: await query<Row>(`SELECT COALESCE(SUM(refunded_cents),0)::int total FROM wl.payments p WHERE ${payments}`, values).then((r) => Number(r[0].total)),
+    tips: Number(salesTotal[0].tips),
+    upsells: Number(salesTotal[0].upsells),
+    discounts: Number(salesTotal[0].discounts),
+    completed_jobs: Number(salesTotal[0].completed_jobs),
     expenses: expenses.total_cents,
     net_operating_profit: revenue - expenses.total_cents,
     operating_margin: revenue ? ((revenue - expenses.total_cents) / revenue) * 100 : null,

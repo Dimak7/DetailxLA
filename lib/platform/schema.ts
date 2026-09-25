@@ -169,6 +169,14 @@ CREATE TABLE IF NOT EXISTS wl.booking_discounts (
  id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.bookings(id) ON DELETE CASCADE,
  kind text NOT NULL CHECK(kind IN ('fixed','percent')), value integer NOT NULL CHECK(value>=0), amount_cents integer NOT NULL CHECK(amount_cents>=0), reason text NOT NULL DEFAULT '', code text NOT NULL DEFAULT '', applied_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS wl_booking_discounts_booking ON wl.booking_discounts(booking_id);
+ALTER TABLE wl.bookings ADD COLUMN IF NOT EXISTS completed_at timestamptz;
+ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'stripe' CHECK(provider IN ('stripe','square','manual'));
+ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS external_id text NOT NULL DEFAULT '';
+ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS payment_method text NOT NULL DEFAULT '';
+ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS processor_fee_cents integer NOT NULL DEFAULT 0 CHECK(processor_fee_cents >= 0);
+ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}';
+CREATE UNIQUE INDEX IF NOT EXISTS wl_payment_provider_external_unique ON wl.payments(provider,external_id) WHERE external_id<>'';
+CREATE INDEX IF NOT EXISTS wl_payments_financial_lookup ON wl.payments(status,paid_at,booking_id,customer_id);
 CREATE TABLE IF NOT EXISTS wl.audit_logs (
  id uuid PRIMARY KEY, actor_id uuid REFERENCES wl.users(id), entity_type text NOT NULL, entity_id uuid, action text NOT NULL, before_data jsonb NOT NULL DEFAULT '{}', after_data jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.expenses (
