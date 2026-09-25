@@ -367,12 +367,28 @@ const actionSections: Record<string, string> = {
   record_job_tip: "payroll",
   save_pay_period: "payroll",
   lock_pay_period: "payroll",
+  save_booking_line_item: "bookings",
+  save_booking_discount: "bookings",
 };
 export async function adminAction(action: string, raw: unknown, user: Session) {
   const section = actionSections[action];
   if (!section || !access[section]?.includes(user.role))
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
+  if (action === "save_booking_line_item") {
+    const item = z.object({ id: uuid.optional(), booking_id: uuid, kind: z.enum(["base_service","upsell"]), name: z.string().trim().min(2).max(160), quantity: z.number().int().min(1).max(1000).default(1), unit_price_cents: z.number().int().min(0).max(100000000) }).parse(data);
+    const id = item.id || randomUUID();
+    await query("INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET kind=$3,name=$4,quantity=$5,unit_price_cents=$6", [id,item.booking_id,item.kind,item.name,item.quantity,item.unit_price_cents,user.user_id]);
+    await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_line_item',$3,'saved',$4::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify(item)]);
+    return { id };
+  }
+  if (action === "save_booking_discount") {
+    const discount = z.object({ id: uuid.optional(), booking_id: uuid, kind: z.enum(["fixed","percent"]), value: z.number().int().min(0).max(10000), amount_cents: z.number().int().min(0).max(100000000), reason: txt.default(""), code: z.string().trim().max(80).default("") }).parse(data);
+    const id = discount.id || randomUUID();
+    await query("INSERT INTO wl.booking_discounts(id,booking_id,kind,value,amount_cents,reason,code,applied_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(id) DO UPDATE SET kind=$3,value=$4,amount_cents=$5,reason=$6,code=$7", [id,discount.booking_id,discount.kind,discount.value,discount.amount_cents,discount.reason,discount.code,user.user_id]);
+    await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_discount',$3,'saved',$4::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify(discount)]);
+    return { id };
+  }
   if (action === "save_pay_rule") {
     const rule = z.object({ id: uuid.optional(), employee_id: uuid, service_id: uuid.nullable(), rule_type: z.enum(["commission_percent","flat_job"]), value: z.number().int().min(0).max(100000000), active: z.boolean().default(true) }).parse(data);
     const id = rule.id || randomUUID();

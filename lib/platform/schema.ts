@@ -161,6 +161,14 @@ ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS license_plate text NOT NULL DEF
 ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS vin text NOT NULL DEFAULT '';
 ALTER TABLE wl.bookings ADD COLUMN IF NOT EXISTS tip_cents integer NOT NULL DEFAULT 0 CHECK(tip_cents >= 0);
 ALTER TABLE wl.employee_job_assignments ADD COLUMN IF NOT EXISTS tip_override_cents integer CHECK(tip_override_cents >= 0);
+CREATE TABLE IF NOT EXISTS wl.booking_line_items (
+ id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.bookings(id) ON DELETE CASCADE,
+ kind text NOT NULL CHECK(kind IN ('base_service','upsell')), name text NOT NULL, quantity integer NOT NULL DEFAULT 1 CHECK(quantity>0), unit_price_cents integer NOT NULL CHECK(unit_price_cents>=0), created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS wl_booking_line_items_booking ON wl.booking_line_items(booking_id);
+CREATE TABLE IF NOT EXISTS wl.booking_discounts (
+ id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.bookings(id) ON DELETE CASCADE,
+ kind text NOT NULL CHECK(kind IN ('fixed','percent')), value integer NOT NULL CHECK(value>=0), amount_cents integer NOT NULL CHECK(amount_cents>=0), reason text NOT NULL DEFAULT '', code text NOT NULL DEFAULT '', applied_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS wl_booking_discounts_booking ON wl.booking_discounts(booking_id);
 CREATE TABLE IF NOT EXISTS wl.audit_logs (
  id uuid PRIMARY KEY, actor_id uuid REFERENCES wl.users(id), entity_type text NOT NULL, entity_id uuid, action text NOT NULL, before_data jsonb NOT NULL DEFAULT '{}', after_data jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.expenses (
