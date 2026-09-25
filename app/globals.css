@@ -2368,6 +2368,27 @@ td small {
 .app-profile > div { background: #fff; border: 1px solid var(--line); box-shadow: 0 12px 32px #1c29311c; display: grid; gap: 7px; min-width: 210px; padding: 13px; position: absolute; right: 0; top: 39px; z-index: 40; }
 .app-profile small { color: var(--muted); font-size: 10px; }
 .app-profile a, .app-profile button { background: none; border: 0; color: #1f5d4b; font: inherit; font-size: 11px; padding: 3px 0; text-align: left; }
+.admin-shell { display: block; }
+.app-global-bar { background: #35383a; color: #fff; gap: 18px; min-height: 42px; padding: 0 2.5%; }
+.app-brand .wordmark { color: #fff; font-size: 9px; }
+.app-brand .monogram { border-color: #fff; color: #fff; height: 25px; width: 23px; }
+.app-business-name { border-left: 1px solid #ffffff30; color: #fff; font-size: 12px; padding-left: 16px; }
+.app-business-name small { color: #cbd2d3; font-size: 9px; margin-left: 8px; }
+.app-global-actions { margin-left: auto; }
+.admin-global-search input { border: 0; border-radius: 2px 0 0 2px; min-height: 25px; width: min(200px, 18vw); }
+.admin-global-search button { background: #e8ecec; border: 0; border-radius: 0 2px 2px 0; color: #354047; min-height: 25px; padding: 0 8px; }
+.admin-quick-menu summary { align-content: center; background: transparent; border: 0; border-radius: 50%; color: #d4e8df; font-size: 23px; font-weight: 400; height: 28px; padding: 0; text-align: center; width: 28px; }
+.app-profile summary { background: #52635e; color: #fff; height: 27px; width: 27px; }
+.app-body { display: grid; grid-template-columns: 166px minmax(0, 1fr); min-height: calc(100vh - 42px); }
+.admin-sidebar { background: #f7f8f9; border-right: 1px solid #dce1e5; color: #354047; height: auto; overflow: visible; padding: 13px 0; position: static; }
+.admin-sidebar nav { display: grid; gap: 1px; }
+.admin-sidebar nav a { border-left: 3px solid transparent; border-radius: 0; color: #34404a; font-size: 12px; padding: 10px 16px 10px 22px; }
+.admin-sidebar nav a:hover { background: #eef2f2; }
+.admin-sidebar nav a.active { background: #e8f0ed; border: 0; border-left: 3px solid #1f8c63; color: #173f32; font-weight: 700; }
+.admin-main { margin: 0; max-width: none; padding: 20px 3%; }
+.workspace-tabs { border-bottom: 1px solid var(--line); gap: 19px; padding: 0; }
+.workspace-tabs a { border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 0; }
+.workspace-tabs a.active { background: transparent; border-bottom-color: #1f8c63; color: #1f5d4b; }
 @media (max-width: 760px) {
   .booking-review-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
   .booking-review-price { grid-column: 1 / -1; text-align: left; border-top: 1px solid #444b46; padding-top: 12px; }
