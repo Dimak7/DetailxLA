@@ -2249,8 +2249,8 @@ td small {
     margin-left: 6%;
     margin-right: 6%;
   }
-  .admin-shell {
-    display: block;
+.admin-shell {
+  display: block;
   }
   .admin-sidebar {
     height: auto;
@@ -2353,6 +2353,21 @@ td small {
     font-size: 12px;
   }
 }
+.app-global-bar { align-items: center; background: #ffffffed; border-bottom: 1px solid var(--line); display: flex; gap: 28px; min-height: 64px; padding: 0 3.5%; position: sticky; top: 0; z-index: 40; backdrop-filter: blur(12px); }
+.app-brand { flex: 0 0 auto; }
+.app-brand .wordmark { color: #173a30; font-size: 11px; margin: 0; }
+.app-brand .monogram { border-color: #1f5d4b; color: #1f5d4b; height: 32px; width: 29px; }
+.app-primary-nav { align-items: stretch; display: flex; flex: 1; gap: 2px; height: 64px; }
+.app-primary-nav a { align-content: center; border-bottom: 2px solid transparent; color: #66727f; font-size: 12px; padding: 0 11px; }
+.app-primary-nav a:hover { color: #1f2933; }
+.app-primary-nav a.active { border-color: #1f5d4b; color: #1f5d4b; font-weight: 700; }
+.app-global-actions { align-items: center; display: flex; gap: 9px; }
+.app-profile { position: relative; }
+.app-profile summary { align-content: center; background: #e7f0ec; border-radius: 50%; color: #1f5d4b; cursor: pointer; font-size: 12px; font-weight: 800; height: 31px; list-style: none; text-align: center; width: 31px; }
+.app-profile summary::-webkit-details-marker { display: none; }
+.app-profile > div { background: #fff; border: 1px solid var(--line); box-shadow: 0 12px 32px #1c29311c; display: grid; gap: 7px; min-width: 210px; padding: 13px; position: absolute; right: 0; top: 39px; z-index: 40; }
+.app-profile small { color: var(--muted); font-size: 10px; }
+.app-profile a, .app-profile button { background: none; border: 0; color: #1f5d4b; font: inherit; font-size: 11px; padding: 3px 0; text-align: left; }
 @media (max-width: 760px) {
   .booking-review-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
   .booking-review-price { grid-column: 1 / -1; text-align: left; border-top: 1px solid #444b46; padding-top: 12px; }

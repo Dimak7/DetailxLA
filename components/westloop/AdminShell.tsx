@@ -27,15 +27,14 @@ const sectionLabels: Record<string, string> = {
   analytics: "Analytics",
   settings: "Settings",
 };
-const navigationGroups = [
-  { label: "Dashboard", target: "dashboard" },
-  { label: "Bookings", target: "bookings" },
-  { label: "CRM", target: "customers" },
-  { label: "Team", target: "employees" },
-  { label: "Marketing", target: "marketing" },
-  { label: "Operations", target: "inventory" },
-  { label: "Reports", target: "reports" },
-  { label: "Settings", target: "settings" },
+const workspaces = [
+  { label: "Home", target: "dashboard", sections: ["dashboard"] },
+  { label: "Bookings", target: "bookings", sections: ["bookings", "calendar", "services"] },
+  { label: "Customers", target: "customers", sections: ["customers", "leads", "reviews"] },
+  { label: "Team", target: "employees", sections: ["employees", "schedule", "hours", "payroll", "performance", "my_schedule"] },
+  { label: "Growth", target: "marketing", sections: ["marketing", "messages", "gallery"] },
+  { label: "Operations", target: "inventory", sections: ["inventory", "expenses", "payments"] },
+  { label: "Reports", target: "reports", sections: ["reports", "analytics"] },
 ];
 export function AdminShell({
   user,
@@ -48,39 +47,22 @@ export function AdminShell({
 }) {
   const path = usePathname();
   const currentSection = path.split("/").filter(Boolean).at(-1) || "dashboard";
+  const activeWorkspace = workspaces.find((workspace) => workspace.sections.includes(currentSection));
   return (
     <div className="admin-shell">
-      <aside className="admin-sidebar">
-        <Link href="/">
-          <Wordmark />
-        </Link>
-        <nav aria-label="Business workspace">
-          {navigationGroups.filter((group) => sections.includes(group.target)).map((group) => <Link key={group.target} href={"/admin/" + group.target} className={path === "/admin/" + group.target ? "active" : ""}><span>{group.label}</span></Link>)}
+      <header className="app-global-bar">
+        <Link className="app-brand" href="/admin/dashboard" aria-label="West Loop Auto Spa home"><Wordmark /></Link>
+        <nav className="app-primary-nav" aria-label="Business workspaces">
+          {workspaces.filter((workspace) => sections.includes(workspace.target)).map((workspace) => <Link key={workspace.target} href={`/admin/${workspace.target}`} className={activeWorkspace?.target === workspace.target ? "active" : ""}>{workspace.label}</Link>)}
         </nav>
-        <div className="admin-user">
-          {user.name}
-          <p>
-            {user.role} · {user.email}
-          </p>
-          <button
-            onClick={async () => {
-              await fetch("/api/admin/logout", { method: "POST" });
-              location.assign("/admin/login");
-            }}
-          >
-            Sign out
-          </button>
+        <div className="app-global-actions">
+          <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label="Search bookings and customers" placeholder="Search the business" /><button>Search</button></form>
+          {sections.includes("bookings") && <details className="admin-quick-menu"><summary>Create</summary><div><Link href="/admin/bookings?new=booking">New booking</Link><Link href="/admin/customers">New customer</Link><Link href="/admin/employees">New employee</Link><Link href="/admin/expenses">New expense</Link><Link href="/admin/inventory">New inventory item</Link></div></details>}
+          <details className="app-profile"><summary>{user.name.slice(0, 1).toUpperCase()}</summary><div><strong>{user.name}</strong><small>{user.role} · {user.email}</small><Link href="/admin/settings">Settings</Link><button onClick={async () => { await fetch("/api/admin/logout", { method: "POST" }); location.assign("/admin/login"); }}>Sign out</button></div></details>
         </div>
-      </aside>
+      </header>
       <main id="main" className="admin-main">
-        <div className="admin-topbar">
-          <div><span className="admin-breadcrumb">WEST LOOP AUTO SPA / BUSINESS WORKSPACE</span><strong>{sectionLabels[currentSection] || "Dashboard"}</strong></div>
-          <div className="admin-top-actions">
-            <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label="Search bookings and customers" placeholder="Search bookings, customers..." /><button>Search</button></form>
-            {sections.includes("bookings") && <details className="admin-quick-menu"><summary>+ Add</summary><div><Link href="/admin/bookings?new=booking">New booking</Link><Link href="/admin/customers">New customer</Link><Link href="/admin/employees">New employee</Link><Link href="/admin/expenses">New expense</Link><Link href="/admin/inventory">New inventory item</Link></div></details>}
-            <Link href="/" target="_blank">View website ↗</Link>
-          </div>
-        </div>
+        <div className="admin-topbar"><span>WORKSPACE</span><strong>{activeWorkspace?.label || "Home"}{currentSection !== activeWorkspace?.target ? ` / ${sectionLabels[currentSection] || currentSection}` : ""}</strong></div>
         {children}
       </main>
     </div>
