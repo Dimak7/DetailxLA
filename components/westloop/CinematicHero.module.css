@@ -28,7 +28,7 @@
 .canvas[data-replaying="true"] { animation: replay-in .7s ease both; }
 .bottom { position: relative; display: grid; grid-template-columns: 1fr minmax(320px,450px) 1fr; align-items: center; column-gap: 35px; padding-top: 21px; border-top: 1px solid #ffffff16; }
 .signature { display: flex; align-items: center; gap: 14px; }
-.monogram { color: #d8ba90; font-family: var(--font-display), Georgia, serif; font-size: 28px; letter-spacing: -.08em; }
+.signatureMark { flex: 0 0 auto; width: 42px; height: 42px; color: #d8ba90; }
 .signature p { margin: 0; color: #d4cdc1; font-size: 8px; letter-spacing: .14em; }
 .signature p span { display: block; margin-top: 7px; color: #93958e; font-size: 10px; letter-spacing: 0; }
 .track { height: 2px; background: #46443e; overflow: hidden; }

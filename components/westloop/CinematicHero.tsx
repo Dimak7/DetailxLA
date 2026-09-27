@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { CeramicMark } from "./CeramicMark";
 import { heroVideoMedia } from "./hero-media";
 import type { HeroPlayback, HeroPlaybackState } from "./hero-video";
 import styles from "./CinematicHero.module.css";
@@ -124,7 +125,7 @@ export function CinematicHero() {
       </div>
 
       <div className={styles.bottom}>
-        <div className={styles.signature}><span className={styles.monogram} aria-hidden="true">W/C</span><p>THE ART OF CAR CARE<span>Details make the difference.</span></p></div>
+        <div className={styles.signature}><CeramicMark className={styles.signatureMark} /><p>THE ART OF CAR CARE<span>Details make the difference.</span></p></div>
         <div className={styles.journey}>
           <div ref={progressBar} className={styles.track} role="progressbar" aria-label="Detailing film progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}><div ref={meter} /></div>
           <ol className={styles.chapters} aria-label="The detailing transformation">
