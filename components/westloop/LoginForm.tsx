@@ -89,7 +89,7 @@ export function LoginForm({ token = "" }: { token?: string }) {
             </p>
           )}
           <button className="button" disabled={busy}>
-            {busy ? "Please wait..." : reset ? "Reset password" : "Sign in ↗"}
+            {busy ? "Please wait..." : reset ? "Reset password" : "Sign in"}
           </button>
         </form>
         {token ? (

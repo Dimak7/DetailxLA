@@ -92,7 +92,7 @@ export default async function Page({
           booking record. {s.cancellation_policy}
         </p>
         <a className="text-link" href="/contact">
-          Need to change something? Contact us ↗
+          Need to change something? Contact us
         </a>
       </section>
     </PageShell>

@@ -40,7 +40,7 @@ export default async function Page() {
           promptly about any service concern so we can review it together.
         </p>
         <a className="text-link" href="/contact">
-          Contact the team ↗
+          Contact the team
         </a>
       </article>
     </PageShell>

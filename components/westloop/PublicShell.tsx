@@ -31,10 +31,10 @@ export function Wordmark() {
 export function CallLink({ phone, className = "" }: { phone: string; className?: string }) {
   return phone ? (
     <a className={className} href={"tel:" + phone.replace(/[^+\d]/g, "")} onClick={() => track("phone_clicked")}>
-      Call the studio <span aria-hidden="true">↗</span>
+      Call the studio
     </a>
   ) : (
-    <Link className={className} href="/contact">Talk to us <span aria-hidden="true">↗</span></Link>
+    <Link className={className} href="/contact">Talk to us</Link>
   );
 }
 
@@ -82,13 +82,13 @@ export function PublicHeader({ business }: { business: BusinessSettings }) {
           <span className="ceramics-menu-caption">THE STUDIO</span>
           {navigation.map(({ href, label, feature }) => (
             <Link key={href} href={href} className={feature ? "ceramics-nav-feature" : undefined} aria-current={pathname === href ? "page" : undefined} onClick={() => setOpen(false)}>
-              {label}<span className="ceramics-nav-arrow" aria-hidden="true">↗</span>
+              {label}
             </Link>
           ))}
-          <Link href="/booking" className="ceramics-menu-book" onClick={() => setOpen(false)}>Book an appointment <span aria-hidden="true">↗</span></Link>
+          <Link href="/booking" className="ceramics-menu-book" onClick={() => setOpen(false)}>Book an appointment</Link>
           <p className="ceramics-menu-note">For the car you love. For the roads ahead.</p>
         </nav>
-        <Link className="button ceramics-header-book" href="/booking">Book a detail <span aria-hidden="true">↗</span></Link>
+        <Link className="button ceramics-header-book" href="/booking">Book a detail</Link>
         <button ref={toggle} className="ceramics-menu-toggle" aria-expanded={open} aria-controls="ceramics-navigation" aria-label={open ? "Close navigation" : "Open navigation"} onClick={() => setOpen((value) => !value)}>
           <span>{open ? "Close" : "Menu"}</span><span className="ceramics-menu-icon" aria-hidden="true"><i /><i /></span>
         </button>
@@ -103,20 +103,20 @@ export function PublicFooter({ business }: { business: BusinessSettings }) {
       <section className="ceramics-final-cta" aria-labelledby="final-cta-heading">
         <div className="wrap ceramics-final-inner">
           <div><p className="eyebrow">THE NEXT CHAPTER STARTS HERE</p><h2 id="final-cta-heading">For the car you love.<br /><em>For the roads ahead.</em></h2><p>Thoughtful preparation. A deeper finish. Care that continues beyond the studio.</p></div>
-          <div className="ceramics-final-actions"><Link href="/booking" className="button">Find your appointment <span aria-hidden="true">↗</span></Link><Link href="/services/ceramic-coating" className="text-link">Explore ceramic protection <span aria-hidden="true">↗</span></Link></div>
+          <div className="ceramics-final-actions"><Link href="/booking" className="button">Find your appointment</Link><Link href="/services/ceramic-coating" className="text-link">Explore ceramic protection</Link></div>
         </div>
       </section>
       <footer className="ceramics-footer">
         <div className="wrap ceramics-footer-grid">
           <div className="ceramics-footer-brand"><Link href="/" aria-label={`${business.name} home`}><Wordmark /></Link><p>Considered care.<br />An exceptional finish.</p><span className="ceramics-footer-location">WEST LOOP, CHICAGO</span></div>
           <div><h3>Care & protection</h3><Link href="/services/ceramic-coating">Ceramic coatings</Link><Link href="/services/paint-correction">Paint correction</Link><Link href="/services/interior-detail">Interior detailing</Link><Link href="/services/exterior-detail">Exterior detailing</Link><Link href="/services">All services & pricing</Link></div>
-          <div><h3>The studio</h3><Link href="/#process">Our process</Link><Link href="/gallery">Our work</Link><Link href="/booking">Book an appointment</Link><Link href="/contact">Talk to the team</Link>{business.instagram_url ? <a href={business.instagram_url} target="_blank" rel="noreferrer">Instagram <span aria-hidden="true">↗</span></a> : null}</div>
+          <div><h3>The studio</h3><Link href="/#process">Our process</Link><Link href="/gallery">Our work</Link><Link href="/booking">Book an appointment</Link><Link href="/contact">Talk to the team</Link>{business.instagram_url ? <a href={business.instagram_url} target="_blank" rel="noreferrer">Instagram</a> : null}</div>
           <div className="ceramics-footer-contact"><h3>Plan your visit</h3><p>{business.address || "West Loop, Chicago"}</p><p>{business.hours_label || "By appointment"}</p>{business.phone ? <a href={"tel:" + business.phone.replace(/[^+\d]/g, "")} onClick={() => track("phone_clicked")}>{business.phone}</a> : null}{business.email ? <a href={"mailto:" + business.email}>{business.email}</a> : null}{!business.address ? <p className="ceramics-visit-note">Your appointment location is confirmed before your visit.</p> : null}</div>
           <div className="ceramics-service-area"><span>SERVING CHICAGO</span><p>{business.service_area || "West Loop and the surrounding Chicago neighborhoods."}</p></div>
           <div className="ceramics-footer-bottom"><span>© {new Date().getFullYear()} {business.name}</span><div><Link href="/privacy-notice">Privacy notice</Link><Link href="/service-rules">Service terms</Link><Link href="/admin">Team access</Link></div><span>CARE IN EVERY LAYER.</span></div>
         </div>
       </footer>
-      <div className="mobile-bar ceramics-mobile-bar"><Link className="button" href="/booking">Book an appointment <span aria-hidden="true">↗</span></Link><CallLink phone={business.phone} className="button outline" /></div>
+      <div className="mobile-bar ceramics-mobile-bar"><Link className="button" href="/booking">Book an appointment</Link><CallLink phone={business.phone} className="button outline" /></div>
     </>
   );
 }

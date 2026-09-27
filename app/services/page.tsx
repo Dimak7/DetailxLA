@@ -26,13 +26,13 @@ export default async function Page() {
             <p className={styles.eyebrow}>THE WEST LOOP CERAMICS SERVICE COLLECTION</p>
             <h1>Protect the finish.<br /><em>Enjoy the drive.</em></h1>
             <p className={styles.lead}>From the first careful wash to a thoughtfully protected finish. Find the right attention for your car, and a care routine that fits your life.</p>
-            <a className={styles.textLink} href="#all-services">Explore every service <span aria-hidden="true">↓</span></a>
+            <a className={styles.textLink} href="#all-services">Explore every service</a>
             {coating && (
               <div className={styles.flagship}>
                 <p className={styles.eyebrow}>OUR SIGNATURE SERVICE</p>
                 <div className={styles.flagshipTitle}><h2>{coating.name}</h2><span>{servicePrice(coating)}</span></div>
                 <p>Careful preparation. A protective surface layer. A finish that is easier to look after.</p>
-                <Link className={styles.textLink} href={`/services/${coating.slug}`}>Discover ceramic protection <span aria-hidden="true">↗</span></Link>
+                <Link className={styles.textLink} href={`/services/${coating.slug}`}>Discover ceramic protection</Link>
               </div>
             )}
           </div>
@@ -54,7 +54,7 @@ export default async function Page() {
                 <article key={stage.slug} className={styles.comparisonCard}>
                   <span className={styles.stepNumber}>{stage.number}</span><h3>{stage.title}</h3>
                   <strong>{stage.purpose}</strong><p>{stage.detail}</p><p className={styles.comparisonNote}>{stage.boundary}</p>
-                  {offered && <Link className={styles.textLink} href={`/services/${offered.slug}`}>{offered.name} <span aria-hidden="true">↗</span></Link>}
+                  {offered && <Link className={styles.textLink} href={`/services/${offered.slug}`}>{offered.name}</Link>}
                 </article>
               );
             })}
@@ -86,7 +86,7 @@ export default async function Page() {
         <section className={styles.consultation}>
           <p className={styles.eyebrow}>YOUR CAR. YOUR PRIORITIES.</p><h2>Not sure where to begin?</h2>
           <p>Tell us what you drive and what you want to improve. We will help you find a sensible starting point.</p>
-          <div className={styles.actions}><Link className={styles.primaryLink} href="/contact">Talk through your options <span aria-hidden="true">↗</span></Link><Link className={styles.lightTextLink} href="/booking">Explore appointments <span aria-hidden="true">↗</span></Link></div>
+          <div className={styles.actions}><Link className={styles.primaryLink} href="/contact">Talk through your options</Link><Link className={styles.lightTextLink} href="/booking">Explore appointments</Link></div>
         </section>
       </div>
     </PageShell>

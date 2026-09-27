@@ -62,11 +62,11 @@
 .cardIncludes ul { padding-left: 16px; margin: 5px 0 15px; font-size: 12px; line-height: 1.9; color: #655f55; }
 .vehiclePrices { color: #6d6558; font-size: 11px; line-height: 1.8; }
 .cardLinks { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: auto; border-top: 1px solid #d9d1c5; padding-top: 17px; }
-.cardBook { display: inline-flex; align-items: center; gap: 18px; min-height: 44px; color: #151719; background: #e8dece; padding: 8px 14px; font-size: 11px; font-weight: 600; text-decoration: none; }
+.cardBook { display: inline-flex; align-items: center; min-height: 44px; color: #151719; background: #e8dece; padding: 8px 14px; font-size: 11px; font-weight: 600; text-decoration: none; }
 .cardBook:hover { background: #d8ba90; }
-.textLink,.lightTextLink { display: inline-flex; align-items: center; gap: 19px; font-size: 11px; font-weight: 600; line-height: 1.65; min-height: 44px; color: #65472f; text-decoration: none; }
+.textLink,.lightTextLink { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; line-height: 1.65; min-height: 44px; color: #65472f; text-decoration: none; }
 .textLink:hover,.lightTextLink:hover { text-decoration: underline; text-underline-offset: 5px; }
-.primaryLink { display: inline-flex; align-items: center; justify-content: center; gap: 28px; background: #151719; color: #f2efe8; padding: 17px 24px; min-height: 50px; font-size: 11px; font-weight: 600; line-height: 1.6; text-decoration: none; transition: background .18s ease; }
+.primaryLink { display: inline-flex; align-items: center; justify-content: center; background: #151719; color: #f2efe8; padding: 17px 24px; min-height: 50px; font-size: 11px; font-weight: 600; line-height: 1.6; text-decoration: none; transition: background .18s ease; }
 .primaryLink:hover { background: #343332; }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 18px 28px; margin-top: 29px; }
 .faqLayout { display: grid; grid-template-columns: .9fr 1.1fr; gap: 9%; }
@@ -102,8 +102,7 @@
 .treatmentLayout { display: grid; grid-template-columns: 1.15fr .85fr; gap: 9%; align-items: start; }
 .smallHeading { font-family: var(--font-body), sans-serif !important; font-size: 12px; font-weight: 650 !important; margin: 30px 0 13px; }
 .inclusions { padding: 0; margin: 0; list-style: none; border-top: 1px solid #d7d0c3; }
-.inclusions li { display: flex; align-items: center; gap: 18px; font-size: 13px; line-height: 1.7; padding: 13px 0; border-bottom: 1px solid #d7d0c3; }
-.inclusions li span { color: #986c45; }
+.inclusions li { font-size: 13px; line-height: 1.7; padding: 13px 0; border-bottom: 1px solid #d7d0c3; }
 .fitPanel { background: #e9e3d8; border: 1px solid #d5cabb; padding: 32px; }
 .fitPanel h3 { font-size: 37px; margin: 17px 0 20px; }
 .fitPanel > ul { padding-left: 17px; color: #5d574d; font-size: 13px; line-height: 1.85; }

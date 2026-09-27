@@ -425,8 +425,7 @@ export function BookingWizard({
               ? "Reserving..."
               : step === 3
                 ? "CONFIRM APPOINTMENT"
-                : "Continue"}{" "}
-            <span>↗</span>
+                : "Continue"}
           </button>
         </div>
         <p className="small-note">

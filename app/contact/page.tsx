@@ -46,7 +46,7 @@ export default async function Page() {
                 encodeURIComponent(business.address)
               }
             >
-              Get directions ↗
+              Get directions
             </a>
           )}
         </div>

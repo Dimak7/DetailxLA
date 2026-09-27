@@ -51,7 +51,7 @@
 .ceramics-site .ceramics-nav > a:hover::after, .ceramics-site .ceramics-nav > a[aria-current]::after { transform: scaleX(1); }
 .ceramics-site .ceramics-nav-feature { color: #81562f; }
 .ceramics-site .ceramics-header-book { min-height: 46px; padding: 12px 19px; font-size: 10px; gap: 25px; flex-shrink: 0; }
-.ceramics-site .ceramics-menu-toggle, .ceramics-site .ceramics-menu-caption, .ceramics-site .ceramics-nav-arrow, .ceramics-site .ceramics-nav .ceramics-menu-book, .ceramics-site .ceramics-menu-note { display: none; }
+.ceramics-site .ceramics-menu-toggle, .ceramics-site .ceramics-menu-caption, .ceramics-site .ceramics-nav .ceramics-menu-book, .ceramics-site .ceramics-menu-note { display: none; }
 
 /* Interior pages retain their working layouts with the new paper and copper palette. */
 .ceramics-site .page-intro { padding-top: 84px; padding-bottom: 60px; border-bottom: 0; }
@@ -167,9 +167,8 @@
   .ceramics-site .ceramics-nav { display: none; position: absolute; top: 100%; left: 0; right: 0; margin: 0; padding: 24px 6% 29px; background: #f2efe8; border-top: 1px solid #d9d4ca; border-bottom: 1px solid #c6bcab; box-shadow: 0 20px 40px #1517191c; max-height: calc(100svh - 100px); overflow-y: auto; }
   .ceramics-site .ceramics-nav.is-open { display: flex; align-items: stretch; flex-direction: column; gap: 0; }
   .ceramics-site .ceramics-menu-caption { display: block; font-size: 8px; letter-spacing: .2em; color: #8b623d; padding-bottom: 12px; }
-  .ceramics-site .ceramics-nav > a { font-family: var(--font-display), serif; font-weight: 500; font-size: 28px; min-height: 53px; border-bottom: 1px solid #dfd8cb; justify-content: space-between; }
+  .ceramics-site .ceramics-nav > a { font-family: var(--font-display), serif; font-weight: 500; font-size: 28px; min-height: 53px; border-bottom: 1px solid #dfd8cb; justify-content: flex-start; }
   .ceramics-site .ceramics-nav > a::after { display: none; }
-  .ceramics-site .ceramics-nav-arrow { display: inline; font-family: var(--font-body), sans-serif; font-size: 17px; font-weight: 400; color: #a57447; }
   .ceramics-site .ceramics-nav .ceramics-menu-book { display: flex; background: #151719; color: #fffaf0; padding: 12px 19px; font-family: var(--font-body), sans-serif; font-size: 11px; margin-top: 20px; border: 0; }
   .ceramics-site .ceramics-menu-note { display: block; color: #777065; font-size: 10px; margin: 19px 0 0; }
   .ceramics-site .ceramics-footer-grid { grid-template-columns: 1.4fr 1fr 1fr; gap: 40px 28px; }

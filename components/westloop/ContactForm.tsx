@@ -56,7 +56,7 @@ export function ContactForm() {
         <a href="/privacy-notice">privacy notice</a>.
       </p>
       <button disabled={busy} className="button">
-        {busy ? "Sending..." : "Send enquiry"} ↗
+        {busy ? "Sending..." : "Send enquiry"}
       </button>
       {status && <p role="status">{status}</p>}
     </form>

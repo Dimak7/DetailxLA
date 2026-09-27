@@ -108,18 +108,19 @@ export function CinematicHero() {
         <h1>A finish worth <em>protecting.</em></h1>
         <p className={styles.description}>Precision detailing. Lasting ceramic protection.<br className={styles.mobileBreak} /> An extraordinary finish, every time.</p>
         <div className={styles.actions}>
-          <Link href="/services/ceramic-coating" className={styles.primary}>Explore ceramic coatings <span aria-hidden="true">↗</span></Link>
-          <Link href="/booking" className={styles.secondary}>Book your detail <span aria-hidden="true">↗</span></Link>
+          <Link href="/services/ceramic-coating" className={styles.primary}>Explore ceramic coatings</Link>
+          <Link href="/booking" className={styles.secondary}>Book your detail</Link>
         </div>
       </div>
 
       <div className={styles.visual}>
-        <div className={styles.studioGlow} aria-hidden="true" />
+        <div className={styles.mediaFrame}>
         <picture>
           <source media="(max-width: 760px)" srcSet={mobilePoster} />
           <Image src={desktopPoster} alt="A polished Porsche 911, prepared to perfection in a softly lit studio" fill priority sizes="(max-width: 760px) 100vw, 1180px" className={styles.poster} aria-hidden={status === "ready"} />
         </picture>
         <div ref={stage} className={styles.canvas} role="img" aria-hidden={status !== "ready"} aria-label={heroVideoMedia?.description ?? "A Porsche 911 turns through a careful wash to reveal a polished finish"} />
+        </div>
       </div>
 
       <div className={styles.bottom}>

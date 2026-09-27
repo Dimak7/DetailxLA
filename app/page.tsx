@@ -47,7 +47,7 @@ export default async function Home() {
           <p className={styles.lead}>For the way it looks today.<br />And the way you care for it tomorrow.</p>
           <p>Ceramic coating brings a new depth to your paint and helps make regular washing easier. The difference starts before the coating touches the car: thoughtful preparation, a clean surface and attention to every panel.</p>
           <div className={styles.featurePrice}><span>{coating && coating.pricing_mode !== "quote" ? `${coating.pricing_mode === "starting" ? "From " : ""}${money(coating.price_cents)}` : "Tailored to your vehicle"}</span><small>Preparation and vehicle condition guide the final scope.</small></div>
-          <div className={styles.links}><Link className="button" href="/services/ceramic-coating">Explore ceramic coating <span aria-hidden="true">↗</span></Link><Link className="text-link" href={coatingBooking}>Book your coating <span aria-hidden="true">↗</span></Link></div>
+          <div className={styles.links}><Link className="button" href="/services/ceramic-coating">Explore ceramic coating</Link><Link className="text-link" href={coatingBooking}>Book your coating</Link></div>
         </div>
         <div className={styles.featureVisual}><CeramicFilm /><div className={styles.benefits}>
           <div><span>01</span><h3>A richer finish</h3><p>Gloss and clarity that reward a closer look.</p></div>
@@ -56,7 +56,7 @@ export default async function Home() {
         </div></div>
       </section>
       <section className={styles.services} id="services"><div className="wrap">
-        <div className={styles.sectionHeading}><div><p className="eyebrow">02 / THE RIGHT CARE, EVERY TIME</p><h2>Refine. Protect.<br /><em>Enjoy the drive.</em></h2></div><div><p>From a complete detail to a carefully prepared coating, find the service that fits your car.</p><Link className="text-link" href="/services">Explore all {services.length} services <span aria-hidden="true">↗</span></Link></div></div>
+        <div className={styles.sectionHeading}><div><p className="eyebrow">02 / THE RIGHT CARE, EVERY TIME</p><h2>Refine. Protect.<br /><em>Enjoy the drive.</em></h2></div><div><p>From a complete detail to a carefully prepared coating, find the service that fits your car.</p><Link className="text-link" href="/services">Explore all {services.length} services</Link></div></div>
         <ServiceCards services={featured} compact />
         <ServiceFinder services={services.map(({ id, slug, name, price_cents, pricing_mode }) => ({ id, slug, name, price_cents, pricing_mode }))} />
       </div></section>
@@ -64,7 +64,7 @@ export default async function Home() {
         <div className={styles.processImage}><Image src="/portfolio/black-porsche-studio.jpg" alt="Light tracing the contours of a polished black Porsche" fill sizes="(max-width: 760px) 100vw, 44vw" /><span>GOOD PREPARATION. BEAUTIFUL RESULTS.</span></div>
         <div className={styles.processCopy}><p className="eyebrow">03 / THE WEST LOOP STANDARD</p><h2>The finish matters.<br /><em>So does the process.</em></h2><p>Premium care should feel clear from the first conversation to the first drive home.</p>
           {[["01", "Understand your vehicle", "We start with the condition of the paint, the way you drive and the finish you want."], ["02", "Prepare with purpose", "A careful wash, decontamination and any agreed paint correction establish the right foundation."], ["03", "Finish. Inspect. Advise.", "We check the finish and explain the care it needs, including coating cure and maintenance guidance."]].map(([n, title, body]) => <div className={styles.processStep} key={n}><span>{n}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}
-          <Link className="text-link" href="/contact">Talk through your vehicle <span aria-hidden="true">↗</span></Link>
+          <Link className="text-link" href="/contact">Talk through your vehicle</Link>
         </div>
       </section>
       <section className={styles.detailStrip} aria-label="Attention to every surface">
@@ -72,8 +72,8 @@ export default async function Home() {
         <figure><Image src="/portfolio/tan-interior-detail.jpg" alt="Fine leather texture and detailed interior stitching" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>INTERIOR CARE</span><h3>Care you feel, every day.</h3></figcaption></figure>
       </section>
       {reviews.length > 0 && <section className={`${styles.reviews} wrap`}><p className="eyebrow">FROM THE DRIVER’S SEAT</p><h2>Good care gets remembered.</h2><div>{reviews.slice(0, 3).map((r) => <blockquote key={r.id}><span aria-label={`${r.rating} out of 5 stars`}>{"★".repeat(r.rating)}</span><p>“{r.text}”</p><cite>{r.name}</cite><small>Verified appointment</small></blockquote>)}</div></section>}
-      <section className={`${styles.faq} wrap`}><div><p className="eyebrow">BEFORE YOU BOOK</p><h2>A little clarity.<br /><em>A better decision.</em></h2><p>Not sure where to start? Tell us about your vehicle and we’ll help you choose.</p><Link className="text-link" href="/contact">Ask the studio <span aria-hidden="true">↗</span></Link></div><div className={styles.questions}>{questions.map(([question, answer]) => <details key={question}><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div></section>
-      <section className={styles.location}><div className="wrap"><div><p className="eyebrow">ROOTED IN THE WEST LOOP</p><h2>Chicago roads.<br /><em>Extraordinary care.</em></h2></div><div><p>{business.service_area}</p><p>{business.address || "Your appointment location is confirmed before your visit."}</p><span>{business.hours_label}</span><Link className="text-link" href="/contact">Plan your visit <span aria-hidden="true">↗</span></Link></div></div></section>
+      <section className={`${styles.faq} wrap`}><div><p className="eyebrow">BEFORE YOU BOOK</p><h2>A little clarity.<br /><em>A better decision.</em></h2><p>Not sure where to start? Tell us about your vehicle and we’ll help you choose.</p><Link className="text-link" href="/contact">Ask the studio</Link></div><div className={styles.questions}>{questions.map(([question, answer]) => <details key={question}><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div></section>
+      <section className={styles.location}><div className="wrap"><div><p className="eyebrow">ROOTED IN THE WEST LOOP</p><h2>Chicago roads.<br /><em>Extraordinary care.</em></h2></div><div><p>{business.service_area}</p><p>{business.address || "Your appointment location is confirmed before your visit."}</p><span>{business.hours_label}</span><Link className="text-link" href="/contact">Plan your visit</Link></div></div></section>
     </PageShell>
   );
 }

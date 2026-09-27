@@ -49,7 +49,7 @@ export function ReceiptActions({
               disabled={busy}
               onClick={() => pay("deposit")}
             >
-              Pay deposit securely ↗
+              Pay deposit securely
             </button>
           )}
           <button
@@ -57,7 +57,7 @@ export function ReceiptActions({
             disabled={busy}
             onClick={() => pay("balance")}
           >
-            Pay balance ↗
+            Pay balance
           </button>
         </div>
       )}

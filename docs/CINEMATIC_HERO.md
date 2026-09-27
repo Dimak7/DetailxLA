@@ -81,6 +81,14 @@ including roof, rear wing, headlights and wheels; remove Ferrari branding.
 - `CinematicHero.module.css`: graphite studio, ivory typography, pale-gold and
   copper accents, full-car framing, mobile layout and visible focus indicators.
 
+The poster and film share an intrinsic 25:11 frame fitted inside the available
+hero area. A combined horizontal and vertical alpha mask blends all four edges
+into the uniform hero background. Applying this mask to the actual media frame,
+rather than its letterboxed video element, prevents exposed rectangular borders
+at tablet widths and tall viewports. This is a presentation blend; the original
+generated film remains intact. Decorative arrows have been removed from links
+and buttons throughout the site at the owner's request.
+
 Encode silent H.264, yuv420p, with a fast-start header. The mobile variant keeps
 the same complete composition at lower resolution; do not crop wheels or
 bumpers. Derive first/final stills from the exact film. Asset requests are
