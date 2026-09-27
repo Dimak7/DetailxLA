@@ -139,7 +139,6 @@ export function CinematicHero() {
           {status === "loading" && <span className={styles.filmNote}>Preparing the film</span>}
           {status === "static" && <span className={styles.filmNote}>The final finish</span>}
           {status === "error" && <button type="button" className={styles.playback} onClick={() => setAttempt((value) => value + 1)}>Retry film <span aria-hidden="true">↻</span></button>}
-          <a className={styles.credit} href="/hero/credits.txt" target="_blank" rel="noreferrer">Visual credits</a>
         </div>
       </div>
       <noscript><style>{`.${styles.journey},.${styles.filmNote}{display:none}`}</style></noscript>

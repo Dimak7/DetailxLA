@@ -42,7 +42,6 @@
 .playback:hover { background: #d8ba9014; }
 .playback svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .filmNote { color: #b5b5aa; font-size: 10px; white-space: nowrap; }
-.credit { color: #999c94; font-size: 9px; line-height: 1.5; text-decoration: underline; text-underline-offset: 3px; }
 @keyframes replay-in { from { opacity: 0; } to { opacity: 1; } }
 @media (min-width: 1700px) { .hero { padding-top: 55px; } .visual { width: min(1350px,100%); } }
 @media (max-width: 1100px) { .hero { height: calc(100svh - 114px); } .bottom { grid-template-columns: minmax(300px,1fr) auto; gap: 30px; } .signature { display: none; } }
@@ -63,9 +62,8 @@
   .chapters { gap: 7px; }
   .chapters li { font-size: 9px; }
   .chapters li span { margin-right: 6px; font-size: 7px; }
-  .filmControls { width: 100%; flex-direction: row-reverse; justify-content: space-between; }
+  .filmControls { width: 100%; justify-content: flex-end; }
   .playback { font-size: 10px; min-width: 114px; }
-  .credit { font-size: 9px; }
 }
 @media (max-width: 360px) { .hero { padding-left: 18px; padding-right: 18px; } .location { display: none; } .actions { gap: 13px; } .primary,.secondary { font-size: 9px; gap: 7px; } .primary { padding-left: 11px; padding-right: 11px; } .visual { width: calc(100% + 36px); margin-left: -18px; margin-right: -18px; } .chapters li span { display: none; } }
 @media (max-height: 650px) and (min-width: 761px) { .hero { height: auto; min-height: 720px; padding-top: 32px; } .visual { min-height: 340px; } }

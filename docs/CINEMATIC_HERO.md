@@ -24,7 +24,8 @@ The clean Porsche appearance reference was created with the built-in image
 generation tool. Higgsfield Genjutsu object replacement uses that reference and
 a deterministic 9-second Three.js motion guide rendered from the previously
 licensed model. The guide is not the final Porsche asset. The original model's
-attribution is retained in `public/hero/credits.txt`.
+attribution is retained in `public/hero/credits.txt`, accessible through the
+footer's Visual credits link. The hero keeps only its film playback control.
 
 - Higgsfield project: `8d981144-7e99-486f-a5a3-636084081a91`
 - Porsche reference media: `a9fceb9e-442e-4771-b421-6447a2a83ca3`
