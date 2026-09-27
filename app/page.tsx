@@ -70,14 +70,14 @@ export default async function Home() {
         </div>
         <div className="hero-visual">
           <Image
-            src="/portfolio/silver-porsche-street.jpg"
-            alt="Sculpted silver Porsche bodywork"
+            src="/portfolio/west-loop-hero-arrival.png"
+            alt="Luxury coupe arriving at a West Loop auto spa after rain"
             fill
             priority
             sizes="(max-width: 760px) 100vw, 55vw"
           />
           <div className="image-label">
-            THE ART OF AUTOMOTIVE CARE <span>01 / CHICAGO</span>
+            WEST LOOP AFTER HOURS <span>01 / CHICAGO</span>
           </div>
           <span className="hero-seal">
             WEST LOOP

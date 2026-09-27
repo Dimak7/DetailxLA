@@ -363,12 +363,13 @@ button:disabled {
   font-size: 12px;
   font-weight: 600;
   min-height: 50px;
-  transition: background 0.2s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 .button:hover {
   background: var(--gold);
   border-color: var(--gold);
   color: #111;
+  transform: translateY(-2px);
 }
 .button.light {
   background: var(--paper);
@@ -378,6 +379,12 @@ button:disabled {
 .button.outline {
   background: transparent;
   color: var(--ink);
+}
+.button:focus-visible,
+.text-link:focus-visible,
+.public-header nav a:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 4px;
 }
 .button.small {
   padding: 11px 19px;
@@ -408,8 +415,12 @@ button:disabled {
 }
 .hero-copy {
   padding: 49px 32px 0 0;
-  animation: reveal 0.65s ease-out;
+  animation: reveal 0.65s ease-out both;
 }
+.hero-copy .eyebrow { animation: reveal .55s .08s ease-out both; }
+.hero-copy h1 { animation: reveal .7s .16s ease-out both; }
+.hero-copy .hero-description { animation: reveal .7s .28s ease-out both; }
+.hero-copy .button-row { animation: reveal .7s .38s ease-out both; }
 .hero-description {
   font-size: 14px;
   line-height: 1.9;
@@ -445,19 +456,31 @@ button:disabled {
 .hero-visual {
   position: relative;
   min-height: 570px;
-  background: #c2c7bd;
+  background: #131817;
   border-radius: 130px 0 0 0;
   overflow: hidden;
 }
 .hero-visual > img {
   object-fit: cover;
-  object-position: 50% 55%;
+  object-position: 58% 55%;
+  animation: hero-arrival 1.35s cubic-bezier(.18,.7,.2,1) both;
 }
 .hero-visual:after {
   content: "";
   position: absolute;
-  inset: 60% 0 0;
-  background: linear-gradient(transparent, #15231db3);
+  inset: 0;
+  background: linear-gradient(90deg, #080c0ab8 0%, transparent 44%, #07100b28 100%), linear-gradient(0deg, #08100cc9 0%, transparent 45%);
+  pointer-events: none;
+}
+.hero-visual:before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: -30% auto -30% -65%;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, #f6d99924 48%, transparent);
+  transform: skewX(-20deg);
+  animation: passing-light 4.8s 1.2s ease-in-out infinite;
   pointer-events: none;
 }
 .image-label {
@@ -486,6 +509,23 @@ button:disabled {
   font-size: 8px;
   line-height: 1.8;
   letter-spacing: 0.13em;
+  animation: seal-settle 1.05s .55s cubic-bezier(.18,.7,.2,1) both;
+}
+@keyframes hero-arrival {
+  from { opacity: 0; transform: scale(1.09) translateX(5%); filter: saturate(.75) contrast(.9); }
+  to { opacity: 1; transform: scale(1) translateX(0); filter: saturate(1) contrast(1); }
+}
+@keyframes passing-light {
+  0%, 35% { transform: translateX(0) skewX(-20deg); opacity: 0; }
+  44% { opacity: .85; }
+  68%, 100% { transform: translateX(440%) skewX(-20deg); opacity: 0; }
+}
+@keyframes seal-settle {
+  from { opacity: 0; transform: rotate(-14deg) scale(.72); }
+  to { opacity: 1; transform: rotate(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
 .hero-seal i {
   font-family: var(--font-display), serif;
@@ -1936,6 +1976,8 @@ td small {
     min-height: 370px;
     border-radius: 85px 0 0 0;
   }
+  .hero-visual > img { object-position: 64% 55%; }
+  .hero-visual:before { animation-duration: 6.5s; }
   .hero-seal {
     height: 85px;
     width: 85px;
