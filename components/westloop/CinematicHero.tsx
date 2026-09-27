@@ -118,7 +118,7 @@ export function CinematicHero() {
         <div className={styles.mediaFrame}>
         <picture>
           <source media="(max-width: 760px)" srcSet={mobilePoster} />
-          <Image src={desktopPoster} alt="A polished Porsche 911, prepared to perfection in a softly lit studio" fill priority sizes="(max-width: 760px) 100vw, 1180px" className={styles.poster} aria-hidden={status === "ready"} />
+          <Image src={desktopPoster} alt="A polished Porsche 911, prepared to perfection in a softly lit studio" fill priority unoptimized sizes="(max-width: 760px) 100vw, 1180px" className={styles.poster} aria-hidden={status === "ready"} />
         </picture>
         <div ref={stage} className={styles.canvas} role="img" aria-hidden={status !== "ready"} aria-label={heroVideoMedia?.description ?? "A Porsche 911 turns through a careful wash to reveal a polished finish"} />
         </div>

@@ -11,6 +11,8 @@ and retained legacy fallback assets follows.
 Current graphite version: deterministic color grade of the existing Higgsfield
 film, retaining its generated motion and detail. Cropped to frame the full car,
 trimmed by six opening frames, desaturated and adjusted for contrast and gamma.
+The quality refresh is encoded from the original generated film with restrained
+sharpening and Lanczos upscaling for desktop presentation; it adds no new footage.
 No new vehicle footage or customer result is represented by this illustration.
 
 Ceramic application image: AI-generated editorial illustration, created with the

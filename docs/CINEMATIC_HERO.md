@@ -37,17 +37,27 @@ Generation status: completed and visually reviewed. The finished film and its
 matching posters are installed under `public/hero/` and enabled in
 `components/westloop/hero-media.ts`. A fixed studio crop removes empty margins;
 the first six frames are trimmed to keep the whole Porsche visible on entry.
-Desktop is 1000×440 and mobile is 900×396, both 24fps and approximately 8.46 seconds.
+The source crop is 1000×440. The quality refresh presents it at 2000×880 on desktop
+and 1000×440 on mobile, both 24fps and approximately 8.46 seconds.
 
 The current West Loop Ceramics version uses a deterministic neutral-graphite
 color grade of this same generated film, not a new Higgsfield generation. The
 original green film is retained. The grade is
 `hue=s=0.12,eq=contrast=1.045:brightness=0.006:gamma=1.025` applied after the original
-six-frame trim and studio crop. Current files are `porsche-graphite.mp4`,
-`porsche-graphite-mobile.mp4`, `porsche-graphite-dirty.webp` and
-`porsche-graphite-clean.webp`. The encodes use a 24-frame keyframe interval and
-CRF 20 desktop / 23 mobile for automatic playback. Their 203 frames run for
-8.458333 seconds. The matching stills are extracted from the graded film.
+six-frame trim and studio crop. Current files are `porsche-graphite-hq.mp4`,
+`porsche-graphite-hq-mobile.mp4`, `porsche-graphite-hq-dirty.webp` and
+`porsche-graphite-hq-clean.webp`. Both are encoded directly from the original
+1280×720 Higgsfield source, avoiding another encode of an already compressed
+web file. A restrained luma sharpen (`unsharp=5:5:0.65:3:3:0`) follows the grade;
+desktop then uses `scale=2000:880:flags=lanczos`. This improves edge clarity and
+resampling; the upscale does not create new source detail.
+
+The H.264 High level 4.1 encodes use four references, a 24-frame keyframe interval,
+CRF 19 desktop / 18 mobile, yuv420p, a 24000 track timescale, and fast-start headers.
+Their 203 frames run for 8.458333 seconds. High-quality WebP stills (quality 95)
+are extracted from the exact desktop encode's first and final frames. They are
+served without Next/Image recompression so the static/replay fallback retains
+the same crisp finish. The final video frame remains visible above the poster.
 
 ### Reference image prompt
 

@@ -17,14 +17,14 @@ export type HeroVideoMedia = {
 // A null value shows the existing clean studio still without animation.
 export const heroVideoMedia: HeroVideoMedia | null = {
   desktop: {
-    src: "/hero/porsche-graphite.mp4",
-    poster: "/hero/porsche-graphite-dirty.webp",
-    cleanPoster: "/hero/porsche-graphite-clean.webp",
+    src: "/hero/porsche-graphite-hq.mp4",
+    poster: "/hero/porsche-graphite-hq-dirty.webp",
+    cleanPoster: "/hero/porsche-graphite-hq-clean.webp",
   },
   mobile: {
-    src: "/hero/porsche-graphite-mobile.mp4",
-    poster: "/hero/porsche-graphite-dirty.webp",
-    cleanPoster: "/hero/porsche-graphite-clean.webp",
+    src: "/hero/porsche-graphite-hq-mobile.mp4",
+    poster: "/hero/porsche-graphite-hq-dirty.webp",
+    cleanPoster: "/hero/porsche-graphite-hq-clean.webp",
   },
   description: "A graphite Porsche 911 rotates through a complete turn, from road-worn paint through a careful wash to a polished finish",
 };
