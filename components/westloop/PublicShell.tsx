@@ -61,7 +61,6 @@ export function PublicHeader({ business }: { business: BusinessSettings }) {
 
   return (
     <>
-      <div className="ceramics-announcement"><span>PROTECTION. REFINEMENT. EVERY DAY.</span><span>WEST LOOP · CHICAGO</span></div>
       <header ref={header} className="ceramics-header" data-menu-open={open}>
         <Link href="/" className="ceramics-home" aria-label={`${business.name} home`} onClick={() => setOpen(false)}>
           {business.logo_url && business.name !== BRAND_NAME ? (
@@ -76,9 +75,8 @@ export function PublicHeader({ business }: { business: BusinessSettings }) {
             </Link>
           ))}
           <Link href="/booking" className="ceramics-menu-book" onClick={() => setOpen(false)}>Book an appointment</Link>
-          <p className="ceramics-menu-note">For the car you love. For the roads ahead.</p>
         </nav>
-        <Link className="button ceramics-header-book" href="/booking">Book a detail</Link>
+        <Link className="button ceramics-header-book" href="/booking">Book now</Link>
         <button ref={toggle} className="ceramics-menu-toggle" aria-expanded={open} aria-controls="ceramics-navigation" aria-label={open ? "Close navigation" : "Open navigation"} onClick={() => setOpen((value) => !value)}>
           <span>{open ? "Close" : "Menu"}</span><span className="ceramics-menu-icon" aria-hidden="true"><i /><i /></span>
         </button>
@@ -92,8 +90,8 @@ export function PublicFooter({ business }: { business: BusinessSettings }) {
     <>
       <section className="ceramics-final-cta" aria-labelledby="final-cta-heading">
         <div className="wrap ceramics-final-inner">
-          <div><p className="eyebrow">THE NEXT CHAPTER STARTS HERE</p><h2 id="final-cta-heading">For the car you love.<br /><em>For the roads ahead.</em></h2><p>Thoughtful preparation. A deeper finish. Care that continues beyond the studio.</p></div>
-          <div className="ceramics-final-actions"><Link href="/booking" className="button">Find your appointment</Link><Link href="/services/ceramic-coating" className="text-link">Explore ceramic protection</Link></div>
+          <div><p className="eyebrow">READY WHEN YOU ARE</p><h2 id="final-cta-heading">Give your car the finish it deserves.</h2><p>Choose a service and reserve a time online. We will confirm the details before your visit.</p></div>
+          <div className="ceramics-final-actions"><Link href="/booking" className="button">Book an appointment</Link><Link href="/services" className="text-link">View services & pricing</Link></div>
         </div>
       </section>
       <footer className="ceramics-footer">
@@ -103,10 +101,10 @@ export function PublicFooter({ business }: { business: BusinessSettings }) {
           <div><h3>The studio</h3><Link href="/#process">Our process</Link><Link href="/gallery">Our work</Link><Link href="/booking">Book an appointment</Link><Link href="/contact">Talk to the team</Link>{business.instagram_url ? <a href={business.instagram_url} target="_blank" rel="noreferrer">Instagram</a> : null}</div>
           <div className="ceramics-footer-contact"><h3>Plan your visit</h3><p>{business.address || "West Loop, Chicago"}</p><p>{business.hours_label || "By appointment"}</p>{business.phone ? <a href={"tel:" + business.phone.replace(/[^+\d]/g, "")} onClick={() => track("phone_clicked")}>{business.phone}</a> : null}{business.email ? <a href={"mailto:" + business.email}>{business.email}</a> : null}{!business.address ? <p className="ceramics-visit-note">Your appointment location is confirmed before your visit.</p> : null}</div>
           <div className="ceramics-service-area"><span>SERVING CHICAGO</span><p>{business.service_area || "West Loop and the surrounding Chicago neighborhoods."}</p></div>
-          <div className="ceramics-footer-bottom"><span>© {new Date().getFullYear()} {business.name}</span><div><Link href="/privacy-notice">Privacy notice</Link><Link href="/service-rules">Service terms</Link><a href="/hero/credits.txt" target="_blank" rel="noreferrer">Visual credits</a><Link href="/admin">Team access</Link></div><span>CARE IN EVERY LAYER.</span></div>
+          <div className="ceramics-footer-bottom"><span>© {new Date().getFullYear()} {business.name}</span><div><Link href="/privacy-notice">Privacy notice</Link><Link href="/service-rules">Service terms</Link><a href="/hero/credits.txt" target="_blank" rel="noreferrer">Visual credits</a><Link href="/admin">Team access</Link></div></div>
         </div>
       </footer>
-      <div className="mobile-bar ceramics-mobile-bar"><Link className="button" href="/booking">Book an appointment</Link><CallLink phone={business.phone} className="button outline" /></div>
+      <div className="mobile-bar ceramics-mobile-bar"><Link className="button" href="/booking">Book appointment</Link><CallLink phone={business.phone} className="button outline" /></div>
     </>
   );
 }

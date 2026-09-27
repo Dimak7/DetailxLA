@@ -189,3 +189,20 @@
   .cardTop { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { .primaryLink,.filters button { transition: none; } }
+
+/* Premium readability pass: labels stay restrained without becoming tiny. */
+.eyebrow { font-size: 11px; letter-spacing: .13em; }
+.lead,.bodyCopy,.sectionHeading>p { font-size: 15px; line-height: 1.75; }
+.sectionNote,.comparisonCard .comparisonNote,.vehiclePrices,.fitPricing>p { font-size: 12px; }
+.filters button,.cardIncludes summary,.cardBook,.textLink,.lightTextLink,.primaryLink { font-size: 13px; }
+.cardTop { font-size: 10px; }
+.cardPrice>span { font-size: 12px; }
+.inclusions li { padding: 15px 0; font-size: 14px; }
+.inclusions li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #986c45; flex: 0 0 auto; }
+.appointmentStrip>div>span { font-size: 10px; }
+.appointmentStrip>p { font-size: 13px; line-height: 1.7; }
+@media(max-width:760px) {
+  .lead,.bodyCopy,.sectionHeading>p { font-size: 14px; }
+  .filters button { font-size: 12px; }
+  .cardBook,.textLink,.lightTextLink,.primaryLink { font-size: 12px; }
+}
