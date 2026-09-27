@@ -3,14 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { heroVideoMedia } from "./hero-media";
 import type { HeroScene } from "./hero-scene";
 import styles from "./CinematicHero.module.css";
 
 const chapters = [
-  { label: "The everyday", title: "Your car deserves better.", detail: "Road grime. City dust. A finish waiting to come back." },
-  { label: "The reset", title: "Care in every contour.", detail: "A thoughtful clean, down to the smallest detail." },
-  { label: "The refinement", title: "A deeper kind of clean.", detail: "Clear glass. Clean wheels. Paint that catches the light." },
-  { label: "The finish", title: "We bring the showroom back.", detail: "Premium detailing for people who care about their car." },
+  { label: "Road-worn", title: "Your car deserves better.", detail: "Road grime. City dust. A finish waiting to come back." },
+  { label: "The wash", title: "Care in every contour.", detail: "A careful wash, down to the smallest detail." },
+  { label: "The rinse", title: "A deeper kind of clean.", detail: "Clear glass. Clean wheels. Paint that catches the light." },
+  { label: "Showroom", title: "We bring the showroom back.", detail: "Premium detailing for people who care about their car." },
 ];
 
 export function CinematicHero() {
@@ -22,6 +23,14 @@ export function CinematicHero() {
   const [chapter, setChapter] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "static" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
+  const still = status === "static" || status === "error";
+  const desktopPoster = heroVideoMedia
+    ? still ? heroVideoMedia.desktop.cleanPoster : heroVideoMedia.desktop.poster
+    : still ? "/hero/poster-clean.webp" : "/hero/poster.webp";
+  const mobileMedia = heroVideoMedia?.mobile ?? heroVideoMedia?.desktop;
+  const mobilePoster = mobileMedia
+    ? still ? mobileMedia.cleanPoster : mobileMedia.poster
+    : still ? "/hero/poster-clean-mobile.webp" : "/hero/poster-mobile.webp";
 
   useEffect(() => {
     const root = section.current!, screen = viewport.current!, host = stage.current!;
@@ -37,6 +46,9 @@ export function CinematicHero() {
       root.dataset.interactive = "false";
       setStatus(failed ? "error" : "static");
       setChapter(3);
+      root.style.setProperty("--finish", "1");
+      if (meter.current) meter.current.style.transform = "scaleX(1)";
+      if (percentage.current) percentage.current.textContent = "100%";
       cancelAnimationFrame(raf); raf = 0;
       scene?.dispose(); scene = undefined;
     }
@@ -75,9 +87,19 @@ export function CinematicHero() {
       setStatus("loading");
       timeout = setTimeout(() => { abort.abort(); staticView(true); }, 25000);
       try {
-        const { createHeroScene } = await import("./hero-scene");
-        if (abort.signal.aborted) return;
-        const result = await createHeroScene(host, abort.signal);
+        let result: HeroScene;
+        if (heroVideoMedia) {
+          const { createHeroVideo } = await import("./hero-video");
+          if (abort.signal.aborted) return;
+          const source = window.matchMedia("(max-width: 760px)").matches
+            ? heroVideoMedia.mobile ?? heroVideoMedia.desktop
+            : heroVideoMedia.desktop;
+          result = await createHeroVideo(host, source, abort.signal, () => staticView(true));
+        } else {
+          const { createHeroScene } = await import("./hero-scene");
+          if (abort.signal.aborted) return;
+          result = await createHeroScene(host, abort.signal);
+        }
         if (abort.signal.aborted) { result.dispose(); return; }
         scene = result;
         root.dataset.interactive = "true";
@@ -99,8 +121,10 @@ export function CinematicHero() {
     window.addEventListener("scroll", wake, { passive: true });
     window.addEventListener("resize", resize);
     document.addEventListener("visibilitychange", wake);
-    screen.addEventListener("pointermove", move, { passive: true });
-    screen.addEventListener("pointerleave", leave);
+    if (!heroVideoMedia) {
+      screen.addEventListener("pointermove", move, { passive: true });
+      screen.addEventListener("pointerleave", leave);
+    }
     motion.addEventListener("change", motionChanged);
     return () => {
       clearTimeout(timeout); abort.abort(); cancelAnimationFrame(raf);
@@ -115,11 +139,11 @@ export function CinematicHero() {
 
   function jump(progress: number) {
     const root = section.current!, screen = viewport.current!;
-    window.scrollTo({ top: window.scrollY + root.getBoundingClientRect().top + progress * (root.offsetHeight - screen.offsetHeight), behavior: "smooth" });
+    window.scrollTo({ top: window.scrollY + root.getBoundingClientRect().top + progress * (root.offsetHeight - screen.offsetHeight), behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   }
 
   return (
-    <section ref={section} className={styles.hero} aria-label="The West Loop detailing transformation" data-status={status}>
+    <section ref={section} className={styles.hero} aria-label="The West Loop detailing transformation" data-status={status} data-renderer={heroVideoMedia ? "video" : "3d"}>
       <div ref={viewport} className={styles.viewport}>
         <div className={styles.topline}><span>WEST LOOP AUTO SPA / CHICAGO</span><a href="#services">Skip to services <span aria-hidden="true">&#8595;</span></a></div>
         <div className={styles.heading}>
@@ -130,12 +154,12 @@ export function CinematicHero() {
         <div className={styles.visual}>
           <div className={styles.halo} aria-hidden="true" />
           <picture>
-            <source media="(max-width: 760px)" srcSet={status === "static" || status === "error" ? "/hero/poster-clean-mobile.webp" : "/hero/poster-mobile.webp"} type="image/webp" />
-            <Image src={status === "static" || status === "error" ? "/hero/poster-clean.webp" : "/hero/poster.webp"} alt={status === "static" || status === "error" ? "Deep green sports car after detailing in a softly lit studio" : "Road-worn sports car before the West Loop detailing treatment"} fill priority sizes="(max-width: 760px) 100vw, 85vw" className={styles.poster} aria-hidden={status === "ready"} />
+            <source media="(max-width: 760px)" srcSet={mobilePoster} />
+            <Image src={desktopPoster} alt={heroVideoMedia ? still ? "A polished Porsche 911 after a complete detail" : "A road-worn Porsche 911 before its detailing transformation" : still ? "Deep green sports car after detailing in a softly lit studio" : "Road-worn sports car before the West Loop detailing treatment"} fill priority sizes="(max-width: 760px) 100vw, 85vw" className={styles.poster} aria-hidden={status === "ready"} />
           </picture>
-          <div ref={stage} className={styles.canvas} role="img" aria-hidden={status !== "ready"} aria-label="A single sports car rotates from road-worn paint to a polished finish as you scroll" />
+          <div ref={stage} className={styles.canvas} role="img" aria-hidden={status !== "ready"} aria-label={heroVideoMedia ? heroVideoMedia.description ?? "A Porsche 911 rotates from road-worn paint through a wash to a polished finish as you scroll" : "A single sports car rotates from road-worn paint to a polished finish as you scroll"} />
           <span className={styles.studioLabel}>THE WEST LOOP TREATMENT</span>
-          <a className={styles.credit} href="/hero/credits.txt" target="_blank" rel="noreferrer">3D model credit</a>
+          <a className={styles.credit} href="/hero/credits.txt" target="_blank" rel="noreferrer">{heroVideoMedia ? "Visual credits" : "3D model credit"}</a>
         </div>
         <div className={styles.bottom}>
           <div className={styles.actions}>

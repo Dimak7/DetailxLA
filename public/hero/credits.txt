@@ -1,4 +1,12 @@
-West Loop Auto Spa interactive detailing illustration
+West Loop Auto Spa cinematic detailing illustration
+
+Porsche hero: AI-generated appearance reference and Higgsfield Genjutsu film.
+The Porsche 911 GT3 is depicted as a detailing visualization, not customer footage.
+No affiliation with or endorsement by Porsche.
+The reference was made with the built-in image generator; the motion guide was
+rendered from the previously licensed model below. The generated film replaces
+that guide vehicle with the reference Porsche. Attribution for the source motion
+and retained legacy fallback assets follows.
 
 Vehicle: Ferrari 458 Italia by vicent091036.
 Original model: https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6
