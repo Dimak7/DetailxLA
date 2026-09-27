@@ -9,7 +9,7 @@
   border: 1px solid #cbd2c5;
   padding: 9px 16px;
   background: transparent;
-  color: #203e35;
+  color: #e5ece5;
   border-radius: 30px;
   font-size: 12px;
 }
@@ -24,7 +24,7 @@
   letter-spacing: 0.08em;
 }
 .service-index {
-  color: #b69361;
+  color: #785729;
 }
 .pill {
   font-size: 9px;
@@ -65,7 +65,9 @@
   text-align: center;
   border: 1px dashed #b8c3b6;
   background: linear-gradient(120deg, #edf0e7, #f7f4ee);
+  color: #203e35;
 }
+.empty-public p, .empty-public .eyebrow { color: #365344; }
 .empty-public h3 {
   font-family: var(--font-display);
   font-size: 36px;
@@ -104,6 +106,7 @@
   position: absolute;
   top: 15px;
   background: #f7f4ee;
+  color: #203e35;
   padding: 3px 8px;
   font-size: 9px;
 }
@@ -602,7 +605,7 @@ button:disabled {
 .gallery-tabs button.active,
 .filter-tabs a.active {
   background: var(--ink);
-  color: white;
+  color: var(--paper);
 }
 .service-grid {
   display: grid;
@@ -650,7 +653,7 @@ button:disabled {
 .service-card .price {
   font-family: var(--font-display);
   font-size: 36px;
-  color: var(--ink);
+  color: #17211d;
   margin: 12px 0;
 }
 .service-card small {
@@ -660,7 +663,7 @@ button:disabled {
 .service-card ul {
   padding-left: 17px;
   font-size: 12px;
-  color: var(--muted);
+  color: #485249;
   line-height: 2;
 }
 .service-card details {
@@ -770,6 +773,7 @@ button:disabled {
   padding: 48px;
   text-align: center;
   background: linear-gradient(120deg, #edf0e7, #f7f4ee);
+  color: #203e35;
   min-height: 190px;
   display: flex;
   flex-direction: column;
@@ -782,6 +786,7 @@ button:disabled {
 }
 .empty-gallery p {
   max-width: 500px;
+  color: #485249;
 }
 .steps-section {
   padding-top: 65px;
@@ -885,7 +890,7 @@ button:disabled {
   gap: 25px;
 }
 .final-cta .eyebrow {
-  color: #c9d3c7;
+  color: #365344;
 }
 .final-cta h2 {
   margin-bottom: 0;
@@ -1275,7 +1280,7 @@ select.control option {
 }
 .time-grid button.selected {
   background: var(--ink);
-  color: white;
+  color: #17211d;
 }
 .booking-actions {
   display: flex;
@@ -2207,6 +2212,9 @@ td small {
     min-height: 44px;
     gap: 8px;
   }
+  .mobile-bar > .button { background: #203e35; border-color: #203e35; color: #ffffff; }
+  .mobile-bar > .button.outline { background: #fffdf7; border-color: #52675a; color: #203e35; }
+  .mobile-bar > .button:hover { background: #d5e3d0; border-color: #203e35; color: #14271e; }
   .page-intro {
     padding-top: 45px;
     padding-bottom: 35px;

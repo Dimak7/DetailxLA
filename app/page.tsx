@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { publicData } from "@/lib/platform/public";
 import { PageShell } from "@/components/westloop/PageShell";
-import { CallLink } from "@/components/westloop/PublicShell";
+import { CinematicHero } from "@/components/westloop/CinematicHero";
 import { ServiceCards } from "@/components/westloop/ServiceCards";
 import { Gallery } from "@/components/westloop/Gallery";
 import { siteUrl } from "@/lib/platform/settings";
@@ -37,57 +37,7 @@ export default async function Home() {
           __html: JSON.stringify(schema).replace(/</g, "\\u003c"),
         }}
       />
-      <section className="hero wrap">
-        <div className="hero-copy">
-          <p className="eyebrow">
-            <span className="dot" /> WEST LOOP / CHICAGO
-          </p>
-          <h1>
-            Not just clean.
-            <br />
-            <em>Considered.</em>
-          </h1>
-          <p className="hero-description">
-            Exceptional detailing. Thoughtful protection.
-            <br />A fresh perspective on the car you love.
-          </p>
-          <div className="button-row">
-            <Link href="/booking" className="button">
-              Book your visit <span>↗</span>
-            </Link>
-            <CallLink phone={business.phone} className="text-link" />
-          </div>
-          <div className="hero-foot">
-            <span>
-              FOR THE DAILY DRIVE.
-              <br />
-              AND THE EXTRAORDINARY.
-            </span>
-            <a href="#services" aria-label="Explore our services">
-              ↓
-            </a>
-          </div>
-        </div>
-        <div className="hero-visual">
-          <Image
-            src="/portfolio/west-loop-hero-arrival.png"
-            alt="Luxury coupe arriving at a West Loop auto spa after rain"
-            fill
-            priority
-            sizes="(max-width: 760px) 100vw, 55vw"
-          />
-          <div className="image-label">
-            WEST LOOP AFTER HOURS <span>01 / CHICAGO</span>
-          </div>
-          <span className="hero-seal">
-            WEST LOOP
-            <br />
-            <i>the auto spa</i>
-            <br />
-            CHICAGO
-          </span>
-        </div>
-      </section>
+      <CinematicHero />
       <div className="principles wrap">
         <span>Care, down to the detail.</span>
         <p>Transparent service pricing</p>
@@ -99,9 +49,9 @@ export default async function Home() {
           <div>
             <p className="eyebrow">THE SERVICE MENU</p>
             <h2>
-              A little care.
+              Premium care.
               <br />
-              <em>A remarkable difference.</em>
+              <em>For the car you love.</em>
             </h2>
           </div>
           <div>

@@ -1,0 +1,78 @@
+.hero { --finish: 0; position: relative; height: 250svh; background: #0d1413; color: #f6f5ed; }
+.hero[data-interactive="false"] { height: auto; }
+.viewport { position: sticky; top: 0; height: 100svh; min-height: 650px; max-height: 1100px; isolation: isolate; overflow: hidden; background: radial-gradient(ellipse at 50% 66%, #263b35 0%, #141e1b 35%, #0d1413 70%); }
+.viewport::after { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse at 50% 60%, #64786c35, transparent 65%); opacity: var(--finish); pointer-events: none; }
+.topline { position: absolute; top: 25px; left: 5%; right: 5%; display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #bdc6be; font-size: 10px; letter-spacing: .13em; }
+.topline a { min-height: 44px; display: inline-flex; align-items: center; gap: 18px; color: #dee7df; letter-spacing: .03em; }
+.heading { position: absolute; top: 11%; left: 5%; right: 5%; z-index: 2; text-align: center; pointer-events: none; }
+.eyebrow { color: #b8d7bb; font-size: 10px; letter-spacing: .2em; margin: 0 0 12px; }
+.heading h1 { max-width: 100%; margin: 0; color: #f7f6ef; font-family: var(--font-display), Georgia, serif; font-size: clamp(42px, 5.4vw, 82px); font-weight: 500; line-height: 1.04; letter-spacing: -.04em; animation: chapter-in .45s ease both; }
+.description { margin: 14px auto 0; font-size: 13px; color: #c6cdc7; line-height: 1.65; }
+.visual { position: absolute; inset: 25% 0 22%; }
+.visual > picture { position: absolute; inset: 0; }
+.halo { position: absolute; left: 12%; right: 12%; top: 34%; height: 60%; border: 1px solid #c3d2c314; border-radius: 50%; transform: rotateX(65deg); box-shadow: 0 0 100px #99c5aa0d; }
+.canvas { position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease; touch-action: pan-y; }
+.canvas canvas { display: block; width: 100%; height: 100%; }
+.poster { object-fit: contain; mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 86%, transparent); transition: opacity .6s ease; }
+.hero[data-status="ready"] .canvas { opacity: 1; }
+.hero[data-status="ready"] .poster { opacity: 0; pointer-events: none; }
+.studioLabel { position: absolute; bottom: 4px; left: 5%; font-size: 8px; letter-spacing: .22em; color: #b1beb4; }
+.credit { position: absolute; bottom: 0; right: 5%; font-size: 10px; color: #a6b4a9; padding: 8px 0; text-decoration: underline; text-underline-offset: 3px; }
+.bottom { position: absolute; bottom: 4%; left: 5%; right: 5%; z-index: 3; }
+.actions { display: flex; align-items: center; justify-content: center; gap: 28px; margin-bottom: 28px; }
+.book, .work { display: inline-flex; align-items: center; justify-content: space-between; gap: 40px; min-height: 50px; padding: 15px 23px; font-size: 12px; font-weight: 650; }
+.book { background: #cde4c2; color: #12271b; border: 1px solid #cde4c2; transition: background .2s, transform .2s; }
+.book:hover { background: #e1f0d9; transform: translateY(-2px); }
+.work { color: #f3f6ed; padding-left: 0; padding-right: 0; border-bottom: 1px solid #788a7b; }
+.work:hover { color: #cde4c2; }
+.hero :is(a,button):focus-visible { outline: 2px solid #d4e8c9; outline-offset: 5px; }
+.journey { max-width: 660px; margin: auto; }
+.journeyHeading { display: flex; justify-content: space-between; font-size: 9px; letter-spacing: .16em; color: #bac8bd; margin-bottom: 10px; font-variant-numeric: tabular-nums; }
+.track { height: 2px; background: #3b4c42; }
+.track div { height: 100%; background: #cde4c2; transform-origin: left; transform: scaleX(0); }
+.hero:is([data-status="static"],[data-status="error"]) .track div { transform: scaleX(1); }
+.chapters { display: flex; justify-content: space-between; gap: 12px; }
+.chapters button { border: 0; border-top: 2px solid transparent; background: transparent; color: #a9b7ad; padding: 12px 0; font-size: 10px; cursor: pointer; min-height: 44px; text-align: left; }
+.chapters button span { color: #8eaa95; margin-right: 10px; font-size: 8px; }
+.chapters button[aria-current] { color: #eef6e9; border-color: #cde4c2; }
+.chapters button:disabled { cursor: default; }
+.fallbackNote { text-align: center; color: #bdc6be; font-size: 11px; margin: 2px 0 0; }
+.fallbackNote button { color: #e1f0d9; background: none; border: 0; text-decoration: underline; cursor: pointer; min-height: 32px; }
+@keyframes chapter-in { from { opacity: .25; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (min-width: 1600px) { .visual { inset: 24% 7% 22%; } }
+@media (max-width: 760px) {
+  .hero { height: 225svh; }
+  .viewport { min-height: 610px; height: calc(100svh - 64px); max-height: 900px; }
+  .topline { top: 13px; font-size: 8px; letter-spacing: .07em; }
+  .topline a { font-size: 9px; gap: 7px; }
+  .heading { top: 12%; left: 6%; right: 6%; }
+  .eyebrow { font-size: 8px; margin-bottom: 12px; }
+  .heading h1 { font-size: clamp(39px, 10.5vw, 60px); max-width: 440px; margin: auto; min-height: 2.08em; text-wrap: balance; }
+  .description { max-width: 300px; font-size: 11px; margin-top: 12px; }
+  .visual { inset: 33% -3% 25%; }
+  .studioLabel { left: 8%; font-size: 7px; }
+  .credit { right: 8%; font-size: 9px; }
+  .bottom { left: 6%; right: 6%; bottom: 3%; }
+  .actions { gap: 18px; margin-bottom: 23px; }
+  .book, .work { gap: 20px; min-height: 48px; font-size: 11px; }
+  .book { padding: 13px 18px; }
+  .journeyHeading { font-size: 8px; }
+  .chapters { gap: 6px; }
+  .chapters button { font-size: 9px; }
+  .chapters button span { display: none; }
+}
+@media (max-width: 360px) { .actions { gap: 12px; } .book,.work { font-size: 10px; gap: 12px; } }
+@media (max-height: 550px) and (min-width: 761px) {
+  .viewport { min-height: 360px; }
+  .topline { top: 4px; }
+  .heading { top: 13%; }
+  .heading h1 { font-size: 34px; }
+  .eyebrow,.description { display: none; }
+  .visual { inset: 24% 10% 27%; }
+  .actions { margin-bottom: 12px; }
+  .book,.work { min-height: 40px; padding-top: 10px; padding-bottom: 10px; }
+  .journey { max-width: 500px; }
+  .chapters { display: none; }
+  .studioLabel,.credit { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .hero { height: auto; } .heading h1,.canvas,.poster,.book { animation: none; transition: none; } }

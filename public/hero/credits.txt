@@ -1,0 +1,13 @@
+West Loop Auto Spa interactive detailing illustration
+
+Vehicle: Ferrari 458 Italia by vicent091036.
+Original model: https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6
+Distribution source: https://github.com/mrdoob/three.js/blob/r180/examples/models/gltf/ferrari.glb
+Example and attribution: https://threejs.org/examples/webgl_materials_car.html
+Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
+Changes: forest-green paint, scroll-controlled dirt/wash materials, studio lighting,
+camera framing, compressed poster render. The geometry remains unchanged.
+This is a detailing illustration. No affiliation with or endorsement by Ferrari.
+
+Three.js: MIT license, see THREE-LICENSE.txt.
+Draco decoder: Google Draco, Apache License 2.0, see DRACO-LICENSE.txt.
