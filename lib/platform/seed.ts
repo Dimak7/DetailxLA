@@ -1,9 +1,10 @@
 import { randomUUID, scryptSync, randomBytes } from "node:crypto";
 import type { Query } from "./db";
 import type { BusinessSettings } from "./types";
+import { BRAND_NAME } from "../brand";
 
 export const defaultSettings: BusinessSettings = {
-  name: "West Loop Auto Spa",
+  name: BRAND_NAME,
   phone: "",
   email: "",
   address: "",

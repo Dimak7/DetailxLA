@@ -12,7 +12,7 @@ export default async function Page() {
   return (
     <PageShell business={business}>
       <section className="page-intro wrap">
-        <p className="eyebrow">LET'S TALK CAR CARE</p>
+        <p className="eyebrow">LET’S TALK ABOUT YOUR FINISH</p>
         <h1>
           You're in
           <br />
@@ -21,7 +21,7 @@ export default async function Page() {
       </section>
       <section className="contact-grid wrap section no-top">
         <div>
-          <h2>Visit the spa.</h2>
+          <h2>Your West Loop studio.</h2>
           <p>
             {business.address ||
               "West Loop, Chicago. Appointment location confirmed before your visit."}
@@ -52,7 +52,7 @@ export default async function Page() {
         </div>
         <div className="paper">
           <h2>A question first?</h2>
-          <p>Tell us about your vehicle and what you have in mind.</p>
+          <p>Tell us about your vehicle, its paint condition and the finish you have in mind. We can help you choose a coating, a correction or a complete detail.</p>
           <ContactForm />
         </div>
       </section>

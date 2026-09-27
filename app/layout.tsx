@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Manrope, Cormorant_Garamond } from "next/font/google";
 import { siteUrl } from "@/lib/platform/settings";
+import { BRAND_DESCRIPTION, BRAND_NAME } from "@/lib/brand";
 import "./globals.css";
+import "./ceramics.css";
 const body = Manrope({ subsets: ["latin"], variable: "--font-body" });
 const display = Cormorant_Garamond({
   subsets: ["latin"],
@@ -12,21 +14,21 @@ const display = Cormorant_Garamond({
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: {
-    default: "West Loop Auto Spa | Considered Car Care in Chicago",
-    template: "%s | West Loop Auto Spa",
+    default: `${BRAND_NAME} | Ceramic Coatings & Detailing in Chicago`,
+    template: `%s | ${BRAND_NAME}`,
   },
   description:
-    "A considered approach to car detailing in Chicago's West Loop. Explore interior detailing, paint correction and ceramic protection. Book your appointment online.",
+    BRAND_DESCRIPTION,
   openGraph: {
-    siteName: "West Loop Auto Spa",
+    siteName: BRAND_NAME,
     type: "website",
-    title: "West Loop Auto Spa",
-    description: "Exceptional care. An extraordinary finish.",
+    title: `${BRAND_NAME} | Care in Every Layer`,
+    description: BRAND_DESCRIPTION,
   },
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body className={body.variable + " " + display.variable}>
         <a className="skip-link" href="#main">
           Skip to content

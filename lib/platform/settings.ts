@@ -8,6 +8,7 @@ import { query, transaction } from "./db";
 import { defaultSettings } from "./seed";
 import type { BusinessSettings } from "./types";
 import { z } from "zod";
+import { resolveBusinessName } from "../brand";
 
 const optionalUrl = z.union([
   z.literal(""),
@@ -76,7 +77,7 @@ export async function settings(): Promise<BusinessSettings> {
   const rows = await query<{ value: Partial<BusinessSettings> }>(
     "SELECT value FROM wl.settings WHERE key='business'",
   );
-  return {
+  const business = {
     ...defaultSettings,
     phone: process.env.NEXT_PUBLIC_BUSINESS_PHONE || "",
     email: process.env.BUSINESS_EMAIL || "",
@@ -92,6 +93,8 @@ export async function settings(): Promise<BusinessSettings> {
       Object.entries(rows[0]?.value || {}).filter(([, v]) => v !== ""),
     ),
   } as BusinessSettings;
+  // Resolve the former default without modifying custom contact or integration fields.
+  return { ...business, name: resolveBusinessName(business.name) };
 }
 function encryptionKey() {
   const key = process.env.SETTINGS_ENCRYPTION_KEY;

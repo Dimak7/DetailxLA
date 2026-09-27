@@ -1,94 +1,35 @@
 "use client";
+
 import Link from "next/link";
 import { useState } from "react";
 import { money, type Service } from "@/lib/platform/types";
 import { track } from "./Tracking";
-export function ServiceCards({
-  services,
-  compact = false,
-}: {
-  services: Service[];
-  compact?: boolean;
-}) {
-  const [category, setCategory] = useState("All care");
-  const categories = ["All care", ...new Set(services.map((s) => s.category))];
+import styles from "./ServiceDetails.module.css";
+
+export function ServiceCards({ services, compact = false }: { services: Service[]; compact?: boolean }) {
+  const [category, setCategory] = useState("All services");
+  const categories = ["All services", ...new Set(services.map((service) => service.category))];
+  const selectedCategory = categories.includes(category) ? category : "All services";
+  const visible = services.filter((service) => compact || selectedCategory === "All services" || service.category === selectedCategory);
   return (
-    <>
-      {!compact && (
-        <div
-          className="filter-row"
-          role="group"
-          aria-label="Service categories"
-        >
-          {categories.map((c) => (
-            <button
-              key={c}
-              className={c === category ? "active" : ""}
-              onClick={() => setCategory(c)}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="service-grid">
-        {services
-          .filter((s) => category === "All care" || s.category === category)
-          .map((s, i) => (
-            <article className="service-card" key={s.id}>
-              <div className="service-top">
-                <span className="service-index">
-                  {String(i + 1).padStart(2, "0")} - {s.category.toUpperCase()}
-                </span>
-                <span className="pill">EST. {s.duration_minutes / 60}H</span>
-              </div>
-              <h3>{s.name}</h3>
-              <p>{s.description}</p>
-              <div className="service-price">
-                <strong>
-                  {s.pricing_mode === "quote"
-                    ? "Let's discuss"
-                    : (s.pricing_mode === "starting" ? "From " : "") +
-                      money(s.price_cents)}
-                </strong>
-                <span>
-                  {s.duration_minutes / 60} hr
-                  {s.duration_minutes !== 60 ? "s" : ""} estimated
-                </span>
-              </div>
-              {!compact && (
-                <details
-                  onToggle={(e) => {
-                    if (e.currentTarget.open)
-                      track("service_view", { service_id: s.id });
-                  }}
-                >
-                  <summary>
-                    What is included <span>+</span>
-                  </summary>
-                  <ul>
-                    {s.includes.map((v) => (
-                      <li key={v}>{v}</li>
-                    ))}
-                  </ul>
-                  {s.pricing_mode !== "quote" && (
-                    <p className="fine-print">
-                      SUV {money(s.price_cents + s.suv_extra_cents)} · Truck{" "}
-                      {money(s.price_cents + s.truck_extra_cents)}
-                    </p>
-                  )}
-                </details>
-              )}
-              <Link
-                className="service-book"
-                href={"/booking?service=" + s.id}
-                onClick={() => track("service_selected", { service_id: s.id })}
-              >
-                Reserve this service <span>↗</span>
-              </Link>
+    <div className={styles.serviceCollection}>
+      {!compact && <div className={styles.filters} role="group" aria-label="Filter services by category">{categories.map((item) => <button type="button" key={item} aria-pressed={item === selectedCategory} onClick={() => setCategory(item)}>{item}</button>)}</div>}
+      {!compact && <p className={styles.resultCount} role="status">{visible.length} {visible.length === 1 ? "service" : "services"} {selectedCategory === "All services" ? "in the collection" : `in ${selectedCategory.toLowerCase()}`}</p>}
+      <div className={`${styles.cardGrid} ${compact ? styles.compactGrid : ""}`}>
+        {visible.map((service) => {
+          const index = services.findIndex((item) => item.id === service.id) + 1;
+          return (
+            <article className={styles.serviceCard} key={service.id} data-featured={service.slug === "ceramic-coating" || undefined}>
+              <div className={styles.cardTop}><span>{String(index).padStart(2, "0")} / {service.category}</span>{service.slug === "ceramic-coating" && <span className={styles.signatureLabel}>SIGNATURE</span>}</div>
+              <h3><Link href={`/services/${service.slug}`}>{service.name}</Link></h3><p className={styles.cardDescription}>{service.description}</p>
+              <div className={styles.cardPrice}><strong>{service.pricing_mode === "quote" ? "By consultation" : `${service.pricing_mode === "starting" ? "From " : ""}${money(service.price_cents)}`}</strong><span>{service.duration_minutes / 60} {service.duration_minutes === 60 ? "hour" : "hours"} estimated</span></div>
+              {!compact && <details className={styles.cardIncludes} onToggle={(event) => { if (event.currentTarget.open) track("service_view", { service_id: service.id }); }}><summary>What is included <span aria-hidden="true">+</span></summary><ul>{service.includes.map((item) => <li key={item}>{item}</li>)}</ul>{service.pricing_mode !== "quote" && <p className={styles.vehiclePrices}>{service.pricing_mode === "starting" ? "Starting prices · " : ""}SUV {money(service.price_cents + service.suv_extra_cents)} · Truck {money(service.price_cents + service.truck_extra_cents)}</p>}</details>}
+              <div className={styles.cardLinks}><Link className={styles.textLink} href={`/services/${service.slug}`}>Explore service <span aria-hidden="true">↗</span></Link><Link className={styles.cardBook} href={`/booking?service=${encodeURIComponent(service.id)}`} onClick={() => track("service_selected", { service_id: service.id })}>Book <span className={styles.srOnly}>{service.name}</span><span aria-hidden="true">↗</span></Link></div>
             </article>
-          ))}
+          );
+        })}
       </div>
-    </>
+      {services.length === 0 && <p className={styles.sectionNote}>Our service menu is being updated. <Link href="/contact">Contact us to discuss your vehicle.</Link></p>}
+    </div>
   );
 }

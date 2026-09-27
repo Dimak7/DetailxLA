@@ -4,182 +4,144 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { heroVideoMedia } from "./hero-media";
-import type { HeroScene } from "./hero-scene";
+import type { HeroPlayback, HeroPlaybackState } from "./hero-video";
 import styles from "./CinematicHero.module.css";
 
-const chapters = [
-  { label: "Road-worn", title: "Your car deserves better.", detail: "Road grime. City dust. A finish waiting to come back." },
-  { label: "The wash", title: "Care in every contour.", detail: "A careful wash, down to the smallest detail." },
-  { label: "The rinse", title: "A deeper kind of clean.", detail: "Clear glass. Clean wheels. Paint that catches the light." },
-  { label: "Showroom", title: "We bring the showroom back.", detail: "Premium detailing for people who care about their car." },
-];
+const chapters = ["Road-worn", "The wash", "The rinse", "The reveal"];
 
 export function CinematicHero() {
   const section = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
-  const viewport = useRef<HTMLDivElement>(null);
   const meter = useRef<HTMLDivElement>(null);
-  const percentage = useRef<HTMLSpanElement>(null);
+  const progressBar = useRef<HTMLDivElement>(null);
+  const player = useRef<HeroPlayback | null>(null);
   const [chapter, setChapter] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "static" | "error">("loading");
+  const [playback, setPlayback] = useState<HeroPlaybackState>("paused");
   const [attempt, setAttempt] = useState(0);
-  const still = status === "static" || status === "error";
-  const desktopPoster = heroVideoMedia
-    ? still ? heroVideoMedia.desktop.cleanPoster : heroVideoMedia.desktop.poster
-    : still ? "/hero/poster-clean.webp" : "/hero/poster.webp";
-  const mobileMedia = heroVideoMedia?.mobile ?? heroVideoMedia?.desktop;
-  const mobilePoster = mobileMedia
-    ? still ? mobileMedia.cleanPoster : mobileMedia.poster
-    : still ? "/hero/poster-clean-mobile.webp" : "/hero/poster-mobile.webp";
+  const desktopPoster = heroVideoMedia?.desktop.cleanPoster ?? "/hero/poster-clean.webp";
+  const mobilePoster = heroVideoMedia?.mobile?.cleanPoster ?? desktopPoster;
 
   useEffect(() => {
-    const root = section.current!, screen = viewport.current!, host = stage.current!;
+    const root = section.current!;
+    const host = stage.current!;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const device = navigator as Navigator & { connection?: { saveData?: boolean }; deviceMemory?: number };
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
     const abort = new AbortController();
-    let scene: HeroScene | undefined;
-    let raf = 0, visible = true, starting = false, current = 0, lastFrame = 0, lastChapter = -1;
-    let pointer = { x: 0, y: 0 }, smoothed = { x: 0, y: 0 };
+    let visible = false;
+    let starting = false;
+    let previousChapter = -1;
     let timeout: ReturnType<typeof setTimeout> | undefined;
 
+    function progress(value: number) {
+      if (meter.current) meter.current.style.transform = `scaleX(${value})`;
+      progressBar.current?.setAttribute("aria-valuenow", String(Math.round(value * 100)));
+      const nextChapter = value < 0.2 ? 0 : value < 0.5 ? 1 : value < 0.78 ? 2 : 3;
+      if (nextChapter !== previousChapter) { previousChapter = nextChapter; setChapter(nextChapter); }
+    }
     function staticView(failed = false) {
-      root.dataset.interactive = "false";
+      clearTimeout(timeout);
+      player.current?.dispose();
+      player.current = null;
       setStatus(failed ? "error" : "static");
-      setChapter(3);
-      root.style.setProperty("--finish", "1");
-      if (meter.current) meter.current.style.transform = "scaleX(1)";
-      if (percentage.current) percentage.current.textContent = "100%";
-      cancelAnimationFrame(raf); raf = 0;
-      scene?.dispose(); scene = undefined;
+      progress(1);
     }
-    function frame(now: number) {
-      raf = 0;
-      if (!visible || document.hidden || !scene || abort.signal.aborted) return;
-      const travel = root.offsetHeight - screen.offsetHeight;
-      const target = Math.max(0, Math.min(1, -root.getBoundingClientRect().top / Math.max(1, travel)));
-      const blend = 1 - Math.exp(-Math.min(64, now - (lastFrame || now - 16)) / 75);
-      lastFrame = now;
-      current += (target - current) * blend;
-      smoothed.x += (pointer.x - smoothed.x) * blend;
-      smoothed.y += (pointer.y - smoothed.y) * blend;
-      scene.update(current, smoothed.x, smoothed.y);
-      root.style.setProperty("--finish", current.toFixed(4));
-      if (meter.current) meter.current.style.transform = `scaleX(${current})`;
-      if (percentage.current) percentage.current.textContent = `${Math.round(current * 100)}`.padStart(2, "0") + "%";
-      const next = current < 0.2 ? 0 : current < 0.5 ? 1 : current < 0.78 ? 2 : 3;
-      if (next !== lastChapter) { setChapter(next); lastChapter = next; }
-      if (Math.abs(target - current) > 0.0001 || Math.abs(pointer.x - smoothed.x) > 0.001 || Math.abs(pointer.y - smoothed.y) > 0.001) wake();
+    function syncVisibility() { player.current?.setVisible(visible && !document.hidden); }
+    function motionChanged() {
+      if (motion.matches) { abort.abort(); staticView(); }
     }
-    function wake() { if (!raf && visible && !document.hidden && scene) raf = requestAnimationFrame(frame); }
-    function resize() { scene?.resize(); wake(); }
-    function move(event: PointerEvent) {
-      if (event.pointerType !== "mouse") return;
-      const bounds = screen.getBoundingClientRect();
-      pointer = { x: ((event.clientX - bounds.left) / bounds.width - 0.5) * 2, y: ((event.clientY - bounds.top) / bounds.height - 0.5) * 2 };
-      wake();
-    }
-    function leave() { pointer = { x: 0, y: 0 }; wake(); }
-    function contextLost(event: Event) { event.preventDefault(); abort.abort(); staticView(true); }
-    function motionChanged() { if (motion.matches) { abort.abort(); staticView(); } }
     async function start() {
-      if (starting || abort.signal.aborted) return;
+      if (starting || abort.signal.aborted || !heroVideoMedia) return;
       starting = true;
       setStatus("loading");
       timeout = setTimeout(() => { abort.abort(); staticView(true); }, 25000);
       try {
-        let result: HeroScene;
-        if (heroVideoMedia) {
-          const { createHeroVideo } = await import("./hero-video");
-          if (abort.signal.aborted) return;
-          const source = window.matchMedia("(max-width: 760px)").matches
-            ? heroVideoMedia.mobile ?? heroVideoMedia.desktop
-            : heroVideoMedia.desktop;
-          result = await createHeroVideo(host, source, abort.signal, () => staticView(true));
-        } else {
-          const { createHeroScene } = await import("./hero-scene");
-          if (abort.signal.aborted) return;
-          result = await createHeroScene(host, abort.signal);
-        }
+        const { createHeroVideo } = await import("./hero-video");
+        if (abort.signal.aborted) return;
+        const source = window.matchMedia("(max-width: 760px)").matches
+          ? heroVideoMedia.mobile ?? heroVideoMedia.desktop
+          : heroVideoMedia.desktop;
+        const result = await createHeroVideo(host, source, abort.signal, {
+          onProgress: progress,
+          onState: setPlayback,
+          onFailure: () => staticView(true),
+        });
         if (abort.signal.aborted) { result.dispose(); return; }
-        scene = result;
-        root.dataset.interactive = "true";
-        host.querySelector("canvas")?.addEventListener("webglcontextlost", contextLost);
+        player.current = result;
+        progress(0);
         setStatus("ready");
-        wake();
+        syncVisibility();
       } catch {
         if (!abort.signal.aborted) staticView(true);
       } finally { clearTimeout(timeout); }
     }
     const observer = new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
-      if (visible) { void start(); wake(); }
-      else { cancelAnimationFrame(raf); raf = 0; }
-    }, { rootMargin: "100px" });
-    const resizeObserver = new ResizeObserver(resize);
-    if (motion.matches || (!attempt && (device.connection?.saveData || (device.deviceMemory && device.deviceMemory <= 2)))) staticView();
-    else { observer.observe(root); resizeObserver.observe(host); }
-    window.addEventListener("scroll", wake, { passive: true });
-    window.addEventListener("resize", resize);
-    document.addEventListener("visibilitychange", wake);
-    if (!heroVideoMedia) {
-      screen.addEventListener("pointermove", move, { passive: true });
-      screen.addEventListener("pointerleave", leave);
+      visible = entry.isIntersecting && entry.intersectionRatio >= 0.15;
+      if (visible && !document.hidden) void start();
+      syncVisibility();
+    }, { threshold: 0.15 });
+    function visibilityChanged() {
+      if (visible && !document.hidden) void start();
+      syncVisibility();
     }
+    if (!heroVideoMedia || motion.matches || connection?.saveData) staticView();
+    else observer.observe(root);
+    document.addEventListener("visibilitychange", visibilityChanged);
     motion.addEventListener("change", motionChanged);
     return () => {
-      clearTimeout(timeout); abort.abort(); cancelAnimationFrame(raf);
-      observer.disconnect(); resizeObserver.disconnect();
-      window.removeEventListener("scroll", wake); window.removeEventListener("resize", resize);
-      document.removeEventListener("visibilitychange", wake);
-      screen.removeEventListener("pointermove", move); screen.removeEventListener("pointerleave", leave);
+      clearTimeout(timeout);
+      abort.abort();
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", visibilityChanged);
       motion.removeEventListener("change", motionChanged);
-      scene?.dispose();
+      player.current?.dispose();
+      player.current = null;
     };
   }, [attempt]);
 
-  function jump(progress: number) {
-    const root = section.current!, screen = viewport.current!;
-    window.scrollTo({ top: window.scrollY + root.getBoundingClientRect().top + progress * (root.offsetHeight - screen.offsetHeight), behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
-  }
+  const controlLabel = playback === "playing" ? "Pause film" : playback === "ended" ? "Replay film" : "Play film";
 
   return (
-    <section ref={section} className={styles.hero} aria-label="The West Loop detailing transformation" data-status={status} data-renderer={heroVideoMedia ? "video" : "3d"}>
-      <div ref={viewport} className={styles.viewport}>
-        <div className={styles.topline}><span>WEST LOOP AUTO SPA / CHICAGO</span><a href="#services">Skip to services <span aria-hidden="true">&#8595;</span></a></div>
-        <div className={styles.heading}>
-          <p className={styles.eyebrow}>AUTOMOTIVE CARE, TRANSFORMED</p>
-          <h1 key={chapter}>{chapters[chapter].title}</h1>
-          <p className={styles.description}>{chapters[chapter].detail}</p>
-        </div>
-        <div className={styles.visual}>
-          <div className={styles.halo} aria-hidden="true" />
-          <picture>
-            <source media="(max-width: 760px)" srcSet={mobilePoster} />
-            <Image src={desktopPoster} alt={heroVideoMedia ? still ? "A polished Porsche 911 after a complete detail" : "A road-worn Porsche 911 before its detailing transformation" : still ? "Deep green sports car after detailing in a softly lit studio" : "Road-worn sports car before the West Loop detailing treatment"} fill priority sizes="(max-width: 760px) 100vw, 85vw" className={styles.poster} aria-hidden={status === "ready"} />
-          </picture>
-          <div ref={stage} className={styles.canvas} role="img" aria-hidden={status !== "ready"} aria-label={heroVideoMedia ? heroVideoMedia.description ?? "A Porsche 911 rotates from road-worn paint through a wash to a polished finish as you scroll" : "A single sports car rotates from road-worn paint to a polished finish as you scroll"} />
-          <span className={styles.studioLabel}>THE WEST LOOP TREATMENT</span>
-          <a className={styles.credit} href="/hero/credits.txt" target="_blank" rel="noreferrer">{heroVideoMedia ? "Visual credits" : "3D model credit"}</a>
-        </div>
-        <div className={styles.bottom}>
-          <div className={styles.actions}>
-            <Link href="/booking" className={styles.book}>Book your detail <span aria-hidden="true">&#8599;</span></Link>
-            <Link href="/gallery" className={styles.work}>View our work <span aria-hidden="true">&#8599;</span></Link>
-          </div>
-          <div className={styles.journey}>
-            <div className={styles.journeyHeading}>
-              <span>{status === "ready" ? "SCROLL TO TRANSFORM" : status === "loading" ? "PREPARING YOUR STUDIO VIEW" : "A FINISH WORTH COMING BACK FOR"}</span>
-              <span ref={percentage} aria-hidden="true">{status === "static" || status === "error" ? "100%" : "00%"}</span>
-            </div>
-            <div className={styles.track}><div ref={meter} /></div>
-            <div className={styles.chapters} aria-label="Transformation stages">
-              {chapters.map((item, index) => <button key={item.label} onClick={() => jump(index / 3)} disabled={status !== "ready"} aria-current={chapter === index ? "step" : undefined}><span>0{index + 1}</span>{item.label}</button>)}
-            </div>
-          </div>
-          {status === "error" && <p className={styles.fallbackNote}>Showing the studio still. <button onClick={() => setAttempt((a) => a + 1)}>Retry interactive view</button></p>}
+    <section ref={section} className={styles.hero} aria-label="West Loop Ceramics — a finish worth protecting" data-status={status} data-playback={playback}>
+      <div className={styles.heading}>
+        <p className={styles.eyebrow}><span aria-hidden="true" /> WEST LOOP CERAMICS <span className={styles.location}>CHICAGO, IL</span></p>
+        <h1>A finish worth <em>protecting.</em></h1>
+        <p className={styles.description}>Precision detailing. Lasting ceramic protection.<br className={styles.mobileBreak} /> An extraordinary finish, every time.</p>
+        <div className={styles.actions}>
+          <Link href="/services/ceramic-coating" className={styles.primary}>Explore ceramic coatings <span aria-hidden="true">↗</span></Link>
+          <Link href="/booking" className={styles.secondary}>Book your detail <span aria-hidden="true">↗</span></Link>
         </div>
       </div>
-      <noscript><style>{`.${styles.hero}{height:auto!important}.${styles.journey}{display:none}@media(max-width:760px){.${styles.bottom}{bottom:90px}}`}</style></noscript>
+
+      <div className={styles.visual}>
+        <div className={styles.studioGlow} aria-hidden="true" />
+        <picture>
+          <source media="(max-width: 760px)" srcSet={mobilePoster} />
+          <Image src={desktopPoster} alt="A polished Porsche 911, prepared to perfection in a softly lit studio" fill priority sizes="(max-width: 760px) 100vw, 1180px" className={styles.poster} aria-hidden={status === "ready"} />
+        </picture>
+        <div ref={stage} className={styles.canvas} role="img" aria-hidden={status !== "ready"} aria-label={heroVideoMedia?.description ?? "A Porsche 911 turns through a careful wash to reveal a polished finish"} />
+      </div>
+
+      <div className={styles.bottom}>
+        <div className={styles.signature}><span className={styles.monogram} aria-hidden="true">W/C</span><p>THE ART OF CAR CARE<span>Details make the difference.</span></p></div>
+        <div className={styles.journey}>
+          <div ref={progressBar} className={styles.track} role="progressbar" aria-label="Detailing film progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}><div ref={meter} /></div>
+          <ol className={styles.chapters} aria-label="The detailing transformation">
+            {chapters.map((label, index) => <li key={label} aria-current={chapter === index ? "step" : undefined}><span>0{index + 1}</span>{label}</li>)}
+          </ol>
+        </div>
+        <div className={styles.filmControls}>
+          {status === "ready" && <button type="button" className={styles.playback} onClick={() => playback === "playing" ? player.current?.pause() : player.current?.play()} aria-label={controlLabel}>
+            {playback === "playing" ? <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M11 3v10" /></svg> : playback === "ended" ? <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6a5.5 5.5 0 1 1-.4 5M3 2v4h4" /></svg> : <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m5 3 8 5-8 5Z" /></svg>}
+            {controlLabel}
+          </button>}
+          {status === "loading" && <span className={styles.filmNote}>Preparing the film</span>}
+          {status === "static" && <span className={styles.filmNote}>The final finish</span>}
+          {status === "error" && <button type="button" className={styles.playback} onClick={() => setAttempt((value) => value + 1)}>Retry film <span aria-hidden="true">↻</span></button>}
+          <a className={styles.credit} href="/hero/credits.txt" target="_blank" rel="noreferrer">Visual credits</a>
+        </div>
+      </div>
+      <noscript><style>{`.${styles.journey},.${styles.filmNote}{display:none}`}</style></noscript>
     </section>
   );
 }

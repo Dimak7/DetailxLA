@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wordmark } from "./PublicShell";
+import { BRAND_NAME } from "@/lib/brand";
 import type { Session } from "@/lib/platform/types";
 const sectionLabels: Record<string, string> = {
   dashboard: "Dashboard",
@@ -51,8 +52,8 @@ export function AdminShell({
   return (
     <div className="admin-shell">
       <header className="app-global-bar">
-        <Link className="app-brand" href="/admin/dashboard" aria-label="West Loop Auto Spa home"><Wordmark /></Link>
-        <span className="app-business-name">WEST LOOP AUTO SPA <small>Business workspace</small></span>
+        <Link className="app-brand" href="/admin/dashboard" aria-label={`${BRAND_NAME} home`}><Wordmark /></Link>
+        <span className="app-business-name">{BRAND_NAME.toUpperCase()} <small>Business workspace</small></span>
         <div className="app-global-actions">
           <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label="Search bookings and customers" placeholder="Search" /><button>Search</button></form>
           {sections.includes("bookings") && <details className="admin-quick-menu"><summary>+</summary><div><Link href="/admin/bookings?new=booking">New booking</Link><Link href="/admin/customers">New customer</Link><Link href="/admin/employees">New employee</Link><Link href="/admin/expenses">New expense</Link><Link href="/admin/inventory">New inventory item</Link></div></details>}

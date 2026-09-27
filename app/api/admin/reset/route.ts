@@ -9,7 +9,7 @@ import {
 import { apiError, readJson } from "@/lib/platform/http";
 import { enqueue } from "@/lib/platform/outbox";
 import { transaction } from "@/lib/platform/db";
-import { siteUrl } from "@/lib/platform/settings";
+import { settings, siteUrl } from "@/lib/platform/settings";
 import { processOutbox } from "@/lib/platform/worker";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -28,12 +28,13 @@ export async function POST(request: Request) {
     const email = z.email().parse(b.email),
       token = await createReset(email, requestIP(request));
     if (token) {
+      const business = await settings();
       await transaction((q) =>
         enqueue(q, {
           key: randomUUID(),
           channel: "email",
           recipient: email,
-          subject: "Reset your West Loop Auto Spa password",
+          subject: `Reset your ${business.name} password`,
           body:
             "This reset link expires in 30 minutes:\n" +
             siteUrl() +

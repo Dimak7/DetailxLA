@@ -1,5 +1,5 @@
 export type HeroVideoSource = {
-  /** Same-origin, seekable H.264 MP4, encoded with frequent keyframes. */
+  /** Same-origin, silent H.264 MP4 with a fast-start header. */
   src: string;
   /** First and final frames from this exact clip. */
   poster: string;
@@ -14,17 +14,17 @@ export type HeroVideoMedia = {
 };
 
 // Enable only after the finished film and its matching stills exist in public/hero.
-// A null value keeps the existing interactive 3D experience and its stills.
+// A null value shows the existing clean studio still without animation.
 export const heroVideoMedia: HeroVideoMedia | null = {
   desktop: {
-    src: "/hero/porsche-transform.mp4",
-    poster: "/hero/porsche-dirty.webp",
-    cleanPoster: "/hero/porsche-clean.webp",
+    src: "/hero/porsche-graphite.mp4",
+    poster: "/hero/porsche-graphite-dirty.webp",
+    cleanPoster: "/hero/porsche-graphite-clean.webp",
   },
   mobile: {
-    src: "/hero/porsche-transform-mobile.mp4",
-    poster: "/hero/porsche-dirty.webp",
-    cleanPoster: "/hero/porsche-clean.webp",
+    src: "/hero/porsche-graphite-mobile.mp4",
+    poster: "/hero/porsche-graphite-dirty.webp",
+    cleanPoster: "/hero/porsche-graphite-clean.webp",
   },
-  description: "A Porsche 911 rotates through a complete turn, from road-worn paint through a wash to a polished finish as you scroll",
+  description: "A graphite Porsche 911 rotates through a complete turn, from road-worn paint through a careful wash to a polished finish",
 };

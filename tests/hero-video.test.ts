@@ -1,177 +1,207 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
-import { createHeroVideo } from "../components/westloop/hero-video";
+import { createHeroVideo, type HeroPlaybackState } from "../components/westloop/hero-video";
 
 const source = { src: "/test-film.mp4", poster: "/first.webp", cleanPoster: "/last.webp" };
 
-// A controllable media decoder: seeking stays busy until the test completes it.
-// That lets us exercise scroll events arriving faster than frames can decode.
+// A controllable media element lets the tests reproduce delayed play promises,
+// browser autoplay policy, and events arriving after a visitor leaves the hero.
 class VideoDecoder extends EventTarget {
   duration = 8;
-  readyState = 2;
-  seeking = false;
+  currentTime = 0;
   src = "";
   removed = false;
-  requests: number[] = [];
-  private playhead = 0;
+  paused = true;
+  playCalls = 0;
+  rejectNextPlay = false;
+  deferNextPlay = false;
+  private pendingPlay: (() => void) | undefined;
 
   constructor(private autoLoad: boolean) { super(); }
-
   setAttribute() {}
   removeAttribute(name: string) { if (name === "src") this.src = ""; }
-  pause() {}
+  pause() { this.paused = true; }
   remove() { this.removed = true; }
   load() {
-    if (this.autoLoad && this.src) {
-      queueMicrotask(() => {
-        if (this.src && !this.removed) this.dispatchEvent(new Event("loadeddata"));
+    if (this.autoLoad && this.src) queueMicrotask(() => {
+      if (this.src && !this.removed) this.dispatchEvent(new Event("loadeddata"));
+    });
+  }
+  play() {
+    this.playCalls++;
+    if (this.rejectNextPlay) {
+      this.rejectNextPlay = false;
+      return Promise.reject(new DOMException("Autoplay blocked", "NotAllowedError"));
+    }
+    if (this.deferNextPlay) {
+      this.deferNextPlay = false;
+      return new Promise<void>((resolve) => {
+        this.pendingPlay = () => { this.beginPlayback(); resolve(); };
       });
     }
+    this.beginPlayback();
+    return Promise.resolve();
   }
-  get currentTime() { return this.playhead; }
-  set currentTime(value: number) {
-    assert.equal(this.seeking, false, "a busy decoder must finish before another seek");
-    this.playhead = value;
-    this.requests.push(value);
-    this.seeking = true;
+  private beginPlayback() {
+    this.paused = false;
+    this.dispatchEvent(new Event("playing"));
   }
-  completeSeek() {
-    this.seeking = false;
-    this.dispatchEvent(new Event("seeked"));
-  }
+  resolvePlay() { this.pendingPlay?.(); this.pendingPlay = undefined; }
+  advance(seconds: number) { this.currentTime = seconds; this.dispatchEvent(new Event("timeupdate")); }
+  finish() { this.currentTime = this.duration; this.paused = true; this.dispatchEvent(new Event("ended")); }
 }
 
 function setup(t: TestContext, { autoLoad = true } = {}) {
   let video: VideoDecoder;
-  let nextFrame = 0;
-  const frames = new Map<number, FrameRequestCallback>();
+  let failures = 0;
   const controller = new AbortController();
-  const saved = new Map<PropertyKey, PropertyDescriptor | undefined>();
-  const replacements = {
-    document: { createElement: () => (video = new VideoDecoder(autoLoad)) },
-    requestAnimationFrame: (callback: FrameRequestCallback) => {
-      frames.set(++nextFrame, callback);
-      return nextFrame;
-    },
-    cancelAnimationFrame: (id: number) => { frames.delete(id); },
-  };
-  for (const [key, value] of Object.entries(replacements)) {
-    saved.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
-    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
-  }
+  const states: HeroPlaybackState[] = [];
+  const progress: number[] = [];
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: { createElement: () => (video = new VideoDecoder(autoLoad)) },
+  });
   t.after(() => {
     controller.abort();
-    for (const [key, descriptor] of saved) {
-      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
-      else Reflect.deleteProperty(globalThis, key);
-    }
+    if (originalDocument) Object.defineProperty(globalThis, "document", originalDocument);
+    else Reflect.deleteProperty(globalThis, "document");
   });
-  const host = { appendChild() {} } as unknown as HTMLElement;
+  const host = { appendChild() {}, dataset: {} } as unknown as HTMLElement;
   return {
-    controller,
+    controller, states, progress, host,
     get video() { return video; },
-    get pendingFrames() { return frames.size; },
-    create: (onFailure = () => {}) => createHeroVideo(host, source, controller.signal, onFailure),
-    flush() {
-      const pending = [...frames.values()];
-      frames.clear();
-      pending.forEach((callback) => callback(0));
-    },
+    get failures() { return failures; },
+    create: () => createHeroVideo(host, source, controller.signal, {
+      onState: (state) => states.push(state),
+      onProgress: (value) => progress.push(value),
+      onFailure: () => { failures++; },
+    }),
   };
 }
+const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
-test("scroll reversal during a busy decode lands on the latest requested frame", async (t) => {
+test("the film plays only while visible and resumes at the same playhead", async (t) => {
   const h = setup(t);
-  const scene = await h.create();
-  scene.update(0.8, 0, 0);
-  h.flush();
-  assert.equal(h.video.requests.length, 1);
-
-  scene.update(1, 0, 0);
-  h.flush();
-  scene.update(0.5, 0, 0);
-  scene.update(0.2, 0, 0);
-  h.flush();
-  assert.equal(h.video.requests.length, 1, "new scroll positions wait for the decoder");
-
-  h.video.completeSeek();
-  h.flush();
-  assert.equal(h.video.requests.length, 2, "intermediate positions are coalesced");
-  assert.ok(Math.abs(h.video.currentTime - 1.6) < 0.04, "the reverse position wins");
-  h.video.completeSeek();
-  h.flush();
-  assert.equal(h.pendingFrames, 0, "the renderer idles once the frame is current");
+  const player = await h.create();
+  assert.equal(h.video.playCalls, 0);
+  player.setVisible(true);
+  assert.equal(h.video.paused, false);
+  assert.equal(h.states.at(-1), "playing");
+  h.video.advance(3.2);
+  player.setVisible(false);
+  assert.equal(h.video.paused, true);
+  player.setVisible(true);
+  assert.equal(h.video.currentTime, 3.2, "visibility does not restart the sequence");
+  assert.equal(h.video.playCalls, 2);
+  assert.equal(h.progress.at(-1), 0.4);
 });
 
-test("scroll boundaries show the first and last decodable frames", async (t) => {
+test("a visitor's pause is preserved across visibility changes", async (t) => {
   const h = setup(t);
-  const scene = await h.create();
-  scene.update(1.2, 0, 0);
-  h.flush();
-  assert.ok(h.video.currentTime < h.video.duration, "do not seek past the final frame");
-  assert.ok(h.video.currentTime > h.video.duration - 0.1, "the final frame stays near the end");
-  h.video.completeSeek();
-  h.flush();
+  const player = await h.create();
+  player.setVisible(true);
+  player.pause();
+  player.setVisible(false);
+  player.setVisible(true);
+  assert.equal(h.video.paused, true);
+  assert.equal(h.video.playCalls, 1, "returning to the hero cannot override manual pause");
+  player.play();
+  assert.equal(h.video.paused, false);
+  assert.equal(h.video.playCalls, 2);
+});
 
-  scene.update(-0.5, 0, 0);
-  h.flush();
+test("the polished finish is held until an explicit replay", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  player.setVisible(true);
+  h.video.finish();
+  assert.equal(h.states.at(-1), "ended");
+  assert.equal(h.progress.at(-1), 1);
+  player.setVisible(false);
+  player.setVisible(true);
+  assert.equal(h.video.playCalls, 1, "the clean car must not jump back to dirty on return");
+  assert.equal(h.video.currentTime, h.video.duration);
+  player.play();
   assert.equal(h.video.currentTime, 0);
-  h.video.completeSeek();
-  h.flush();
-  scene.update(0, 0, 0);
-  h.flush();
-  assert.equal(h.video.requests.length, 2, "an unchanged position does not decode again");
+  assert.equal(h.video.paused, false);
+  assert.equal(h.progress.at(-1), 0);
+  assert.equal(h.host.dataset.replaying, "true", "replay fades from the matching clean still");
 });
 
-test("a decoder error releases the media and invokes fallback once", async (t) => {
+test("blocked autoplay waits for an explicit play request instead of retrying offscreen", async (t) => {
   const h = setup(t);
-  let failures = 0;
-  const scene = await h.create(() => { failures++; });
-  scene.update(0.5, 0, 0);
-  h.flush();
-  h.video.dispatchEvent(new Event("error"));
-  assert.equal(failures, 1);
-  assert.equal(h.video.src, "", "release the media request");
-  assert.equal(h.video.removed, true);
-
-  h.video.completeSeek();
-  h.video.dispatchEvent(new Event("error"));
-  scene.update(0.9, 0, 0);
-  h.flush();
-  assert.equal(failures, 1, "late media events cannot trigger a second fallback");
-  assert.equal(h.video.requests.length, 1, "disposed media cannot be sought again");
-  assert.equal(h.pendingFrames, 0);
+  const player = await h.create();
+  h.video.rejectNextPlay = true;
+  player.setVisible(true);
+  await settle();
+  assert.equal(h.states.at(-1), "blocked");
+  assert.equal(h.failures, 0, "autoplay policy is not a broken media file");
+  player.setVisible(false);
+  player.setVisible(true);
+  assert.equal(h.video.playCalls, 1);
+  player.play();
+  await settle();
+  assert.equal(h.video.paused, false);
+  assert.equal(h.states.at(-1), "playing");
 });
 
-test("cancellation while loading rejects and releases the pending media", async (t) => {
+test("a late play promise cannot override a visitor's pause", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  h.video.deferNextPlay = true;
+  player.setVisible(true);
+  player.pause();
+  h.video.resolvePlay();
+  await settle();
+  assert.equal(h.video.paused, true);
+  assert.equal(h.states.at(-1), "paused");
+  assert.equal(h.states.includes("playing"), false);
+});
+
+test("cancellation during pending playback releases media and ignores late events", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  h.video.deferNextPlay = true;
+  player.setVisible(true);
+  h.controller.abort();
+  h.video.resolvePlay();
+  h.video.advance(6);
+  h.video.dispatchEvent(new Event("error"));
+  await settle();
+  assert.equal(h.video.paused, true);
+  assert.equal(h.video.src, "");
+  assert.equal(h.video.removed, true);
+  assert.deepEqual(h.states, []);
+  assert.deepEqual(h.progress, []);
+  assert.equal(h.failures, 0);
+});
+
+test("decoder failure releases the film and invokes the still fallback once", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  player.setVisible(true);
+  h.video.dispatchEvent(new Event("error"));
+  assert.equal(h.failures, 1);
+  assert.equal(h.video.src, "");
+  assert.equal(h.video.removed, true);
+  h.video.dispatchEvent(new Event("error"));
+  h.video.advance(4);
+  player.play();
+  assert.equal(h.failures, 1);
+  assert.deepEqual(h.progress, []);
+  assert.equal(h.video.playCalls, 1);
+});
+
+test("cancelling an unfinished load rejects without treating navigation as failure", async (t) => {
   const h = setup(t, { autoLoad: false });
-  let failures = 0;
-  const loading = h.create(() => { failures++; });
+  const loading = h.create();
   const rejected = assert.rejects(loading, { name: "AbortError" });
   h.controller.abort();
   await rejected;
   assert.equal(h.video.src, "");
   assert.equal(h.video.removed, true);
-  assert.equal(failures, 0, "navigation cancellation is not a media failure");
-  assert.equal(h.pendingFrames, 0);
-});
-
-test("cancellation during a seek drops pending scroll positions and late events", async (t) => {
-  const h = setup(t);
-  let failures = 0;
-  const scene = await h.create(() => { failures++; });
-  scene.update(0.5, 0, 0);
-  h.flush();
-  scene.update(0.9, 0, 0);
-  h.controller.abort();
-  h.video.completeSeek();
-  h.video.dispatchEvent(new Event("error"));
-  h.flush();
-  assert.equal(h.video.requests.length, 1);
-  assert.equal(h.video.src, "");
-  assert.equal(h.video.removed, true);
-  assert.equal(failures, 0);
-  assert.equal(h.pendingFrames, 0);
+  assert.equal(h.failures, 0);
 });
 
 test("an already cancelled load never requests the film", async (t) => {
@@ -179,6 +209,5 @@ test("an already cancelled load never requests the film", async (t) => {
   h.controller.abort();
   await assert.rejects(h.create(), { name: "AbortError" });
   assert.equal(h.video.src, "");
-  assert.equal(h.video.removed, true);
-  assert.equal(h.pendingFrames, 0);
+  assert.equal(h.video.playCalls, 0);
 });

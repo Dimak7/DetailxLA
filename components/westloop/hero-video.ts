@@ -1,13 +1,25 @@
 import type { HeroVideoSource } from "./hero-media";
-import type { HeroScene } from "./hero-scene";
 
-/** A paused, scroll-seeked film using the same lifecycle as the 3D scene. */
+export type HeroPlaybackState = "playing" | "paused" | "blocked" | "ended";
+export type HeroPlayback = {
+  setVisible: (visible: boolean) => void;
+  play: () => void;
+  pause: () => void;
+  dispose: () => void;
+};
+export type HeroPlaybackEvents = {
+  onProgress: (progress: number) => void;
+  onState: (state: HeroPlaybackState) => void;
+  onFailure: () => void;
+};
+
+/** Play once while visible, hold the polished finish, and replay only on request. */
 export function createHeroVideo(
   host: HTMLElement,
   source: HeroVideoSource,
   signal: AbortSignal,
-  onFailure: () => void,
-): Promise<HeroScene> {
+  events: HeroPlaybackEvents,
+): Promise<HeroPlayback> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.muted = true;
@@ -23,21 +35,31 @@ export function createHeroVideo(
 
     let ready = false;
     let disposed = false;
-    let progress = 0;
-    let frame = 0;
-    let seekTimeout: ReturnType<typeof setTimeout> | undefined;
+    let visible = false;
+    let manuallyPaused = false;
+    let blocked = false;
+    let finished = false;
+    let playRequest = 0;
+    let stallTimeout: ReturnType<typeof setTimeout> | undefined;
+    let replayTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    const wantsPlayback = () => ready && visible && !manuallyPaused && !blocked && !finished && !disposed;
 
     function dispose() {
       if (disposed) return;
       disposed = true;
-      cancelAnimationFrame(frame);
-      clearTimeout(seekTimeout);
+      playRequest++;
+      clearTimeout(stallTimeout);
+      clearTimeout(replayTimeout);
+      delete host.dataset.replaying;
       signal.removeEventListener("abort", abort);
       video.removeEventListener("loadeddata", loaded);
-      video.removeEventListener("canplay", requestSeek);
-      video.removeEventListener("seeked", seeked);
+      video.removeEventListener("timeupdate", progress);
+      video.removeEventListener("playing", playing);
+      video.removeEventListener("ended", ended);
+      video.removeEventListener("waiting", waiting);
+      video.removeEventListener("stalled", waiting);
       video.removeEventListener("error", failed);
-      video.removeEventListener("play", pause);
       video.pause();
       video.removeAttribute("src");
       video.load();
@@ -51,40 +73,57 @@ export function createHeroVideo(
 
     function failed() {
       if (disposed) return;
-      if (!ready) {
-        reject(new Error("The hero video could not be decoded"));
-        dispose();
-      } else {
-        dispose();
-        onFailure();
-      }
+      const wasReady = ready;
+      dispose();
+      if (wasReady) events.onFailure();
+      else reject(new Error("The hero film could not be decoded"));
     }
 
-    function pause() { video.pause(); }
+    function progress() {
+      if (disposed || !ready) return;
+      clearTimeout(stallTimeout);
+      events.onProgress(Math.max(0, Math.min(1, video.currentTime / video.duration)));
+    }
 
-    function flushSeek() {
-      frame = 0;
-      if (disposed || !ready || video.readyState < 2 || video.seeking) return;
-      // Stop on the last decodable frame instead of the empty end-of-stream frame.
-      const target = progress * Math.max(0, video.duration - 1 / 30);
-      if (Math.abs(video.currentTime - target) < 1 / 60) return;
+    function playing() {
+      if (!wantsPlayback()) { video.pause(); return; }
+      clearTimeout(stallTimeout);
+      events.onState("playing");
+    }
+
+    function waiting() {
+      if (!wantsPlayback()) return;
+      clearTimeout(stallTimeout);
+      stallTimeout = setTimeout(failed, 15000);
+    }
+
+    function ended() {
+      if (disposed) return;
+      finished = true;
+      playRequest++;
+      clearTimeout(stallTimeout);
+      events.onProgress(1);
+      events.onState("ended");
+    }
+
+    function requestPlay() {
+      if (!wantsPlayback()) return;
+      const request = ++playRequest;
+      // Keep play() in the click's call stack when recovering blocked autoplay.
       try {
-        video.currentTime = target;
-        clearTimeout(seekTimeout);
-        seekTimeout = setTimeout(failed, 12000);
+        void video.play().then(() => {
+          if (!wantsPlayback()) video.pause();
+        }).catch(() => {
+          if (disposed || request !== playRequest || !wantsPlayback()) return;
+          blocked = true;
+          clearTimeout(stallTimeout);
+          video.pause();
+          events.onState("blocked");
+        });
       } catch {
-        failed();
+        blocked = true;
+        events.onState("blocked");
       }
-    }
-
-    function requestSeek() {
-      if (!disposed && !frame) frame = requestAnimationFrame(flushSeek);
-    }
-
-    function seeked() {
-      clearTimeout(seekTimeout);
-      // A busy decoder keeps only the newest target, including reverse scrolling.
-      requestSeek();
     }
 
     function loaded() {
@@ -92,11 +131,41 @@ export function createHeroVideo(
       if (!Number.isFinite(video.duration) || video.duration <= 0) { failed(); return; }
       ready = true;
       resolve({
-        update(nextProgress) {
-          progress = Math.max(0, Math.min(1, nextProgress));
-          requestSeek();
+        setVisible(nextVisible) {
+          if (disposed || visible === nextVisible) return;
+          visible = nextVisible;
+          if (visible) requestPlay();
+          else {
+            playRequest++;
+            clearTimeout(stallTimeout);
+            video.pause();
+            if (!finished && !blocked) events.onState("paused");
+          }
         },
-        resize: requestSeek,
+        play() {
+          if (disposed) return;
+          manuallyPaused = false;
+          blocked = false;
+          if (finished) {
+            finished = false;
+            // The matching clean still sits behind the film during this fade.
+            host.dataset.replaying = "true";
+            clearTimeout(replayTimeout);
+            replayTimeout = setTimeout(() => { delete host.dataset.replaying; }, 750);
+            try { video.currentTime = 0; }
+            catch { failed(); return; }
+            events.onProgress(0);
+          }
+          requestPlay();
+        },
+        pause() {
+          if (disposed) return;
+          manuallyPaused = true;
+          playRequest++;
+          clearTimeout(stallTimeout);
+          video.pause();
+          if (!finished) events.onState("paused");
+        },
         dispose,
       });
     }
@@ -104,11 +173,12 @@ export function createHeroVideo(
     if (signal.aborted) { abort(); return; }
     signal.addEventListener("abort", abort, { once: true });
     video.addEventListener("loadeddata", loaded);
-    video.addEventListener("canplay", requestSeek);
-    video.addEventListener("seeked", seeked);
+    video.addEventListener("timeupdate", progress);
+    video.addEventListener("playing", playing);
+    video.addEventListener("ended", ended);
+    video.addEventListener("waiting", waiting);
+    video.addEventListener("stalled", waiting);
     video.addEventListener("error", failed);
-    // No autoplay or playback loop: scroll position is the only playhead.
-    video.addEventListener("play", pause);
     host.appendChild(video);
     video.src = source.src;
     video.load();

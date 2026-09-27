@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       [date],
     );
     const body = [
-      "West Loop Auto Spa · " + date,
+      b.name + " · " + date,
       ...appointments.map(
         (a) =>
           timeLabel(a.start_minute) +

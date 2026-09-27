@@ -1,280 +1,79 @@
 import Image from "next/image";
 import Link from "next/link";
 import { publicData } from "@/lib/platform/public";
+import { money } from "@/lib/platform/types";
+import { siteUrl } from "@/lib/platform/settings";
 import { PageShell } from "@/components/westloop/PageShell";
 import { CinematicHero } from "@/components/westloop/CinematicHero";
 import { ServiceCards } from "@/components/westloop/ServiceCards";
-import { Gallery } from "@/components/westloop/Gallery";
-import { siteUrl } from "@/lib/platform/settings";
+import { ServiceFinder } from "@/components/westloop/ServiceFinder";
+import { CeramicFilm } from "@/components/westloop/CeramicFilm";
+import styles from "./Home.module.css";
+
 export const dynamic = "force-dynamic";
-export const metadata = { alternates: { canonical: "/" } };
+export const metadata = {
+  title: { absolute: "West Loop Ceramics | Ceramic Coating & Detailing in Chicago" },
+  description: "A better finish starts with thoughtful preparation. Discover ceramic coating, paint correction and premium detailing in Chicago’s West Loop. Explore services and book online.",
+  alternates: { canonical: "/" },
+};
+
+const questions = [
+  ["Is ceramic coating right for my car?", "It can be a good fit if you want enhanced gloss, water repellency and easier routine cleaning. We assess the paint first and recommend the preparation it needs. The right choice depends on the vehicle’s condition, how you use it and how you plan to maintain it."],
+  ["Does my car need paint correction before coating?", "Coating protects the finish underneath it; it does not remove scratches or swirl marks. Paint correction may be recommended first to improve clarity. We discuss that work and the price before you commit."],
+  ["Will ceramic coating prevent scratches and stone chips?", "Ceramic coating is not scratch-proof and does not replace paint protection film. Careful washing still matters. Its role is to add a protective surface and make ongoing care easier."],
+  ["What will my appointment cost?", "Each service page shows the current price or starting price. Vehicle size, condition and preparation can change the final scope. Your booking shows an estimate, and any additional work is discussed before we begin."],
+  ["What happens after I book?", "Choose your service, add your vehicle and select an available time. You’ll review the appointment before confirming. For coating, we also discuss preparation, curing and aftercare so you know what to expect."],
+];
+
 export default async function Home() {
-  const { business, services, gallery, reviews } = await publicData();
+  const { business, services, reviews } = await publicData();
+  const coating = services.find((s) => s.slug === "ceramic-coating");
+  const featured = ["ceramic-coating", "paint-correction", "full-detail"].flatMap((slug) => services.filter((s) => s.slug === slug));
+  const coatingBooking = coating ? `/booking?service=${coating.id}` : "/contact";
   const schema = {
-    "@context": "https://schema.org",
-    "@type": "AutomotiveBusiness",
-    name: business.name,
-    url: siteUrl(),
-    areaServed: "Chicago, Illinois",
+    "@context": "https://schema.org", "@type": "AutomotiveBusiness",
+    name: business.name, url: siteUrl(), areaServed: "Chicago, Illinois",
     ...(business.phone ? { telephone: business.phone } : {}),
-    ...(business.address
-      ? {
-          address: {
-            "@type": "PostalAddress",
-            streetAddress: business.address,
-            addressLocality: "Chicago",
-            addressRegion: "IL",
-            addressCountry: "US",
-          },
-        }
-      : {}),
+    ...(business.address ? { address: { "@type": "PostalAddress", streetAddress: business.address, addressLocality: "Chicago", addressRegion: "IL", addressCountry: "US" } } : {}),
   };
   return (
     <PageShell business={business}>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(schema).replace(/</g, "\\u003c"),
-        }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
       <CinematicHero />
-      <div className="principles wrap">
-        <span>Care, down to the detail.</span>
-        <p>Transparent service pricing</p>
-        <p>Appointments that fit your day</p>
-        <p>From daily drivers to exotics</p>
-      </div>
-      <section className="section wrap" id="services">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">THE SERVICE MENU</p>
-            <h2>
-              Premium care.
-              <br />
-              <em>For the car you love.</em>
-            </h2>
-          </div>
-          <div>
-            <p>
-              Choose a refresh, a full reset, or lasting protection.
-              <br />
-              We take care of the details.
-            </p>
-            <Link className="text-link" href="/services">
-              Explore all services ↗
-            </Link>
-          </div>
+      <div className={styles.assurance} aria-label="Our approach"><span>CHICAGO, WITH PRECISION.</span><p>Paint preparation first</p><p>Clear scope & pricing</p><p>Care beyond the appointment</p></div>
+      <section className={`${styles.coating} wrap`} id="ceramic-coating">
+        <div className={styles.featureHeading}>
+          <p className="eyebrow">01 / OUR SIGNATURE SERVICE</p><h2>Exceptional gloss.<br /><em>Considered protection.</em></h2>
+          <p className={styles.lead}>For the way it looks today.<br />And the way you care for it tomorrow.</p>
+          <p>Ceramic coating brings a new depth to your paint and helps make regular washing easier. The difference starts before the coating touches the car: thoughtful preparation, a clean surface and attention to every panel.</p>
+          <div className={styles.featurePrice}><span>{coating && coating.pricing_mode !== "quote" ? `${coating.pricing_mode === "starting" ? "From " : ""}${money(coating.price_cents)}` : "Tailored to your vehicle"}</span><small>Preparation and vehicle condition guide the final scope.</small></div>
+          <div className={styles.links}><Link className="button" href="/services/ceramic-coating">Explore ceramic coating <span aria-hidden="true">↗</span></Link><Link className="text-link" href={coatingBooking}>Book your coating <span aria-hidden="true">↗</span></Link></div>
         </div>
-        <ServiceCards services={services.slice(0, 3)} compact />
+        <div className={styles.featureVisual}><CeramicFilm /><div className={styles.benefits}>
+          <div><span>01</span><h3>A richer finish</h3><p>Gloss and clarity that reward a closer look.</p></div>
+          <div><span>02</span><h3>Easier upkeep</h3><p>A water-repellent surface for a simpler wash routine.</p></div>
+          <div><span>03</span><h3>A considered plan</h3><p>Preparation and aftercare matched to your vehicle.</p></div>
+        </div></div>
       </section>
-      <section className="approach wrap" id="approach">
-        <div className="approach-photo">
-          <Image
-            src="/portfolio/tan-interior-detail.jpg"
-            alt="Detailed leather interior craftsmanship"
-            fill
-            sizes="(max-width: 760px) 100vw, 45vw"
-          />
-        </div>
-        <div className="approach-copy">
-          <p className="eyebrow">THE WEST LOOP APPROACH</p>
-          <h2>
-            Your car.
-            <br />
-            <em>Our full attention.</em>
-          </h2>
-          <p>
-            A great detail starts with understanding the vehicle in front of us.
-            Its materials. Its condition. The way you use it.
-          </p>
-          <div className="numbered">
-            <span>01</span>
-            <div>
-              <h3>Care, not shortcuts.</h3>
-              <p>
-                Purposeful treatments for paint, upholstery and every surface in
-                between.
-              </p>
-            </div>
-          </div>
-          <div className="numbered">
-            <span>02</span>
-            <div>
-              <h3>Clarity from the start.</h3>
-              <p>
-                Clear service inclusions and starting prices. Additional work is
-                discussed before it begins.
-              </p>
-            </div>
-          </div>
-          <div className="numbered">
-            <span>03</span>
-            <div>
-              <h3>Made for your everyday.</h3>
-              <p>
-                A considered service for cherished cars and the ones that do it
-                all.
-              </p>
-            </div>
-          </div>
+      <section className={styles.services} id="services"><div className="wrap">
+        <div className={styles.sectionHeading}><div><p className="eyebrow">02 / THE RIGHT CARE, EVERY TIME</p><h2>Refine. Protect.<br /><em>Enjoy the drive.</em></h2></div><div><p>From a complete detail to a carefully prepared coating, find the service that fits your car.</p><Link className="text-link" href="/services">Explore all {services.length} services <span aria-hidden="true">↗</span></Link></div></div>
+        <ServiceCards services={featured} compact />
+        <ServiceFinder services={services.map(({ id, slug, name, price_cents, pricing_mode }) => ({ id, slug, name, price_cents, pricing_mode }))} />
+      </div></section>
+      <section className={`${styles.process} wrap`} id="process">
+        <div className={styles.processImage}><Image src="/portfolio/black-porsche-studio.jpg" alt="Light tracing the contours of a polished black Porsche" fill sizes="(max-width: 760px) 100vw, 44vw" /><span>GOOD PREPARATION. BEAUTIFUL RESULTS.</span></div>
+        <div className={styles.processCopy}><p className="eyebrow">03 / THE WEST LOOP STANDARD</p><h2>The finish matters.<br /><em>So does the process.</em></h2><p>Premium care should feel clear from the first conversation to the first drive home.</p>
+          {[["01", "Understand your vehicle", "We start with the condition of the paint, the way you drive and the finish you want."], ["02", "Prepare with purpose", "A careful wash, decontamination and any agreed paint correction establish the right foundation."], ["03", "Finish. Inspect. Advise.", "We check the finish and explain the care it needs, including coating cure and maintenance guidance."]].map(([n, title, body]) => <div className={styles.processStep} key={n}><span>{n}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}
+          <Link className="text-link" href="/contact">Talk through your vehicle <span aria-hidden="true">↗</span></Link>
         </div>
       </section>
-      <section className="section wrap">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">THE FINISH</p>
-            <h2>
-              Details worth
-              <br />
-              <em>a closer look.</em>
-            </h2>
-          </div>
-          <Link className="text-link" href="/gallery">
-            View the gallery ↗
-          </Link>
-        </div>
-        {gallery.length ? (
-          <Gallery items={gallery.slice(0, 6)} />
-        ) : (
-          <div className="detail-desk">
-            <div className="detail-desk-intro">
-              <p className="eyebrow">THE DETAIL DESK</p>
-              <h3>Material. Light. Finish.</h3>
-              <p>
-                Every appointment begins with a close look at the surfaces that
-                make your car feel like yours.
-              </p>
-              <Link className="text-link" href="/booking">
-                Start with your car ↗
-              </Link>
-            </div>
-            <figure className="detail-desk-main">
-              <Image
-                src="/portfolio/red-audi-light-detail.jpg"
-                alt="Close-up of a detailed red vehicle finish"
-                fill
-                sizes="(max-width: 760px) 100vw, 50vw"
-              />
-              <figcaption>01 / Paintwork</figcaption>
-            </figure>
-            <figure className="detail-desk-tall">
-              <Image
-                src="/portfolio/audi-cabin-detail.jpg"
-                alt="Detailed automotive interior"
-                fill
-                sizes="(max-width: 760px) 50vw, 25vw"
-              />
-              <figcaption>02 / Cabin</figcaption>
-            </figure>
-            <figure className="detail-desk-wide">
-              <Image
-                src="/portfolio/black-mercedes-rear.jpg"
-                alt="Polished rear vehicle detail"
-                fill
-                sizes="(max-width: 760px) 50vw, 25vw"
-              />
-              <figcaption>03 / Finish</figcaption>
-            </figure>
-          </div>
-        )}
+      <section className={styles.detailStrip} aria-label="Attention to every surface">
+        <figure><Image src="/portfolio/red-audi-light-detail.jpg" alt="Close-up of red paint and precise automotive lighting" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>PAINTWORK</span><h3>Depth in every reflection.</h3></figcaption></figure>
+        <figure><Image src="/portfolio/tan-interior-detail.jpg" alt="Fine leather texture and detailed interior stitching" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>INTERIOR CARE</span><h3>Care you feel, every day.</h3></figcaption></figure>
       </section>
-      <section className="steps-section wrap">
-        <p className="eyebrow">LESS EFFORT. MORE ENJOYMENT.</p>
-        <h2>A better detail starts here.</h2>
-        <div className="steps-grid">
-          {[
-            [
-              "01",
-              "Find your service",
-              "Choose the care your car needs, with clear inclusions and pricing.",
-            ],
-            [
-              "02",
-              "Make it yours",
-              "Tell us about your vehicle and choose a live appointment time.",
-            ],
-            [
-              "03",
-              "Leave it to us",
-              "Receive your confirmation. We will take care of the rest.",
-            ],
-          ].map(([n, t, d]) => (
-            <div key={n}>
-              <span>{n}</span>
-              <h3>{t}</h3>
-              <p>{d}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="premium-panel wrap">
-        <Image
-          src="/portfolio/black-porsche-studio.jpg"
-          alt="Glossy black sports car bodywork"
-          fill
-          sizes="100vw"
-        />
-        <div>
-          <p className="eyebrow">BEYOND THE EVERYDAY</p>
-          <h2>
-            Protect the finish.
-            <br />
-            <em>Preserve the feeling.</em>
-          </h2>
-          <p>
-            Discover paint correction and ceramic coating,
-            <br />
-            tailored to your vehicle's condition.
-          </p>
-          <Link className="button light" href="/services">
-            Explore protection ↗
-          </Link>
-        </div>
-      </section>
-      <section className="section wrap reviews-section">
-        <p className="eyebrow">CUSTOMER PERSPECTIVES</p>
-        <h2>Good care speaks for itself.</h2>
-        {reviews.length ? (
-          <div className="review-grid">
-            {reviews.slice(0, 3).map((r) => (
-              <blockquote key={r.id}>
-                <p aria-label={r.rating + " out of 5"}>
-                  {"★".repeat(r.rating)}
-                </p>
-                <p>“{r.text}”</p>
-                <cite>{r.name}</cite>
-                <small>Verified appointment</small>
-              </blockquote>
-            ))}
-          </div>
-        ) : (
-          <p className="muted">
-            Our story is just beginning. Feedback from completed appointments
-            will appear here. No borrowed reviews.
-          </p>
-        )}
-      </section>
-      <section className="location-section wrap">
-        <div>
-          <p className="eyebrow">IN GOOD COMPANY</p>
-          <h2>
-            Chicago roots.
-            <br />
-            <em>West Loop spirit.</em>
-          </h2>
-        </div>
-        <div>
-          <p>{business.service_area}</p>
-          <p>
-            {business.address ||
-              "Appointment location is confirmed with your booking."}
-          </p>
-          <p>{business.hours_label}</p>
-          <Link className="text-link" href="/contact">
-            Plan your visit ↗
-          </Link>
-        </div>
-      </section>
+      {reviews.length > 0 && <section className={`${styles.reviews} wrap`}><p className="eyebrow">FROM THE DRIVER’S SEAT</p><h2>Good care gets remembered.</h2><div>{reviews.slice(0, 3).map((r) => <blockquote key={r.id}><span aria-label={`${r.rating} out of 5 stars`}>{"★".repeat(r.rating)}</span><p>“{r.text}”</p><cite>{r.name}</cite><small>Verified appointment</small></blockquote>)}</div></section>}
+      <section className={`${styles.faq} wrap`}><div><p className="eyebrow">BEFORE YOU BOOK</p><h2>A little clarity.<br /><em>A better decision.</em></h2><p>Not sure where to start? Tell us about your vehicle and we’ll help you choose.</p><Link className="text-link" href="/contact">Ask the studio <span aria-hidden="true">↗</span></Link></div><div className={styles.questions}>{questions.map(([question, answer]) => <details key={question}><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div></section>
+      <section className={styles.location}><div className="wrap"><div><p className="eyebrow">ROOTED IN THE WEST LOOP</p><h2>Chicago roads.<br /><em>Extraordinary care.</em></h2></div><div><p>{business.service_area}</p><p>{business.address || "Your appointment location is confirmed before your visit."}</p><span>{business.hours_label}</span><Link className="text-link" href="/contact">Plan your visit <span aria-hidden="true">↗</span></Link></div></div></section>
     </PageShell>
   );
 }

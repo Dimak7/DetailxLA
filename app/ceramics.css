@@ -1,0 +1,241 @@
+/* Public brand system. Business workspace styling remains in globals.css. */
+.ceramics-site {
+  --ink: #151719;
+  --paper: #f2efe8;
+  --white: #fbf9f4;
+  --muted: #65625d;
+  --line: #d9d4ca;
+  --sage: #e8e3d9;
+  --gold: #b78559;
+  --copper: #b78559;
+  --pale-gold: #d8ba90;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.75;
+  overflow: clip;
+}
+.ceramics-site .wrap { max-width: 1480px; padding-inline: 6%; }
+.ceramics-site .section { padding-top: 104px; padding-bottom: 104px; }
+.ceramics-site .section.no-top { padding-top: 0; }
+:where(.ceramics-site) h1, :where(.ceramics-site) h2 { font-weight: 500; letter-spacing: -.045em; }
+:where(.ceramics-site) h1 { font-size: clamp(54px, 7vw, 108px); }
+:where(.ceramics-site) h2 { font-size: clamp(40px, 4.8vw, 72px); }
+:where(.ceramics-site) h3 { font-weight: 600; }
+:where(.ceramics-site) p { color: var(--muted); }
+.ceramics-site .eyebrow { color: #825b38; font-size: 10px; font-weight: 600; letter-spacing: .19em; }
+.ceramics-site a, .ceramics-site button { -webkit-tap-highlight-color: transparent; }
+:where(.ceramics-site) :focus-visible { outline: 2px solid #875a32; outline-offset: 5px; }
+.ceramics-site .button {
+  border-radius: 0; background: #151719; border: 1px solid #151719; color: #f7f3eb;
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; min-height: 52px;
+  padding: 16px 25px; gap: 30px; box-shadow: none;
+}
+.ceramics-site .button:hover { background: #775436; border-color: #775436; color: #fff; transform: translateY(-2px); }
+.ceramics-site .button.outline { color: #151719; background: transparent; border-color: #b4aca0; }
+.ceramics-site .button.outline:hover { color: #fff; background: #151719; border-color: #151719; }
+.ceramics-site .button.light { background: #f2efe8; border-color: #f2efe8; color: #151719; }
+.ceramics-site .text-link { color: var(--ink); border-color: #a68b71; font-size: 12px; }
+.ceramics-site .text-link:hover { color: #825b38; text-decoration: none; border-color: #825b38; }
+.ceramics-site .button-row { flex-wrap: wrap; }
+.ceramics-site .ceramics-announcement { background: #151719; color: #ddd3c5; display: flex; justify-content: space-between; gap: 16px; padding: 10px 6%; font-size: 8px; letter-spacing: .2em; line-height: 1.5; }
+.ceramics-site .ceramics-header { position: relative; z-index: 30; display: flex; align-items: center; gap: 28px; padding: 22px 6%; border-bottom: 1px solid var(--line); background: #f2efe8; }
+.ceramics-site .ceramics-home { flex: 0 0 auto; }
+.ceramics-site .ceramics-wordmark { gap: 10px; color: #151719; font-size: 18px; font-weight: 500; line-height: 1.1; letter-spacing: .11em; white-space: nowrap; }
+.ceramics-site .ceramics-mark { flex: 0 0 auto; color: #a57447; width: 53px; height: 53px; }
+.ceramics-site .ceramics-wordmark small { margin-top: 8px; color: inherit; font-size: 9px; letter-spacing: .47em; }
+.ceramics-site .ceramics-nav { margin-left: auto; display: flex; align-items: center; gap: 27px; }
+.ceramics-site .ceramics-nav > a { position: relative; font-size: 10px; font-weight: 600; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; }
+.ceramics-site .ceramics-nav > a:not(.ceramics-menu-book)::after { content: ''; height: 1px; background: #a57447; position: absolute; bottom: 8px; left: 0; right: 0; transform: scaleX(0); transform-origin: left; transition: transform .2s ease; }
+.ceramics-site .ceramics-nav > a:hover::after, .ceramics-site .ceramics-nav > a[aria-current]::after { transform: scaleX(1); }
+.ceramics-site .ceramics-nav-feature { color: #81562f; }
+.ceramics-site .ceramics-header-book { min-height: 46px; padding: 12px 19px; font-size: 10px; gap: 25px; flex-shrink: 0; }
+.ceramics-site .ceramics-menu-toggle, .ceramics-site .ceramics-menu-caption, .ceramics-site .ceramics-nav-arrow, .ceramics-site .ceramics-nav .ceramics-menu-book, .ceramics-site .ceramics-menu-note { display: none; }
+
+/* Interior pages retain their working layouts with the new paper and copper palette. */
+.ceramics-site .page-intro { padding-top: 84px; padding-bottom: 60px; border-bottom: 0; }
+.ceramics-site .page-intro > h1 { max-width: 1000px; }
+.ceramics-site .page-intro p:not(.eyebrow) { font-size: 15px; line-height: 1.85; }
+.ceramics-site .compact-intro h1 { font-size: clamp(48px, 6.5vw, 88px); }
+.ceramics-site .paper { background: #fbf9f4; color: #151719; border-color: #d9d4ca; border-radius: 0; box-shadow: none; }
+.ceramics-site .paper h2 { font-size: 39px; }
+.ceramics-site .field input, .ceramics-site .field select, .ceramics-site .field textarea { background: #fffdf8; color: #151719; border: 1px solid #bdb7ad; border-radius: 0; min-height: 49px; color-scheme: light; }
+.ceramics-site .field input::placeholder, .ceramics-site .field textarea::placeholder { color: #78736b; }
+.ceramics-site .field input:focus, .ceramics-site .field select:focus, .ceramics-site .field textarea:focus { outline: 2px solid #a57447; outline-offset: 2px; border-color: #a57447; }
+.ceramics-site .field select option { background: #fffdf8; color: #151719; }
+.ceramics-site .contact-grid { gap: 10%; }
+.ceramics-site .contact-grid .paper { padding: 40px; background: #e8e3d9; border: 0; }
+.ceramics-site .contact-grid .paper h2 { font-size: 44px; }
+.ceramics-site .filter-row { gap: 9px; flex-wrap: wrap; margin-bottom: 30px; }
+.ceramics-site .filter-row button, .ceramics-site .service-tabs button, .ceramics-site .gallery-tabs button, .ceramics-site .filter-tabs a { color: #5a5752; border: 1px solid #c4bdb1; border-radius: 0; background: transparent; min-height: 43px; padding: 11px 19px; }
+.ceramics-site .filter-row button.active, .ceramics-site .service-tabs button.active, .ceramics-site .gallery-tabs button.active, .ceramics-site .filter-tabs a.active { color: #fffaf0; background: #151719; border-color: #151719; }
+.ceramics-site .service-card { background: #fbf9f4; border-color: #d9d4ca; border-radius: 0; }
+.ceramics-site .service-card :is(p,small,ul,details,a:not(.button)) { color: #65625d; }
+.ceramics-site .service-card .service-book { color: #151719; border-color: #b9a085; }
+.ceramics-site .service-card .service-top .pill { color: #745132; border-color: #d2bea7; }
+.ceramics-site .service-card:hover { border-color: #a57447; }
+.ceramics-site .gallery-grid { gap: 30px; }
+.ceramics-site .gallery-image, .ceramics-site .compare { background: #dfd9cf; }
+.ceramics-site .gallery-grid figcaption { border-bottom: 1px solid #d4cdc1; padding: 21px 0; }
+.ceramics-site .gallery-grid h3 { font-size: 16px; }
+.ceramics-site .empty-gallery, .ceramics-site .empty-state { background: #e8e3d9; border-color: #bcb2a1; color: #151719; }
+.ceramics-site .empty-gallery p { color: #5d5851; }
+.ceramics-site .legal { padding-top: 78px; padding-bottom: 95px; }
+.ceramics-site .legal h1 { font-size: clamp(49px, 6vw, 80px); }
+.ceramics-site .legal h2 { font-size: 34px; }
+
+/* Keep every booking state readable, including availability, review and consent. */
+.ceramics-site .booking-main {
+  --booking-line: #d2c7b6; --booking-text: #151719; --booking-muted: #635f58; --booking-accent: #8b623d;
+  background: #fbf9f4; color: #151719; border: 1px solid #d4cec2; box-shadow: 0 16px 50px #342d1e08; padding: 34px;
+}
+.ceramics-site .booking-main h2, .ceramics-site .booking-main h3, .ceramics-site .booking-main p, .ceramics-site .booking-main .field > span { color: #151719; }
+.ceramics-site .booking-main > p, .ceramics-site .booking-main .small-note { color: #635f58; }
+.ceramics-site .booking-main .field input, .ceramics-site .booking-main .field select, .ceramics-site .booking-main .field textarea { background: #fffdf8; color: #151719; border-color: #bdb7ad; border-radius: 0; caret-color: #151719; }
+.ceramics-site .booking-main .field input::placeholder, .ceramics-site .booking-main .field textarea::placeholder { color: #78736b; }
+.ceramics-site .booking-main .button { background: #151719; border-color: #151719; color: #fffaf0; letter-spacing: .04em; }
+.ceramics-site .booking-main .button.outline { background: transparent; border-color: #a89c8b; color: #151719; }
+.ceramics-site .booking-main .booking-progress span { color: #726b62; border-color: #c7beb0; }
+.ceramics-site .booking-main .booking-progress .active { color: #151719; border-color: #96663d; }
+.ceramics-site .booking-main .service-option { background: #fffdf8; color: #151719; border-color: #cfc6b8; }
+.ceramics-site .booking-main .service-option small { color: #6e6559; }
+.ceramics-site .booking-main .service-option:has(input:checked) { background: #eee5d7; border-color: #96663d; }
+.ceramics-site .booking-main .service-option input { accent-color: #775436; }
+.ceramics-site .time-grid button { color: #151719; border-color: #bdb4a5; background: #fffdf8; }
+.ceramics-site .time-grid button.selected { color: #fffaf0; border-color: #151719; background: #151719; }
+.ceramics-site .booking-summary { background: #e7e0d4; border: 0; padding: 30px; }
+.ceramics-site .booking-summary .summary-row, .ceramics-site .receipt .summary-row { border-color: #cfc6b7; }
+.ceramics-site .booking-review { background: #eee7da; border-color: #c9baa4; border-radius: 0; }
+.ceramics-site .booking-review-grid :is(strong,small) { color: #151719; }
+.ceramics-site .booking-review-grid span { color: #635a4e; }
+.ceramics-site .booking-review-price strong { color: #775436; }
+.ceramics-site .booking-consent { color: #635f58; border-color: #c9c1b5; border-radius: 0; }
+.ceramics-site .booking-consent.required { background: #eee4d3; border-color: #ad916b; }
+.ceramics-site .booking-consent strong { color: #151719; }
+.ceramics-site .booking-consent .text-link { color: #775436; border-color: #9b774f; }
+.ceramics-site .booking-main .error-message { background: #f8e5dd; border-left-color: #9c4935; color: #773321; }
+.ceramics-site .receipt { background: #fbf9f4; border-color: #d4cec2; }
+.ceramics-site .receipt h2, .ceramics-site .receipt .summary-row strong { color: #151719; }
+.ceramics-site .receipt .summary-row span, .ceramics-site .receipt .small-note { color: #635f58; }
+
+/* An unhurried close: a clear invitation, followed by useful studio details. */
+.ceramics-site .ceramics-final-cta { background: #ded5c6; border-top: 1px solid #d5c8b7; color: #151719; }
+.ceramics-site .ceramics-final-inner { display: flex; align-items: center; justify-content: space-between; gap: 64px; padding-top: 86px; padding-bottom: 86px; }
+.ceramics-site .ceramics-final-inner h2 { margin-bottom: 21px; font-size: clamp(43px, 5vw, 76px); }
+.ceramics-site .ceramics-final-inner p:not(.eyebrow) { max-width: 510px; margin: 0; color: #5f584f; font-size: 13px; }
+.ceramics-site .ceramics-final-inner .eyebrow { margin-bottom: 23px; color: #775436; }
+.ceramics-site .ceramics-final-actions { display: grid; flex: 0 0 auto; gap: 21px; justify-items: start; }
+.ceramics-site .ceramics-final-actions .button { min-height: 58px; padding-inline: 26px; }
+.ceramics-site .ceramics-final-actions .text-link { font-size: 11px; }
+.ceramics-site .ceramics-footer { background: #151719; color: #f2efe8; }
+.ceramics-site .ceramics-footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.25fr; gap: 34px; padding-top: 79px; padding-bottom: 30px; }
+.ceramics-site .ceramics-footer .ceramics-wordmark { color: #f2efe8; }
+.ceramics-site .ceramics-footer .ceramics-mark { color: #d8ba90; }
+.ceramics-site .ceramics-footer-brand p { margin-top: 27px; color: #c0bbb3; line-height: 1.8; font-family: var(--font-display), serif; font-size: 25px; }
+.ceramics-site .ceramics-footer-location { font-size: 8px; letter-spacing: .18em; color: #bfa17e; }
+.ceramics-site .ceramics-footer h3 { margin: 11px 0 25px; color: #e7d0b0; font-size: 10px; letter-spacing: .1em; font-weight: 500; }
+.ceramics-site .ceramics-footer-grid > div:not(.ceramics-footer-brand) > a, .ceramics-site .ceramics-footer-contact > p { display: block; color: #bfbab2; font-size: 11px; margin-bottom: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.ceramics-site .ceramics-footer a:hover { color: #fff; }
+.ceramics-site .ceramics-footer a:focus-visible { outline-color: #d8ba90; }
+.ceramics-site .ceramics-footer-contact .ceramics-visit-note { font-size: 10px; color: #aaa397; margin-top: 19px; max-width: 225px; }
+.ceramics-site .ceramics-service-area { grid-column: 1/-1; border-top: 1px solid #343538; padding-top: 26px; margin-top: 16px; display: flex; gap: 33px; align-items: baseline; }
+.ceramics-site .ceramics-service-area > span { color: #bfa17e; font-size: 8px; letter-spacing: .16em; flex: 0 0 auto; }
+.ceramics-site .ceramics-service-area > p { margin: 0; font-size: 10px; color: #aca79e; }
+.ceramics-site .ceramics-footer-bottom { grid-column: 1/-1; border-top: 1px solid #343538; padding-top: 27px; display: flex; align-items: center; justify-content: space-between; gap: 22px; color: #a8a197; font-size: 9px; }
+.ceramics-site .ceramics-footer-bottom > div { display: flex; flex-wrap: wrap; gap: 24px; }
+.ceramics-site .ceramics-footer-bottom > span:last-child { font-size: 8px; letter-spacing: .14em; }
+.ceramics-site .ceramics-mobile-bar { display: none; }
+
+@media (min-width: 1600px) {
+  .ceramics-site .ceramics-announcement, .ceramics-site .ceramics-header { padding-inline: max(6%, calc((100% - 1302px) / 2)); }
+}
+@media (max-width: 1200px) {
+  .ceramics-site .ceramics-header { gap: 20px; padding-inline: 4%; }
+  .ceramics-site .ceramics-nav { gap: 18px; }
+  .ceramics-site .ceramics-wordmark { font-size: 16px; }
+  .ceramics-site .ceramics-header-book { padding-inline: 15px; gap: 17px; }
+}
+@media (max-width: 1080px) {
+  .ceramics-site .ceramics-header { padding: 17px 6%; gap: 24px; }
+  .ceramics-site .ceramics-header-book { margin-left: auto; }
+  .ceramics-site .ceramics-menu-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 12px; border: 0; background: transparent; padding: 0; min-height: 44px; min-width: 64px; color: #151719; font-size: 10px; }
+  .ceramics-site .ceramics-menu-icon { display: grid; gap: 5px; width: 18px; }
+  .ceramics-site .ceramics-menu-icon i { display: block; background: #151719; width: 18px; height: 1px; transition: transform .2s; }
+  .ceramics-site [data-menu-open="true"] .ceramics-menu-icon i:first-child { transform: translateY(3px) rotate(45deg); }
+  .ceramics-site [data-menu-open="true"] .ceramics-menu-icon i:last-child { transform: translateY(-3px) rotate(-45deg); }
+  .ceramics-site .ceramics-nav { display: none; position: absolute; top: 100%; left: 0; right: 0; margin: 0; padding: 24px 6% 29px; background: #f2efe8; border-top: 1px solid #d9d4ca; border-bottom: 1px solid #c6bcab; box-shadow: 0 20px 40px #1517191c; max-height: calc(100svh - 100px); overflow-y: auto; }
+  .ceramics-site .ceramics-nav.is-open { display: flex; align-items: stretch; flex-direction: column; gap: 0; }
+  .ceramics-site .ceramics-menu-caption { display: block; font-size: 8px; letter-spacing: .2em; color: #8b623d; padding-bottom: 12px; }
+  .ceramics-site .ceramics-nav > a { font-family: var(--font-display), serif; font-weight: 500; font-size: 28px; min-height: 53px; border-bottom: 1px solid #dfd8cb; justify-content: space-between; }
+  .ceramics-site .ceramics-nav > a::after { display: none; }
+  .ceramics-site .ceramics-nav-arrow { display: inline; font-family: var(--font-body), sans-serif; font-size: 17px; font-weight: 400; color: #a57447; }
+  .ceramics-site .ceramics-nav .ceramics-menu-book { display: flex; background: #151719; color: #fffaf0; padding: 12px 19px; font-family: var(--font-body), sans-serif; font-size: 11px; margin-top: 20px; border: 0; }
+  .ceramics-site .ceramics-menu-note { display: block; color: #777065; font-size: 10px; margin: 19px 0 0; }
+  .ceramics-site .ceramics-footer-grid { grid-template-columns: 1.4fr 1fr 1fr; gap: 40px 28px; }
+  .ceramics-site .ceramics-footer-contact { grid-column: 1/-1; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 0 30px; }
+  .ceramics-site .ceramics-footer-contact h3 { grid-column: 1/-1; margin-top: 0; }
+  .ceramics-site .ceramics-footer-contact .ceramics-visit-note { margin-top: 0; }
+  .ceramics-site .ceramics-final-inner { gap: 32px; }
+}
+@media (max-width: 760px) {
+  .ceramics-site { padding-bottom: calc(73px + env(safe-area-inset-bottom)); }
+  .ceramics-site .section { padding-top: 68px; padding-bottom: 68px; }
+  .ceramics-site .ceramics-announcement { font-size: 6px; letter-spacing: .1em; padding-top: 8px; padding-bottom: 8px; }
+  .ceramics-site .ceramics-header { padding-top: 13px; padding-bottom: 13px; gap: 16px; }
+  .ceramics-site .ceramics-wordmark { font-size: 13px; gap: 7px; }
+  .ceramics-site .ceramics-wordmark small { font-size: 7px; margin-top: 6px; letter-spacing: .4em; }
+  .ceramics-site .ceramics-mark { width: 40px; height: 40px; }
+  .ceramics-site .ceramics-header-book { min-height: 39px; font-size: 9px; gap: 16px; padding: 10px 12px; }
+  .ceramics-site .ceramics-menu-toggle { min-width: 20px; }
+  .ceramics-site .ceramics-menu-toggle > span:first-child { display: none; }
+  .ceramics-site .ceramics-header .ceramics-nav.is-open { gap: 0; }
+  .ceramics-site .page-intro { padding-top: 56px; padding-bottom: 40px; }
+  .ceramics-site .page-intro h1 { font-size: clamp(46px, 11vw, 70px); }
+  .ceramics-site .page-intro p:not(.eyebrow) { font-size: 13px; }
+  .ceramics-site .eyebrow { font-size: 8px; margin-bottom: 19px; }
+  .ceramics-site .button { font-size: 10px; padding: 15px 20px; gap: 24px; }
+  .ceramics-site .contact-grid .paper { padding: 27px; }
+  .ceramics-site .contact-grid .paper h2 { font-size: 36px; }
+  .ceramics-site .paper { padding: 25px; }
+  .ceramics-site .filter-row button { font-size: 10px; padding: 10px 14px; }
+  .ceramics-site .booking-main { padding: 24px; }
+  .ceramics-site .booking-summary { padding: 25px; }
+  .ceramics-site .booking-main .booking-progress { gap: 7px; }
+  .ceramics-site .booking-review { padding: 16px; }
+  .ceramics-site .booking-review-grid strong { font-size: 14px; }
+  .ceramics-site .receipt { margin-inline: 6%; }
+  .ceramics-site .ceramics-final-inner { flex-direction: column; align-items: flex-start; gap: 34px; padding-top: 57px; padding-bottom: 57px; }
+  .ceramics-site .ceramics-final-inner h2 { font-size: clamp(42px, 10vw, 61px); }
+  .ceramics-site .ceramics-final-inner p:not(.eyebrow) { font-size: 12px; }
+  .ceramics-site .ceramics-final-actions { gap: 20px; width: 100%; }
+  .ceramics-site .ceramics-final-actions .button { min-height: 51px; }
+  .ceramics-site .ceramics-footer-grid { grid-template-columns: 1fr 1fr; gap: 35px 25px; padding-top: 54px; }
+  .ceramics-site .ceramics-footer-brand { grid-column: 1/-1; }
+  .ceramics-site .ceramics-footer .ceramics-wordmark { font-size: 17px; }
+  .ceramics-site .ceramics-footer .ceramics-wordmark small { font-size: 8px; }
+  .ceramics-site .ceramics-footer .ceramics-mark { width: 48px; height: 48px; }
+  .ceramics-site .ceramics-footer-brand p { font-size: 26px; margin-top: 22px; margin-bottom: 17px; }
+  .ceramics-site .ceramics-footer h3 { font-size: 10px; margin-top: 0; margin-bottom: 20px; }
+  .ceramics-site .ceramics-footer-grid > div:not(.ceramics-footer-brand) > a, .ceramics-site .ceramics-footer-contact > p { font-size: 10px; }
+  .ceramics-site .ceramics-footer-contact { display: block; }
+  .ceramics-site .ceramics-footer-contact .ceramics-visit-note { max-width: 100%; margin-top: 16px; }
+  .ceramics-site .ceramics-service-area { display: block; margin-top: 0; padding-top: 23px; }
+  .ceramics-site .ceramics-service-area > p { margin-top: 12px; font-size: 10px; }
+  .ceramics-site .ceramics-footer-bottom { align-items: flex-start; flex-direction: column; gap: 17px; padding-top: 24px; font-size: 9px; }
+  .ceramics-site .ceramics-footer-bottom > div { gap: 22px; }
+  .ceramics-site .ceramics-footer-bottom > span:last-child { margin-top: 4px; }
+  .ceramics-site .ceramics-mobile-bar { display: grid; grid-template-columns: 1.45fr 1fr; gap: 9px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #f2efe8f5; border-top: 1px solid #c6bcab; padding: 9px 5% calc(9px + env(safe-area-inset-bottom)); backdrop-filter: blur(12px); }
+  .ceramics-site .ceramics-mobile-bar .button { min-height: 45px; padding: 12px 10px; font-size: 9px; gap: 13px; white-space: nowrap; }
+}
+@media (max-width: 360px) {
+  .ceramics-site .ceramics-header { gap: 11px; }
+  .ceramics-site .ceramics-header .ceramics-wordmark { font-size: 11px; gap: 5px; }
+  .ceramics-site .ceramics-header .ceramics-mark { width: 34px; height: 34px; }
+  .ceramics-site .ceramics-header-book { padding: 10px; font-size: 8px; gap: 10px; }
+  .ceramics-site .ceramics-mobile-bar .button { font-size: 8px; gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ceramics-site *, .ceramics-site *::before, .ceramics-site *::after { scroll-behavior: auto !important; }
+  .ceramics-site .button, .ceramics-site .ceramics-menu-icon i, .ceramics-site .ceramics-nav > a::after { transition: none; }
+}

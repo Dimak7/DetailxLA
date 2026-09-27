@@ -1,11 +1,19 @@
-# West Loop Auto Spa Porsche scroll hero
+# West Loop Ceramics cinematic Porsche hero
 
 ## Experience
 
-The homepage follows one Porsche 911 GT3 from road grime to a polished finish.
-Native page scrolling controls a paused film through arrival, a horizontal
-360-degree rotation, wash/rinse and the final reveal. Scrolling upward reverses
-the same sequence. No autoplay, sound, wheel interception or scroll hijacking.
+The homepage presents one Porsche 911 in a normal-height cinematic hero. The
+muted film starts automatically when the hero is visible, turns through the
+wash and rinse, and holds its polished final frame. Visitors can pause, resume,
+or explicitly replay the film. Replay fades in over the matching clean still;
+there is no automatic clean-to-dirty jump. The headline and ceramic-coating and
+booking links remain stationary and readable throughout.
+
+The hero has no sticky scene, long scroll section, wheel listeners, or scroll
+controlled playhead. Leaving the viewport or hiding the tab pauses playback.
+Returning resumes only if the visitor has not manually paused or finished the
+film. When a browser blocks autoplay, the visible Play film button recovers
+playback through a direct user gesture.
 
 The video is an AI detailing visualization, not footage of a customer's car.
 Porsche is the depicted vehicle make, not an affiliation or endorsement.
@@ -30,6 +38,16 @@ matching posters are installed under `public/hero/` and enabled in
 the first six frames are trimmed to keep the whole Porsche visible on entry.
 Desktop is 1000×440 and mobile is 900×396, both 24fps and approximately 8.46 seconds.
 
+The current West Loop Ceramics version uses a deterministic neutral-graphite
+color grade of this same generated film, not a new Higgsfield generation. The
+original green film is retained. The grade is
+`hue=s=0.12,eq=contrast=1.045:brightness=0.006:gamma=1.025` applied after the original
+six-frame trim and studio crop. Current files are `porsche-graphite.mp4`,
+`porsche-graphite-mobile.mp4`, `porsche-graphite-dirty.webp` and
+`porsche-graphite-clean.webp`. The encodes use a 24-frame keyframe interval and
+CRF 20 desktop / 23 mobile for automatic playback. Their 203 frames run for
+8.458333 seconds. The matching stills are extracted from the graded film.
+
 ### Reference image prompt
 
 Photorealistic 16:9 automotive studio photograph of one dark forest-green
@@ -50,47 +68,58 @@ including roof, rear wing, headlights and wheels; remove Ferrari branding.
 
 ## Implementation
 
-- `CinematicHero.tsx`: native scroll progress, chapter text, CTAs and lifecycle.
-- `hero-video.ts`: dynamically loaded paused-video renderer. One seek is allowed
-  at a time, and `seeked` consumes only the latest requested progress. Abort,
-  decode failure and stalled seeks clean up the video and restore its still.
-- `hero-media.ts`: explicit same-origin desktop/mobile MP4 and poster manifest.
-  `null` preserves the former Three.js experience if the film is unavailable
-  during development. Never point it at missing or unreviewed files.
-- `CinematicHero.module.css`: isolated styles, contained car framing, mobile
-  layout, visible focus states and contrasting CTAs.
+- `CinematicHero.tsx`: visibility and motion preferences, stable marketing
+  heading, coating and booking CTAs, playback control and process progress.
+- `hero-video.ts`: dynamically loaded playback controller. Plays once, reports
+  media time, pauses offscreen, preserves manual pause, handles blocked autoplay,
+  and holds the last frame for an explicit replay. A stale play promise cannot
+  restart a hidden or disposed film. Decode failure and stalled playback restore
+  the clean still.
+- `hero-media.ts`: same-origin desktop/mobile MP4 and poster manifest. New
+  reviewed media can replace paths without changes to the component. `null`
+  shows the existing clean studio still. Never configure missing assets.
+- `CinematicHero.module.css`: graphite studio, ivory typography, pale-gold and
+  copper accents, full-car framing, mobile layout and visible focus indicators.
 
-Encode H.264, yuv420p, silent, fast-start, with a six-frame keyframe interval for
-seeking. The mobile variant uses the same complete composition at lower resolution;
-it must not crop off wheels or bumpers. Derive first/final stills from this exact
-film. Asset requests are same-origin and require no runtime Higgsfield credentials.
+Encode silent H.264, yuv420p, with a fast-start header. The mobile variant keeps
+the same complete composition at lower resolution; do not crop wheels or
+bumpers. Derive first/final stills from the exact film. Asset requests are
+same-origin and require no runtime Higgsfield credentials.
 
-Reduced-motion, Save-Data, low-memory devices and decoder failures display the
-matching clean still. Without JavaScript, the poster and booking links remain
-available. The film loads only when the hero approaches the viewport. No 3D
-runtime is loaded when the video is configured. Unmounting removes listeners,
-observers, animation frames, timeouts and the video source.
+Reduced-motion, Save-Data and decoder failure display the clean still. Without
+JavaScript, the still and service/booking links remain available. The film loads
+when at least 15% of the hero enters the viewport, and pauses if the document is
+hidden. No Three.js runtime is loaded by this hero. Unmounting removes media
+listeners, observers, timeouts and the video source. Normal page scrolling is
+unmodified.
 
 ## Verification
 
-Use `pnpm typecheck`, `pnpm exec tsx --test tests/hero-video.test.ts` and
-`pnpm build`. The focused tests cover seek coalescing, reversal, endpoints and
-cancellation/failure cleanup. `pnpm test:hero` is the optional Chrome smoke
-script; run against an isolated preview with `PGLITE_PATH=memory://hero-preview`
-and `HERO_TEST_URL=http://localhost:3107`.
+Run `pnpm typecheck`, `pnpm exec tsx --test tests/hero-video.test.ts` and
+`pnpm build`. Focused unit tests cover visibility pause/resume, manual-pause
+persistence, the final-frame hold and explicit replay, blocked-autoplay recovery,
+stale playback promises, and cancellation/failure cleanup.
 
-Inspect actual desktop and mobile rendering at start, 25%, 50%, 75%, finish and
-backward scroll. Check the whole Porsche stays visible, video is paused,
-progress agrees with the playhead, CTAs work, no horizontal overflow occurs,
-and fallbacks retain the same vehicle. Do not create production bookings or
-send notifications to test this visual change.
+Inspect desktop/mobile in the supported browser UI. Check automatic muted
+playback, whole-car framing, pause/resume, replay fade, offscreen/tab pause, a
+single normal-height section, readable CTAs and no horizontal overflow. Confirm
+reduced-motion and media-failure stills retain the same car. Do not create
+production bookings or send notifications to test this visual change.
 
-Baseline before these changes: TypeScript passed; the full business integration
-suite had 12/22 passing with PGlite booking errors on this machine. Those failures
-predate this hero change; do not report them as passing without a new result.
+`pnpm test:hero` now exercises the automatic film and new brand selectors. Run
+it against an isolated preview with `PGLITE_PATH=memory://hero-preview` and
+`HERO_TEST_URL=http://localhost:3107`. It checks the actual desktop/mobile media
+sources and dimensions, muted automatic playback, manual pause/resume, native
+scroll independence, offscreen pause, held finish/replay, error/retry, blocked
+autoplay recovery, reduced-motion/Save-Data/no-JavaScript stills, navigation,
+button contrast and compact layouts. Screenshots and a JSON report go into
+`artifacts/hero/`. This script has been updated and syntax-checked for the new
+experience; do not claim a browser pass until it has actually been executed.
+During this implementation, live browser verification uses the supported
+computer-use browser UI instead of shell-driven browser automation.
 
-The production build, TypeScript check and six focused video-renderer tests pass.
-In-browser inspection at 1440×900 and
-390×844 confirms paused forward/reverse seeking, the matching mobile source, no
-horizontal overflow, and working navigation from the hero to the booking page.
-The final media and posters are also inspected independently across the full turn.
+Baseline before the original hero changes: TypeScript passed; the full business
+integration suite had 12/22 passing with PGlite booking errors on this machine.
+Those failures predate this hero work; do not report them as passing without a
+new result. Current build and browser verification must be recorded after the
+complete rebrand and final assets are in place.

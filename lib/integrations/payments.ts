@@ -14,7 +14,7 @@ export async function createCheckout(
   const key = await secret("stripe_key");
   if (!key)
     throw new AppError(
-      "Payments are not connected. Please contact the spa.",
+      "Payments are not connected. Please contact the studio.",
       503,
     );
   const b = await bookingById(bookingId);

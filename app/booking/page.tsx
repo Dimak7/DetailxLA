@@ -12,19 +12,21 @@ export default async function Page({
   searchParams: Promise<{ service?: string }>;
 }) {
   const d = await publicData();
+  const requestedService = (await searchParams).service;
+  const selectedService = d.services.find((service) => service.id === requestedService || service.slug === requestedService);
   return (
     <PageShell business={d.business}>
       <section className="page-intro compact-intro wrap">
-        <p className="eyebrow">MAKE TIME FOR YOUR CAR</p>
+        <p className="eyebrow">YOUR NEXT GREAT FINISH</p>
         <h1>
-          Your next <em>fresh start.</em>
+          Make it <em>exceptional.</em>
         </h1>
-        <p>Choose your service. Find your time. We'll handle the details.</p>
+        <p>{selectedService ? `${selectedService.name}, selected for your visit. Add your vehicle and find an available time.` : "Choose your care. Tell us about your vehicle. Find a time that works."}</p>
       </section>
       <BookingWizard
         services={d.services}
         business={d.business}
-        initialService={(await searchParams).service}
+        initialService={selectedService?.id}
       />
     </PageShell>
   );

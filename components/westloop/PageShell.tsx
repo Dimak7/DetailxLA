@@ -1,6 +1,7 @@
 import { PublicHeader, PublicFooter } from "./PublicShell";
 import { Tracking } from "./Tracking";
 import type { BusinessSettings } from "@/lib/platform/types";
+import { BRAND_NAME } from "@/lib/brand";
 export function PageShell({
   business,
   children,
@@ -9,8 +10,8 @@ export function PageShell({
   children: React.ReactNode;
 }) {
   return (
-    <>
-      <link rel="icon" href={business.favicon_url || "/icon.svg"} />
+    <div className="ceramics-site">
+      <link rel="icon" href={business.name === BRAND_NAME ? "/icon.svg" : business.favicon_url || "/icon.svg"} />
       <PublicHeader business={business} />
       <Tracking
         config={{
@@ -23,6 +24,6 @@ export function PageShell({
       />
       <main id="main">{children}</main>
       <PublicFooter business={business} />
-    </>
+    </div>
   );
 }
