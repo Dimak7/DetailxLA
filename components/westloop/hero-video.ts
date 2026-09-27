@@ -5,6 +5,7 @@ export type HeroPlayback = {
   setVisible: (visible: boolean) => void;
   play: () => void;
   pause: () => void;
+  seek: (progress: number) => void;
   dispose: () => void;
 };
 export type HeroPlaybackEvents = {
@@ -98,7 +99,8 @@ export function createHeroVideo(
     }
 
     function ended() {
-      if (disposed) return;
+      // A queued end event can arrive after a chapter selection moved backward.
+      if (disposed || video.currentTime < video.duration) return;
       finished = true;
       playRequest++;
       clearTimeout(stallTimeout);
@@ -165,6 +167,22 @@ export function createHeroVideo(
           clearTimeout(stallTimeout);
           video.pause();
           if (!finished) events.onState("paused");
+        },
+        seek(nextProgress) {
+          if (disposed || !Number.isFinite(nextProgress)) return;
+          const target = Math.max(0, Math.min(1, nextProgress));
+          manuallyPaused = true;
+          blocked = false;
+          finished = target === 1;
+          playRequest++;
+          clearTimeout(stallTimeout);
+          clearTimeout(replayTimeout);
+          delete host.dataset.replaying;
+          video.pause();
+          try { video.currentTime = target * video.duration; }
+          catch { failed(); return; }
+          events.onProgress(target);
+          events.onState(finished ? "ended" : "paused");
         },
         dispose,
       });

@@ -8,7 +8,12 @@ import { heroVideoMedia } from "./hero-media";
 import type { HeroPlayback, HeroPlaybackState } from "./hero-video";
 import styles from "./CinematicHero.module.css";
 
-const chapters = ["Road-worn", "The wash", "The rinse", "The reveal"];
+const chapters = [
+  { label: "Road-worn", progress: 0 },
+  { label: "The wash", progress: 0.32 },
+  { label: "The rinse", progress: 0.62 },
+  { label: "The reveal", progress: 1 },
+];
 
 export function CinematicHero() {
   const section = useRef<HTMLElement>(null);
@@ -120,7 +125,7 @@ export function CinematicHero() {
           <source media="(max-width: 760px)" srcSet={mobilePoster} />
           <Image src={desktopPoster} alt="A polished Porsche 911, prepared to perfection in a softly lit studio" fill priority unoptimized sizes="(max-width: 760px) 100vw, 1180px" className={styles.poster} aria-hidden={status === "ready"} />
         </picture>
-        <div ref={stage} className={styles.canvas} role="img" aria-hidden={status !== "ready"} aria-label={heroVideoMedia?.description ?? "A Porsche 911 turns through a careful wash to reveal a polished finish"} />
+        <div ref={stage} id="detailing-film" className={styles.canvas} role="img" aria-hidden={status !== "ready"} aria-label={heroVideoMedia?.description ?? "A Porsche 911 turns through a careful wash to reveal a polished finish"} />
         </div>
       </div>
 
@@ -129,7 +134,13 @@ export function CinematicHero() {
         <div className={styles.journey}>
           <div ref={progressBar} className={styles.track} role="progressbar" aria-label="Detailing film progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}><div ref={meter} /></div>
           <ol className={styles.chapters} aria-label="The detailing transformation">
-            {chapters.map((label, index) => <li key={label} aria-current={chapter === index ? "step" : undefined}><span>0{index + 1}</span>{label}</li>)}
+            {chapters.map(({ label, progress }, index) => (
+              <li key={label}>
+                <button type="button" className={styles.chapter} disabled={status !== "ready"} aria-pressed={chapter === index} aria-controls="detailing-film" aria-label={`Show ${label} stage`} onClick={() => player.current?.seek(progress)}>
+                  <span aria-hidden="true">0{index + 1}</span>{label}
+                </button>
+              </li>
+            ))}
           </ol>
         </div>
         <div className={styles.filmControls}>

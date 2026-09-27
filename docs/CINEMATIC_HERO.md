@@ -9,6 +9,13 @@ or explicitly replay the film. Replay fades in over the matching clean still;
 there is no automatic clean-to-dirty jump. The headline and ceramic-coating and
 booking links remain stationary and readable throughout.
 
+The four stage labels are keyboard-accessible buttons. Selecting Road-worn,
+The wash, The rinse or The reveal seeks to a representative frame (0%, 32%, 62%
+or 100%) and pauses for inspection. Play continues from an intermediate stage;
+the final reveal offers Replay. Stage selection stays paused across viewport
+and tab visibility changes. Controls are disabled while the film is unavailable,
+including loading and reduced-motion/Save-Data still-only views.
+
 The hero has no sticky scene, long scroll section, wheel listeners, or scroll
 controlled playhead. Leaving the viewport or hiding the tab pauses playback.
 Returning resumes only if the visitor has not manually paused or finished the
@@ -83,7 +90,7 @@ including roof, rear wing, headlights and wheels; remove Ferrari branding.
   heading, coating and booking CTAs, playback control and process progress.
 - `hero-video.ts`: dynamically loaded playback controller. Plays once, reports
   media time, pauses offscreen, preserves manual pause, handles blocked autoplay,
-  and holds the last frame for an explicit replay. A stale play promise cannot
+  supports paused stage selection, and holds the last frame for an explicit replay. A stale play promise cannot
   restart a hidden or disposed film. Decode failure and stalled playback restore
   the clean still.
 - `hero-media.ts`: same-origin desktop/mobile MP4 and poster manifest. New

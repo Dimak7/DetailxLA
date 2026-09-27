@@ -33,10 +33,13 @@
 .signature p span { display: block; margin-top: 7px; color: #93958e; font-size: 10px; letter-spacing: 0; }
 .track { height: 2px; background: #46443e; overflow: hidden; }
 .track > div { height: 100%; background: #d8ba90; transform: scaleX(0); transform-origin: left; transition: transform .3s linear; }
-.chapters { display: flex; justify-content: space-between; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
-.chapters li { color: #999c94; font-size: 9px; white-space: nowrap; }
-.chapters li span { color: #a38b70; margin-right: 7px; font-size: 8px; }
-.chapters li[aria-current] { color: #e7d1b3; }
+.chapters { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.chapters li { min-width: 0; }
+.chapter { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; padding: 8px 4px; border: 1px solid transparent; border-radius: 0; background: transparent; color: #b5b5aa; font-family: inherit; font-size: 10px; white-space: nowrap; cursor: pointer; transition: color .2s,background .2s,border-color .2s; }
+.chapter span { color: #a38b70; margin-right: 6px; font-size: 8px; }
+.chapter:hover:not(:disabled) { color: #f2efe8; background: #d8ba9014; }
+.chapter[aria-pressed="true"] { color: #e7d1b3; border-bottom-color: #d8ba90; background: #d8ba900b; }
+.chapter:disabled { cursor: default; }
 .filmControls { justify-self: end; display: flex; align-items: center; gap: 18px; }
 .playback { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; min-width: 111px; border: 1px solid #716756; border-radius: 0; padding: 10px 14px; background: transparent; color: #e9ddcb; font-family: inherit; font-size: 10px; cursor: pointer; white-space: nowrap; transition: background .2s; }
 .playback:hover { background: #d8ba9014; }
@@ -59,12 +62,11 @@
   .primary { padding: 12px 14px; }
   .visual { width: calc(100% + 46px); height: auto; margin: 20px -23px 13px; aspect-ratio: 25 / 11; }
   .bottom { grid-template-columns: 1fr; gap: 17px; padding-top: 19px; }
-  .chapters { gap: 7px; }
-  .chapters li { font-size: 9px; }
-  .chapters li span { margin-right: 6px; font-size: 7px; }
+  .chapter { font-size: 9px; }
+  .chapter span { margin-right: 5px; font-size: 7px; }
   .filmControls { width: 100%; justify-content: flex-end; }
   .playback { font-size: 10px; min-width: 114px; }
 }
 @media (max-width: 360px) { .hero { padding-left: 18px; padding-right: 18px; } .location { display: none; } .actions { gap: 13px; } .primary,.secondary { font-size: 9px; gap: 7px; } .primary { padding-left: 11px; padding-right: 11px; } .visual { width: calc(100% + 36px); margin-left: -18px; margin-right: -18px; } .chapters li span { display: none; } }
 @media (max-height: 650px) and (min-width: 761px) { .hero { height: auto; min-height: 720px; padding-top: 32px; } .visual { min-height: 340px; } }
-@media (prefers-reduced-motion: reduce) { .canvas,.track > div,.primary,.secondary,.playback { animation: none !important; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .canvas,.track > div,.primary,.secondary,.playback,.chapter { animation: none !important; transition: none; } }

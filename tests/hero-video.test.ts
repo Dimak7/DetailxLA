@@ -8,7 +8,8 @@ const source = { src: "/test-film.mp4", poster: "/first.webp", cleanPoster: "/la
 // browser autoplay policy, and events arriving after a visitor leaves the hero.
 class VideoDecoder extends EventTarget {
   duration = 8;
-  currentTime = 0;
+  private playhead = 0;
+  rejectNextSeek = false;
   src = "";
   removed = false;
   paused = true;
@@ -18,6 +19,14 @@ class VideoDecoder extends EventTarget {
   private pendingPlay: (() => void) | undefined;
 
   constructor(private autoLoad: boolean) { super(); }
+  get currentTime() { return this.playhead; }
+  set currentTime(value: number) {
+    if (this.rejectNextSeek) {
+      this.rejectNextSeek = false;
+      throw new DOMException("Seek failed", "InvalidStateError");
+    }
+    this.playhead = value;
+  }
   setAttribute() {}
   removeAttribute(name: string) { if (name === "src") this.src = ""; }
   pause() { this.paused = true; }
@@ -210,4 +219,149 @@ test("an already cancelled load never requests the film", async (t) => {
   await assert.rejects(h.create(), { name: "AbortError" });
   assert.equal(h.video.src, "");
   assert.equal(h.video.playCalls, 0);
+});
+
+test("selecting a stage pauses at its time and stays paused across visibility changes", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  player.setVisible(true);
+  h.video.advance(1);
+  player.seek(0.5);
+  assert.equal(h.video.currentTime, 4);
+  assert.equal(h.video.paused, true);
+  assert.equal(h.progress.at(-1), 0.5);
+  assert.equal(h.states.at(-1), "paused");
+  player.setVisible(false);
+  player.setVisible(true);
+  assert.equal(h.video.paused, true);
+  assert.equal(h.video.playCalls, 1, "stage selection must not resume when scrolling back");
+  player.play();
+  assert.equal(h.video.currentTime, 4, "Play resumes the selected stage instead of restarting");
+  assert.equal(h.video.paused, false);
+});
+
+test("selecting an earlier stage from the finish clears replay state and resumes normally", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  player.setVisible(true);
+  h.video.finish();
+  player.seek(0.25);
+  assert.equal(h.video.currentTime, 2);
+  assert.equal(h.states.at(-1), "paused");
+  player.play();
+  assert.equal(h.video.currentTime, 2);
+  assert.equal(h.host.dataset.replaying, undefined, "leaving the finish via a stage is not a replay");
+
+  h.video.finish();
+  player.play();
+  assert.equal(h.host.dataset.replaying, "true");
+  player.seek(0.75);
+  assert.equal(h.host.dataset.replaying, undefined, "stage selection cancels an in-progress replay fade");
+  assert.equal(h.video.currentTime, 6);
+  assert.equal(h.video.paused, true);
+});
+
+test("a late play promise cannot restart a selected stage", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  h.video.deferNextPlay = true;
+  player.setVisible(true);
+  player.seek(0.5);
+  h.video.resolvePlay();
+  await settle();
+  assert.equal(h.video.currentTime, 4);
+  assert.equal(h.video.paused, true);
+  assert.equal(h.states.at(-1), "paused");
+  assert.equal(h.states.includes("playing"), false);
+});
+
+test("stage bounds clamp to the beginning or held finish with the appropriate controls", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  player.setVisible(true);
+  player.seek(1.4);
+  assert.equal(h.video.currentTime, 8);
+  assert.equal(h.progress.at(-1), 1);
+  assert.equal(h.states.at(-1), "ended");
+  player.setVisible(false);
+  player.setVisible(true);
+  assert.equal(h.video.paused, true);
+  player.play();
+  assert.equal(h.video.currentTime, 0, "Play at the final endpoint becomes Replay");
+
+  player.seek(-0.4);
+  assert.equal(h.video.currentTime, 0);
+  assert.equal(h.progress.at(-1), 0);
+  assert.equal(h.states.at(-1), "paused");
+  player.seek(0.99);
+  assert.equal(h.states.at(-1), "paused", "only the exact clamped endpoint is finished");
+  player.play();
+  assert.equal(h.video.currentTime, 7.92, "near-end stages still resume rather than replay");
+});
+
+test("invalid or cancelled stage requests leave playback and events unchanged", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  player.setVisible(true);
+  h.video.advance(2);
+  const statesBefore = [...h.states];
+  const progressBefore = [...h.progress];
+  for (const invalid of [NaN, Infinity, -Infinity]) player.seek(invalid);
+  assert.equal(h.video.currentTime, 2);
+  assert.equal(h.video.paused, false, "an invalid selection must not interrupt playback");
+  assert.deepEqual(h.states, statesBefore);
+  assert.deepEqual(h.progress, progressBefore);
+  h.controller.abort();
+  player.seek(0.75);
+  assert.equal(h.video.currentTime, 2);
+  assert.deepEqual(h.states, statesBefore);
+  assert.deepEqual(h.progress, progressBefore);
+});
+
+test("stage selection recovers the Play control after blocked autoplay", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  h.video.rejectNextPlay = true;
+  player.setVisible(true);
+  await settle();
+  player.seek(0.5);
+  assert.equal(h.states.at(-1), "paused");
+  assert.equal(h.video.currentTime, 4);
+  player.setVisible(false);
+  player.setVisible(true);
+  assert.equal(h.video.playCalls, 1);
+  player.play();
+  await settle();
+  assert.equal(h.video.paused, false);
+  assert.equal(h.video.currentTime, 4);
+  assert.equal(h.states.at(-1), "playing");
+});
+
+test("a failed stage seek releases the film and invokes fallback once", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  player.setVisible(true);
+  h.video.rejectNextSeek = true;
+  player.seek(0.5);
+  assert.equal(h.failures, 1);
+  assert.equal(h.video.paused, true);
+  assert.equal(h.video.removed, true);
+  assert.equal(h.video.src, "");
+  assert.deepEqual(h.progress, [], "do not report a stage that could not be shown");
+  player.seek(0.25);
+  h.video.dispatchEvent(new Event("error"));
+  assert.equal(h.failures, 1);
+});
+
+test("a queued end event cannot replace a newly selected earlier stage", async (t) => {
+  const h = setup(t);
+  const player = await h.create();
+  player.setVisible(true);
+  h.video.finish();
+  player.seek(0.32);
+  h.video.dispatchEvent(new Event("ended"));
+  assert.equal(h.progress.at(-1), 0.32);
+  assert.equal(h.states.at(-1), "paused");
+  player.play();
+  assert.equal(h.video.currentTime, 2.56, "the stale event must not turn Play into Replay");
 });
