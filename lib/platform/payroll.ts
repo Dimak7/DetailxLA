@@ -1,18 +1,19 @@
-import { query } from "./db";
+import { database, type Query } from "./db";
 import type { Row } from "./types";
 
-export async function payrollSummary(start: string, end: string) {
-  const rows = await query<Row>(
+export async function payrollSummary(start: string, end: string, transactionQuery?: Query) {
+  const run = transactionQuery ?? (await database()).query;
+  const { rows } = await run<Row>(
     `WITH actual_hours AS (
-       SELECT e.id,COALESCE(SUM(GREATEST(0,round(EXTRACT(EPOCH FROM (t.clock_out-t.clock_in))/60)-t.break_minutes)),0)::int actual_minutes
+       SELECT e.id,count(t.id)::int actual_entries,COALESCE(SUM(GREATEST(0,round(EXTRACT(EPOCH FROM (t.clock_out-t.clock_in))/60)-t.break_minutes)),0)::int actual_minutes
        FROM wl.employees e LEFT JOIN wl.time_entries t ON t.employee_id=e.id AND t.clock_out IS NOT NULL AND (t.clock_in AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date GROUP BY e.id
      ), scheduled_hours AS (
        SELECT e.id,COALESCE(SUM(GREATEST(0,s.end_minute-s.start_minute-s.break_minutes)),0)::int scheduled_minutes
        FROM wl.employees e LEFT JOIN wl.employee_shifts s ON s.employee_id=e.id AND s.status='scheduled' AND s.shift_date BETWEEN $1::text AND $2::text GROUP BY e.id
      ), hours AS (
        SELECT a.id,a.actual_minutes,s.scheduled_minutes,
-         CASE WHEN a.actual_minutes>0 THEN a.actual_minutes ELSE s.scheduled_minutes END::int minutes,
-         CASE WHEN a.actual_minutes>0 THEN 'actual_clocked' ELSE 'scheduled_fallback' END paid_hours_source
+         CASE WHEN a.actual_entries>0 THEN a.actual_minutes ELSE s.scheduled_minutes END::int minutes,
+         CASE WHEN a.actual_entries>0 THEN 'actual_clocked' ELSE 'scheduled_fallback' END paid_hours_source
        FROM actual_hours a JOIN scheduled_hours s ON s.id=a.id
      ), job_value AS (
        SELECT b.id,b.service_id,b.price_cents,b.tip_cents,COALESCE(SUM(p.amount_cents-p.refunded_cents),0)::int paid,COUNT(p.id)::int payment_count
@@ -31,9 +32,14 @@ export async function payrollSummary(start: string, end: string) {
          ELSE 0 END),0)::int commission_cents,COALESCE(SUM(CASE
            WHEN (SELECT count(*) FROM assigned ax WHERE ax.booking_id=a.booking_id AND ax.tip_override_cents IS NOT NULL)>0 THEN COALESCE(a.tip_override_cents,0)
            ELSE j.tip_cents/(SELECT count(*) FROM assigned ax WHERE ax.booking_id=a.booking_id) + CASE WHEN a.employee_id=(SELECT ax.employee_id FROM assigned ax WHERE ax.booking_id=a.booking_id ORDER BY ax.employee_id LIMIT 1) THEN j.tip_cents%(SELECT count(*) FROM assigned ax WHERE ax.booking_id=a.booking_id) ELSE 0 END
-         END),0)::int tips_cents,COALESCE(SUM(COALESCE(j.price_cents,j.paid,0)*a.pool_share_bps/10000),0)::int attributed_revenue
+         END),0)::int tips_cents,COALESCE(SUM(COALESCE(j.price_cents,j.paid,0)::bigint*a.pool_share_bps::bigint/10000),0)::int attributed_revenue
        FROM assigned a JOIN job_value j ON j.id=a.booking_id JOIN wl.employees e ON e.id=a.employee_id
-       LEFT JOIN wl.employee_pay_rules r ON r.employee_id=e.id AND r.service_id=j.service_id AND r.active=true AND ((r.rule_type='flat_job' AND e.compensation_model='flat_job') OR (r.rule_type='commission_percent' AND e.compensation_model<>'flat_job'))
+       LEFT JOIN LATERAL (
+         SELECT r.rule_type,r.value FROM wl.employee_pay_rules r
+         WHERE r.employee_id=e.id AND (r.service_id=j.service_id OR r.service_id IS NULL) AND r.active=true
+           AND ((r.rule_type='flat_job' AND e.compensation_model='flat_job') OR (r.rule_type='commission_percent' AND e.compensation_model<>'flat_job'))
+         ORDER BY (r.service_id IS NOT NULL) DESC,r.updated_at DESC,r.id LIMIT 1
+       ) r ON true
        GROUP BY a.employee_id
      ), adjustments AS (
        SELECT employee_id,COALESCE(SUM(amount_cents),0)::int adjustment_cents FROM wl.payroll_adjustments pa JOIN wl.pay_periods pp ON pp.id=pa.pay_period_id WHERE pp.start_date=$1::text AND pp.end_date=$2::text GROUP BY employee_id

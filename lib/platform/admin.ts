@@ -92,9 +92,24 @@ export async function adminData(
 ) {
   if (!access[section]?.includes(user.role))
     throw new AppError("Your role does not have access.", 403);
+  const page = Number(p.get("page") || 1);
+  if (!Number.isSafeInteger(page) || page < 1)
+    throw new AppError("Choose a valid page number.");
+  if (["employees", "schedule"].includes(section) && p.get("week") && !validDate(p.get("week")!))
+    throw new AppError("Choose a valid schedule date.");
+  if (["hours", "payroll", "performance"].includes(section)) {
+    const end = p.get("end") || (await import("./types")).dateToday();
+    const start = p.get("start") || end;
+    if (!validDate(start) || !validDate(end) || start > end)
+      throw new AppError("Choose a valid start and end date.");
+  }
+  if (["bookings", "calendar", "payments"].includes(section) && p.get("date") && !validDate(p.get("date")!))
+    throw new AppError("Choose a valid appointment date.");
+  if (["customers", "inventory"].includes(section) && p.get("id") && !uuid.safeParse(p.get("id")).success)
+    throw new AppError("Choose a valid record.");
   const staff = user.role === "staff",
     limit = 100,
-    offset = Math.max(0, Number(p.get("page") || 1) - 1) * limit,
+    offset = (page - 1) * limit,
     search = p.get("search") || "";
   const team = await query(
     "SELECT id,name,role,active FROM wl.users ORDER BY name",
@@ -118,17 +133,17 @@ export async function adminData(
         "SELECT b.id,b.reference,b.service_name,b.start_minute,b.duration_minutes,b.status,b.assigned_to,c.first_name||' '||c.last_name customer_name,u.name detailer_name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id LEFT JOIN wl.users u ON u.id=b.assigned_to WHERE booking_date=$1 ORDER BY start_minute",
         [(await import("./types")).dateToday()],
       ),
-      operations: await query(
+      operations: (await query(
         `SELECT
-          (SELECT count(*)::int FROM wl.employees WHERE active=true) active_detailers,
+          (SELECT count(*)::int FROM wl.employees WHERE active=true AND lower(trim(position))='detailer') active_detailers,
           (SELECT count(*)::int FROM wl.bookings WHERE booking_date=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND status NOT IN ('cancelled','no_show')) today_jobs,
-          (SELECT count(*)::int FROM wl.bookings WHERE booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND assigned_to IS NULL AND status NOT IN ('cancelled','no_show')) unassigned_jobs`,
-      ),
+          (SELECT count(*)::int FROM wl.bookings WHERE booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND assigned_to IS NULL AND status IN ('new','confirmed','in_progress')) unassigned_jobs`,
+      ))[0],
       unassigned: await query(
         `SELECT b.id,b.reference,b.booking_date,b.start_minute,b.service_name,c.first_name||' '||c.last_name customer_name
          FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id
          WHERE b.booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')
-           AND b.assigned_to IS NULL AND b.status NOT IN ('cancelled','no_show')
+           AND b.assigned_to IS NULL AND b.status IN ('new','confirmed','in_progress')
          ORDER BY b.booking_date,b.start_minute LIMIT 12`,
       ),
       inventory: await inventorySummary(),
@@ -232,7 +247,7 @@ export async function adminData(
     const customers = await query<Customer>(
       `SELECT c.*,
   (SELECT count(*)::int FROM wl.bookings b WHERE b.customer_id=c.id) booking_count,
-  COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::int FROM wl.payments p WHERE p.customer_id=c.id AND status IN ('paid','partially_refunded','refunded')),0) total_spent,
+  COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::bigint FROM wl.revenue_payments p WHERE p.customer_id=c.id AND status IN ('paid','partially_refunded','refunded')),0) total_spent,
   (SELECT max(booking_date) FROM wl.bookings b WHERE b.customer_id=c.id AND booking_date<=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')) last_booking,
   (SELECT min(booking_date) FROM wl.bookings b WHERE b.customer_id=c.id AND booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND status IN ('new','confirmed')) upcoming_booking
   FROM wl.customers c WHERE (first_name||' '||last_name||' '||email||' '||phone) ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
@@ -306,9 +321,9 @@ export async function adminData(
       if (!validDate(focus)) throw new AppError("Choose a valid date.");
       const start = new Date(focus + "T12:00:00Z");
       start.setUTCDate(1);
-      start.setUTCDate(start.getUTCDate() - 7);
-      const end = new Date(focus + "T12:00:00Z");
-      end.setUTCMonth(end.getUTCMonth() + 1, 8);
+      start.setUTCDate(start.getUTCDate() - start.getUTCDay());
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 41);
       args.push(
         start.toISOString().slice(0, 10),
         end.toISOString().slice(0, 10),
@@ -429,9 +444,20 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   const data = z.record(z.string(), z.unknown()).parse(raw);
   if (action === "sync_square_payments") return syncSquarePayments();
   if (action === "save_booking_line_item") {
+    if (user.role === "staff")
+      throw new AppError("A manager must change appointment pricing.", 403);
     const item = z.object({ id: uuid.optional(), booking_id: uuid, kind: z.enum(["base_service","upsell"]), name: z.string().trim().min(2).max(160), quantity: z.number().int().min(1).max(1000).default(1), unit_price_cents: z.number().int().min(0).max(100000000) }).parse(data);
     const id = item.id || randomUUID();
     return transaction(async (q) => {
+      await q("SELECT id FROM wl.bookings WHERE id=$1 FOR UPDATE", [item.booking_id]);
+      if (item.id) {
+        const existing = (await q<{ booking_id: string }>(
+          "SELECT booking_id FROM wl.booking_line_items WHERE id=$1 FOR UPDATE", [item.id],
+        )).rows[0];
+        if (!existing) throw new AppError("Booking line item not found.", 404);
+        if (existing.booking_id !== item.booking_id)
+          throw new AppError("This line item belongs to another appointment.");
+      }
       await syncBookingFinancialTotal(q, item.booking_id);
       await q("INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET kind=$3,name=$4,quantity=$5,unit_price_cents=$6", [id,item.booking_id,item.kind,item.name,item.quantity,item.unit_price_cents,user.user_id]);
       const totals = await syncBookingFinancialTotal(q, item.booking_id);
@@ -440,10 +466,21 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     });
   }
   if (action === "save_booking_discount") {
+    if (user.role === "staff")
+      throw new AppError("A manager must change appointment pricing.", 403);
     const discount = z.object({ id: uuid.optional(), booking_id: uuid, kind: z.enum(["fixed","percent"]), value: z.number().int().min(0).max(100000000), reason: txt.default(""), code: z.string().trim().max(80).default("") }).parse(data);
     if (discount.kind === "percent" && discount.value > 10000) throw new AppError("A percentage discount cannot exceed 100%.");
     const id = discount.id || randomUUID();
     return transaction(async (q) => {
+      await q("SELECT id FROM wl.bookings WHERE id=$1 FOR UPDATE", [discount.booking_id]);
+      if (discount.id) {
+        const existing = (await q<{ booking_id: string }>(
+          "SELECT booking_id FROM wl.booking_discounts WHERE id=$1 FOR UPDATE", [discount.id],
+        )).rows[0];
+        if (!existing) throw new AppError("Booking discount not found.", 404);
+        if (existing.booking_id !== discount.booking_id)
+          throw new AppError("This discount belongs to another appointment.");
+      }
       const before = await syncBookingFinancialTotal(q, discount.booking_id);
       // Percentages are sent as basis points (2,500 = 25%) and calculated only on the server.
       const amountCents = discount.kind === "percent" ? Math.round(before.grossCents * discount.value / 10000) : discount.value;
@@ -455,10 +492,27 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   }
   if (action === "save_pay_rule") {
     const rule = z.object({ id: uuid.optional(), employee_id: uuid, service_id: uuid.nullable(), rule_type: z.enum(["commission_percent","flat_job"]), value: z.number().int().min(0).max(100000000), active: z.boolean().default(true) }).parse(data);
-    const id = rule.id || randomUUID();
-    await query("INSERT INTO wl.employee_pay_rules(id,employee_id,service_id,rule_type,value,active) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(employee_id,service_id,rule_type) DO UPDATE SET value=$5,active=$6,updated_at=now()",[id,rule.employee_id,rule.service_id,rule.rule_type,rule.value,rule.active]);
-    await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'employee_pay_rule',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,id,JSON.stringify(rule)]);
-    return { id };
+    if (rule.rule_type === "commission_percent" && rule.value > 10000)
+      throw new AppError("A commission percentage cannot exceed 100%.");
+    return transaction(async (q) => {
+      // Serialize per employee because a nullable service scope is not covered
+      // by PostgreSQL's ordinary UNIQUE constraint.
+      if (!(await q("SELECT id FROM wl.employees WHERE id=$1 FOR UPDATE", [rule.employee_id])).rows.length)
+        throw new AppError("Employee not found.", 404);
+      const previous = rule.id ? (await q<Row>("SELECT * FROM wl.employee_pay_rules WHERE id=$1 FOR UPDATE", [rule.id])).rows[0] : undefined;
+      if (rule.id && !previous) throw new AppError("Pay rule not found.", 404);
+      const scope = (await q<{ id: string }>(
+        "SELECT id FROM wl.employee_pay_rules WHERE employee_id=$1 AND service_id IS NOT DISTINCT FROM $2::uuid AND rule_type=$3 ORDER BY updated_at DESC,id LIMIT 1",
+        [rule.employee_id, rule.service_id, rule.rule_type],
+      )).rows[0];
+      const changedScope = previous && (previous.employee_id !== rule.employee_id || previous.service_id !== rule.service_id || previous.rule_type !== rule.rule_type);
+      if (changedScope && scope && scope.id !== rule.id)
+        throw new AppError("A pay rule already exists for this employee and service. Edit that rule instead.");
+      const id = rule.id || scope?.id || randomUUID();
+      await q("INSERT INTO wl.employee_pay_rules(id,employee_id,service_id,rule_type,value,active) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO UPDATE SET employee_id=$2,service_id=$3,rule_type=$4,value=$5,active=$6,updated_at=now()", [id,rule.employee_id,rule.service_id,rule.rule_type,rule.value,rule.active]);
+      await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'employee_pay_rule',$3,'saved',$4::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify(rule)]);
+      return { id };
+    });
   }
   if (action === "save_employee_compensation") {
     const compensation = z.object({ employee_id: uuid, compensation_model: z.enum(["hourly","commission","hourly_commission","flat_job"]), default_commission_bps: z.number().int().min(0).max(10000), flat_job_pay_cents: z.number().int().min(0).max(100000000) }).parse(data);
@@ -484,10 +538,37 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   if (action === "save_pay_period") {
     const period = z.object({ id: uuid.optional(), start_date: z.string(), end_date: z.string(), frequency: z.enum(["weekly","biweekly","semi_monthly"]).default("weekly") }).parse(data);
     if (!validDate(period.start_date) || !validDate(period.end_date) || period.end_date < period.start_date) throw new AppError("Choose a valid payroll period.");
-    const id = period.id || randomUUID(); await query("INSERT INTO wl.pay_periods(id,start_date,end_date,frequency,created_by) VALUES($1,$2,$3,$4,$5) ON CONFLICT(start_date,end_date) DO NOTHING",[id,period.start_date,period.end_date,period.frequency,user.user_id]); return { id };
+    return transaction(async (q) => {
+      if (period.id) {
+        const existing = (await q<Row>("SELECT id,status FROM wl.pay_periods WHERE id=$1 FOR UPDATE", [period.id])).rows[0];
+        if (!existing) throw new AppError("Payroll period not found.", 404);
+        if (existing.status === "paid") throw new AppError("Paid payroll periods cannot be changed.", 409);
+        await q("UPDATE wl.pay_periods SET start_date=$2,end_date=$3,frequency=$4 WHERE id=$1", [period.id,period.start_date,period.end_date,period.frequency]);
+        return { id: period.id };
+      }
+      const inserted = (await q<{ id: string }>(
+        "INSERT INTO wl.pay_periods(id,start_date,end_date,frequency,created_by) VALUES($1,$2,$3,$4,$5) ON CONFLICT(start_date,end_date) DO NOTHING RETURNING id",
+        [randomUUID(),period.start_date,period.end_date,period.frequency,user.user_id],
+      )).rows[0];
+      if (inserted) return inserted;
+      const existing = (await q<Row>("SELECT id,status FROM wl.pay_periods WHERE start_date=$1 AND end_date=$2 FOR UPDATE", [period.start_date,period.end_date])).rows[0];
+      if (existing.status === "paid") throw new AppError("Paid payroll periods cannot be changed.", 409);
+      return { id: String(existing.id) };
+    });
   }
   if (action === "lock_pay_period") {
-    const id = uuid.parse(data.id); await transaction(async q => { const period=(await q<Row>("SELECT * FROM wl.pay_periods WHERE id=$1 FOR UPDATE",[id])).rows[0]; if (!period) throw new AppError("Payroll period not found.",404); if (period.status==='locked') throw new AppError("Payroll period is already locked."); const rows=await payrollSummary(String(period.start_date),String(period.end_date)); for(const row of rows) await q("INSERT INTO wl.payroll_records(id,pay_period_id,employee_id,regular_minutes,overtime_minutes,hourly_rate_cents,estimated_gross_cents,approved_at) VALUES($1,$2,$3,$4,0,$5,$6,now()) ON CONFLICT(pay_period_id,employee_id) DO UPDATE SET regular_minutes=$4,hourly_rate_cents=$5,estimated_gross_cents=$6,approved_at=now()",[randomUUID(),id,row.id,Number(row.minutes),Number(row.hourly_rate_cents),Number(row.total_earnings_cents)]); await q("UPDATE wl.pay_periods SET status='paid' WHERE id=$1",[id]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data) VALUES($1,$2,'pay_period',$3,'locked',$4::jsonb)",[randomUUID(),user.user_id,id,JSON.stringify(period)]); });
+    const id = uuid.parse(data.id);
+    await transaction(async (q) => {
+      const period = (await q<Row>("SELECT * FROM wl.pay_periods WHERE id=$1 FOR UPDATE", [id])).rows[0];
+      if (!period) throw new AppError("Payroll period not found.", 404);
+      if (period.status === "paid") throw new AppError("This payroll period is already paid and cannot be changed.", 409);
+      // Read the selected period and save its snapshot through the same transaction.
+      const rows = await payrollSummary(String(period.start_date), String(period.end_date), q);
+      for (const row of rows)
+        await q("INSERT INTO wl.payroll_records(id,pay_period_id,employee_id,regular_minutes,overtime_minutes,hourly_rate_cents,estimated_gross_cents,approved_at) VALUES($1,$2,$3,$4,0,$5,$6,now()) ON CONFLICT(pay_period_id,employee_id) DO UPDATE SET regular_minutes=$4,hourly_rate_cents=$5,estimated_gross_cents=$6,approved_at=now()", [randomUUID(),id,row.id,Number(row.minutes),Number(row.hourly_rate_cents),Number(row.total_earnings_cents)]);
+      await q("UPDATE wl.pay_periods SET status='paid' WHERE id=$1", [id]);
+      await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data) VALUES($1,$2,'pay_period',$3,'locked',$4::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify(period)]);
+    });
   }
   if (action === "save_expense") {
     const expense = z.object({ id: uuid.optional(), expense_date: z.string(), amount_cents: z.number().int().min(0).max(100000000), category: z.string().trim().min(2).max(80), vendor: z.string().max(160).default(""), description: txt.default(""), payment_method: z.string().max(80).default(""), recurrence: z.enum(["one_time","weekly","monthly","yearly"]).default("one_time"), recurring_start: z.string().nullable().default(null), recurring_end: z.string().nullable().default(null), receipt_url: asset.default(""), notes: txt.default("") }).parse(data);

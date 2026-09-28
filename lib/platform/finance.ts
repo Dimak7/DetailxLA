@@ -12,11 +12,18 @@ export type Expense = {
 
 const day = (value: string) => new Date(value + "T12:00:00Z");
 const iso = (value: Date) => value.toISOString().slice(0, 10);
-function advance(value: Date, recurrence: Expense["recurrence"]) {
+function advance(value: Date, recurrence: Expense["recurrence"], anchor: Date) {
   const next = new Date(value);
   if (recurrence === "weekly") next.setUTCDate(next.getUTCDate() + 7);
-  if (recurrence === "monthly") next.setUTCMonth(next.getUTCMonth() + 1);
-  if (recurrence === "yearly") next.setUTCFullYear(next.getUTCFullYear() + 1);
+  if (recurrence === "monthly" || recurrence === "yearly") {
+    // Move from day one so a short month cannot overflow into the next month.
+    // Always restore the original day when it exists, including leap years.
+    next.setUTCDate(1);
+    if (recurrence === "monthly") next.setUTCMonth(next.getUTCMonth() + 1);
+    else next.setUTCFullYear(next.getUTCFullYear() + 1, anchor.getUTCMonth());
+    const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0, 12)).getUTCDate();
+    next.setUTCDate(Math.min(anchor.getUTCDate(), lastDay));
+  }
   return next;
 }
 
@@ -26,12 +33,13 @@ export function expenseOccurrences(expense: Expense, start: string, end: string)
       ? [{ date: expense.expense_date, amount_cents: Number(expense.amount_cents), category: expense.category, recurring: false }]
       : [];
   const result: Array<{ date: string; amount_cents: number; category: string; recurring: boolean }> = [];
-  let current = day(expense.recurring_start || expense.expense_date);
+  const anchor = day(expense.recurring_start || expense.expense_date);
+  let current = new Date(anchor);
   const last = expense.recurring_end || end;
   while (iso(current) <= end && iso(current) <= last) {
     if (iso(current) >= start)
       result.push({ date: iso(current), amount_cents: Number(expense.amount_cents), category: expense.category, recurring: true });
-    current = advance(current, expense.recurrence);
+    current = advance(current, expense.recurrence, anchor);
   }
   return result;
 }

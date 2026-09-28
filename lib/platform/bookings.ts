@@ -11,6 +11,7 @@ import { hash, AppError, receiptToken } from "./auth";
 import { saveAttribution, attributionSchema } from "./attribution";
 import { enqueue, enqueueBooking } from "./outbox";
 import { metaEvent } from "../integrations/providers";
+import { squareEnvironment } from "../integrations/square-reporting";
 import {
   dateToday,
   priceFor,
@@ -401,9 +402,9 @@ export async function bookingById(id: string) {
   return (
     await query<Booking>(
       `SELECT b.*,c.first_name||' '||c.last_name customer_name,c.email,c.phone,
- v.year||' '||v.make||' '||v.model vehicle,COALESCE((SELECT SUM(amount_cents-refunded_cents) FROM wl.payments WHERE booking_id=b.id AND status IN ('paid','partially_refunded','refunded')),0)::int paid_cents
+ v.year||' '||v.make||' '||v.model vehicle,COALESCE((SELECT SUM(amount_cents-refunded_cents) FROM wl.payments WHERE booking_id=b.id AND status IN ('paid','partially_refunded','refunded') AND (provider<>'square' OR metadata->>'square_environment'=$2)),0)::int paid_cents
  FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id JOIN wl.vehicles v ON v.id=b.vehicle_id WHERE b.id=$1`,
-      [id],
+      [id, squareEnvironment()],
     )
   )[0];
 }
@@ -503,6 +504,32 @@ export async function updateBooking(
           "INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking',$3,'assignment_override',$4::jsonb)",
           [randomUUID(), actor, id, JSON.stringify({ assigned_to: assignedTo, warnings, date, start })],
         );
+    }
+    if (data.price_cents !== undefined && data.price_cents !== b.price_cents) {
+      const lines = (await q<{ id: string; kind: string; quantity: number; unit_price_cents: number }>(
+        "SELECT id,kind,quantity,unit_price_cents FROM wl.booking_line_items WHERE booking_id=$1 FOR UPDATE", [id],
+      )).rows;
+      if (lines.length) {
+        if (data.price_cents === null)
+          throw new AppError("Enter an agreed service price for this appointment's existing line items.");
+        const baseLines = lines.filter((line) => line.kind === "base_service");
+        if (baseLines.length > 1)
+          throw new AppError("Adjust the multiple base service line items before changing the agreed total.");
+        const upsells = lines.filter((line) => line.kind === "upsell")
+          .reduce((sum, line) => sum + line.quantity * line.unit_price_cents, 0);
+        const discount = Number((await q<{ amount: string }>(
+          "SELECT COALESCE(SUM(amount_cents),0)::text amount FROM wl.booking_discounts WHERE booking_id=$1", [id],
+        )).rows[0].amount);
+        const baseCents = data.price_cents + discount - upsells;
+        if (baseCents < 0)
+          throw new AppError("This agreed total would make the base service price negative. Adjust the upsells or discounts instead.");
+        if (baseLines[0])
+          await q("UPDATE wl.booking_line_items SET quantity=1,unit_price_cents=$2 WHERE id=$1", [baseLines[0].id, baseCents]);
+        else
+          await q("INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,'base_service',$3,1,$4,$5)", [randomUUID(), id, b.service_name, baseCents, actor]);
+        await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'booking',$3,'agreed_price_updated',$4::jsonb,$5::jsonb)",
+          [randomUUID(), actor, id, JSON.stringify({ price_cents: b.price_cents, base_line_items: baseLines }), JSON.stringify({ price_cents: data.price_cents, base_service_cents: baseCents, upsell_cents: upsells, discount_cents: discount })]);
+      }
     }
     const next = (
       await q<Booking>(

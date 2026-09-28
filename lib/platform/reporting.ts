@@ -8,7 +8,7 @@ export function reportRange(params: URLSearchParams) {
     range = params.get("range") || "30";
   const offset = (days: number) => dateToday(new Date(Date.now() - days * 86400000));
   const todayDate = new Date(today + "T12:00:00Z");
-  const weekStart = new Date(todayDate); weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
+  const weekStart = new Date(todayDate); weekStart.setUTCDate(weekStart.getUTCDate() - (weekStart.getUTCDay() + 6) % 7);
   const monthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1, 12));
   const previousMonthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth() - 1, 1, 12));
   const previousMonthEnd = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 0, 12));

@@ -291,14 +291,20 @@ async function completePayment(
       "Payment received: $" + (p.amount_cents / 100).toFixed(2),
     ],
   );
-  await enqueueBooking(
-    q,
-    b,
-    s,
-    token,
-    "booking_confirmation",
-    "payment-" + p.id,
-  );
+  if (["cancelled", "no_show"].includes(b.status)) {
+    // A previously issued link can still capture money after an appointment
+    // ends. Preserve that payment without inviting the customer to attend.
+    await q("UPDATE wl.messages SET status='cancelled' WHERE booking_id=$1 AND purpose='reminder' AND status IN ('queued','failed','skipped')", [b.id]);
+  } else {
+    await enqueueBooking(
+      q,
+      b,
+      s,
+      token,
+      "booking_confirmation",
+      "payment-" + p.id,
+    );
+  }
   const c = (
     await q<{ email: string; phone: string }>(
       "SELECT email,phone FROM wl.customers WHERE id=$1",

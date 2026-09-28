@@ -11,6 +11,7 @@ export type Field = {
   wide?: boolean;
   min?: number;
   max?: number;
+  step?: number | "any";
   hint?: string;
 };
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -26,6 +27,7 @@ export type EditorSpec = {
   fields: Field[];
   initial: RecordData;
   transform?: (d: RecordData) => RecordData;
+  selectChanges?: (key: string, value: string) => RecordData | undefined;
 };
 export async function action(name: string, data: RecordData) {
   const r = await fetch("/api/manage", {
@@ -135,10 +137,8 @@ export function Editor({
           try {
             const d = { ...v };
             for (const f of spec.fields) {
-              if (f.type === "number" || f.type === "money")
-                d[f.key] = Math.round(
-                  Number(v[f.key] || 0) * (f.type === "money" ? 100 : 1),
-                );
+              if (f.type === "number") d[f.key] = Number(v[f.key] || 0);
+              if (f.type === "money") d[f.key] = Math.round(Number(v[f.key] || 0) * 100);
               if (f.type === "lines")
                 d[f.key] = String(v[f.key] || "")
                   .split("\n")
@@ -214,7 +214,10 @@ export function Editor({
                 <select
                   required={f.required}
                   value={String(v[f.key] ?? "")}
-                  onChange={(e) => setV({ ...v, [f.key]: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setV((current) => ({ ...current, [f.key]: value, ...spec.selectChanges?.(f.key, value) }));
+                  }}
                 >
                   {f.options.map((o) => (
                     <option
@@ -235,7 +238,7 @@ export function Editor({
               ) : (
                 <input
                   type={f.type === "money" ? "number" : f.type || "text"}
-                  step={f.type === "money" ? "0.01" : undefined}
+                  step={f.step ?? (f.type === "money" ? "0.01" : undefined)}
                   min={
                     f.min ??
                     (["number", "money"].includes(f.type || "") ? 0 : undefined)
