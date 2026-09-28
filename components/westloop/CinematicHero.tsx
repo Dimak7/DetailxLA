@@ -10,10 +10,13 @@ import styles from "./CinematicHero.module.css";
 export function CinematicHero() {
   const section = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
-  const player = useRef<HeroPlayback | null>(null);
+  const pausedByVisitor = useRef(false);
+  const player = useRef<Pick<HeroPlayback, "setVisible" | "play" | "pause" | "dispose"> | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "static" | "error">("loading");
   const [playback, setPlayback] = useState<HeroPlaybackState>("paused");
   const [attempt, setAttempt] = useState(0);
+  const [mediaMode, setMediaMode] = useState<"video" | "animation">("video");
+  const [frameReady, setFrameReady] = useState(false);
   const desktopPoster = heroVideoMedia?.desktop.cleanPoster ?? "/hero/poster-clean.webp";
   const mobilePoster = heroVideoMedia?.mobile?.cleanPoster ?? desktopPoster;
 
@@ -23,64 +26,120 @@ export function CinematicHero() {
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
     const abort = new AbortController();
+    const videoAbort = new AbortController();
     let visible = false;
     let starting = false;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let fallbackStarted = false;
+    let played = false;
+    let startupTimeout: ReturnType<typeof setTimeout> | undefined;
+    let fallbackTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    pausedByVisitor.current = false;
+    setFrameReady(false);
+    setPlayback("paused");
+    setMediaMode("video");
 
     function staticView(failed = false) {
-      clearTimeout(timeout);
+      clearTimeout(startupTimeout);
+      clearTimeout(fallbackTimeout);
+      abort.abort();
+      videoAbort.abort();
       player.current?.dispose();
       player.current = null;
+      setFrameReady(false);
       setStatus(failed ? "error" : "static");
     }
     function syncVisibility() {
-      player.current?.setVisible(visible && !document.hidden);
+      const active = visible && !document.hidden;
+      player.current?.setVisible(active);
+      // Some Safari versions leave play() pending instead of rejecting it.
+      // Bound the initial wait, but never restart a film the visitor paused.
+      if (!active || played || fallbackStarted || abort.signal.aborted) {
+        clearTimeout(startupTimeout);
+        startupTimeout = undefined;
+      } else if (starting && !startupTimeout) {
+        startupTimeout = setTimeout(() => void useAnimationFallback(), 10000);
+      }
     }
     function motionChanged() {
-      if (motion.matches) {
-        abort.abort();
-        staticView();
+      if (motion.matches) staticView();
+    }
+    async function useAnimationFallback() {
+      if (abort.signal.aborted || fallbackStarted) return;
+      if (pausedByVisitor.current) { staticView(); return; }
+      fallbackStarted = true;
+      clearTimeout(startupTimeout);
+      videoAbort.abort();
+      player.current?.dispose();
+      player.current = null;
+      setFrameReady(false);
+      setMediaMode("animation");
+      setStatus("loading");
+      const source = heroVideoMedia?.animation;
+      if (!source) { staticView(true); return; }
+      fallbackTimeout = setTimeout(() => staticView(true), 25000);
+      try {
+        const { createHeroAnimation } = await import("./hero-animation");
+        if (abort.signal.aborted) return;
+        const result = await createHeroAnimation(host, source, abort.signal, {
+          onProgress: () => {},
+          onState: (state) => {
+            if (abort.signal.aborted) return;
+            clearTimeout(fallbackTimeout);
+            setPlayback(state);
+            setFrameReady(state === "playing");
+            setStatus("ready");
+          },
+          onFailure: () => { if (!abort.signal.aborted) staticView(true); },
+        });
+        if (abort.signal.aborted) { result.dispose(); return; }
+        clearTimeout(fallbackTimeout);
+        player.current = result;
+        syncVisibility();
+      } catch {
+        if (!abort.signal.aborted) staticView(true);
       }
     }
     async function start() {
       if (starting || abort.signal.aborted || !heroVideoMedia) return;
       starting = true;
       setStatus("loading");
-      timeout = setTimeout(() => {
-        abort.abort();
-        staticView(true);
-      }, 25000);
+      syncVisibility();
       try {
         const { createHeroVideo } = await import("./hero-video");
-        if (abort.signal.aborted) return;
+        if (videoAbort.signal.aborted) return;
         const source = window.matchMedia("(max-width: 760px)").matches
           ? heroVideoMedia.mobile ?? heroVideoMedia.desktop
           : heroVideoMedia.desktop;
-        const result = await createHeroVideo(host, source, abort.signal, {
+        const result = await createHeroVideo(host, source, videoAbort.signal, {
           onProgress: () => {},
-          onState: setPlayback,
-          onFailure: () => staticView(true),
+          onState: (state) => {
+            if (videoAbort.signal.aborted) return;
+            if (state === "blocked") { void useAnimationFallback(); return; }
+            if (state === "playing" || state === "ended") {
+              played = true;
+              clearTimeout(startupTimeout);
+              setFrameReady(true);
+              setStatus("ready");
+            }
+            setPlayback(state);
+          },
+          onFailure: () => { if (!videoAbort.signal.aborted) void useAnimationFallback(); },
         });
-        if (abort.signal.aborted) {
-          result.dispose();
-          return;
-        }
+        if (videoAbort.signal.aborted) { result.dispose(); return; }
         player.current = result;
-        setStatus("ready");
         syncVisibility();
       } catch {
-        if (!abort.signal.aborted) staticView(true);
-      } finally {
-        clearTimeout(timeout);
+        if (!videoAbort.signal.aborted) void useAnimationFallback();
       }
     }
     const observer = new IntersectionObserver(
       ([entry]) => {
-        visible = entry.isIntersecting && entry.intersectionRatio >= 0.15;
+        visible = entry.isIntersecting;
         if (visible && !document.hidden) void start();
         syncVisibility();
       },
-      { threshold: 0.15 },
+      { threshold: 0 },
     );
     function visibilityChanged() {
       if (visible && !document.hidden) void start();
@@ -91,8 +150,10 @@ export function CinematicHero() {
     document.addEventListener("visibilitychange", visibilityChanged);
     motion.addEventListener("change", motionChanged);
     return () => {
-      clearTimeout(timeout);
+      clearTimeout(startupTimeout);
+      clearTimeout(fallbackTimeout);
       abort.abort();
+      videoAbort.abort();
       observer.disconnect();
       document.removeEventListener("visibilitychange", visibilityChanged);
       motion.removeEventListener("change", motionChanged);
@@ -103,7 +164,7 @@ export function CinematicHero() {
 
   const controlLabel =
     playback === "playing"
-      ? "Pause film"
+      ? mediaMode === "animation" ? "Stop animation" : "Pause film"
       : playback === "ended"
         ? "Replay film"
         : "Play film";
@@ -115,6 +176,8 @@ export function CinematicHero() {
       aria-label="West Loop Ceramics — a finish worth protecting"
       data-status={status}
       data-playback={playback}
+      data-media-mode={mediaMode}
+      data-frame-ready={frameReady}
     >
       <div className={styles.heading}>
         <p className={styles.eyebrow}>CHICAGO CERAMIC COATING & DETAILING</p>
@@ -143,14 +206,14 @@ export function CinematicHero() {
               unoptimized
               sizes="(max-width: 760px) 100vw, 1250px"
               className={styles.poster}
-              aria-hidden={status === "ready"}
+              aria-hidden={frameReady}
             />
           </picture>
           <div
             ref={stage}
             className={styles.canvas}
             role="img"
-            aria-hidden={status !== "ready"}
+            aria-hidden={!frameReady}
             aria-label={heroVideoMedia?.description ?? "A Porsche 911 turns through a careful wash to reveal a polished finish"}
           />
         </div>
@@ -159,10 +222,16 @@ export function CinematicHero() {
             <button
               type="button"
               className={styles.playback}
-              onClick={() => playback === "playing" ? player.current?.pause() : player.current?.play()}
+              onClick={() => {
+                pausedByVisitor.current = playback === "playing";
+                if (pausedByVisitor.current) player.current?.pause();
+                else player.current?.play();
+              }}
               aria-label={controlLabel}
             >
-              {playback === "playing" ? (
+              {playback === "playing" && mediaMode === "animation" ? (
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4h8v8H4Z" /></svg>
+              ) : playback === "playing" ? (
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M11 3v10" /></svg>
               ) : playback === "ended" ? (
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6a5.5 5.5 0 1 1-.4 5M3 2v4h4" /></svg>
@@ -174,7 +243,7 @@ export function CinematicHero() {
           )}
           {status === "error" && (
             <button type="button" className={styles.playback} onClick={() => setAttempt((value) => value + 1)}>
-              Play film
+              Retry film
             </button>
           )}
         </div>

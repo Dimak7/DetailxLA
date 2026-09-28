@@ -10,6 +10,8 @@ export type HeroVideoMedia = {
   desktop: HeroVideoSource;
   /** Optional smaller encode. Keep the whole car in a landscape composition. */
   mobile?: HeroVideoSource;
+  /** One-pass animated image for browsers that deny video autoplay. */
+  animation?: { src: string; durationMs: number };
   description?: string;
 };
 
@@ -26,5 +28,6 @@ export const heroVideoMedia: HeroVideoMedia | null = {
     poster: "/hero/porsche-graphite-hq-dirty.webp",
     cleanPoster: "/hero/porsche-graphite-hq-clean.webp",
   },
+  animation: { src: "/hero/porsche-autoplay-fallback.webp", durationMs: 8499 },
   description: "A graphite Porsche 911 rotates through a complete turn, from road-worn paint through a careful wash to a polished finish",
 };

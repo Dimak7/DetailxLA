@@ -8,17 +8,33 @@ const source = { src: "/test-film.mp4", poster: "/first.webp", cleanPoster: "/la
 // browser autoplay policy, and events arriving after a visitor leaves the hero.
 class VideoDecoder extends EventTarget {
   duration = 8;
+  readyState = 0;
+  autoplay = false;
+  muted = false;
+  defaultMuted = false;
+  playsInline = false;
+  attributes = new Map<string, string>();
+  configurationAtSource: { autoplay: boolean; muted: boolean; defaultMuted: boolean; inline: boolean; attributes: string[] } | undefined;
   private playhead = 0;
+  private mediaSource = "";
   rejectNextSeek = false;
-  src = "";
   removed = false;
   paused = true;
   playCalls = 0;
   rejectNextPlay = false;
+  playError: Error | null = null;
   deferNextPlay = false;
-  private pendingPlay: (() => void) | undefined;
+  private pendingPlays: { resolve: () => void; reject: (error: Error) => void }[] = [];
 
-  constructor(private autoLoad: boolean) { super(); }
+  constructor(private autoLoad: boolean, private loadEvent: "loadedmetadata" | "loadeddata") { super(); }
+  get src() { return this.mediaSource; }
+  set src(value: string) {
+    if (value) this.configurationAtSource = {
+      autoplay: this.autoplay, muted: this.muted, defaultMuted: this.defaultMuted,
+      inline: this.playsInline, attributes: [...this.attributes.keys()],
+    };
+    this.mediaSource = value;
+  }
   get currentTime() { return this.playhead; }
   set currentTime(value: number) {
     if (this.rejectNextSeek) {
@@ -27,13 +43,16 @@ class VideoDecoder extends EventTarget {
     }
     this.playhead = value;
   }
-  setAttribute() {}
-  removeAttribute(name: string) { if (name === "src") this.src = ""; }
+  setAttribute(name: string, value: string) { this.attributes.set(name, value); }
+  removeAttribute(name: string) { this.attributes.delete(name); if (name === "src") this.src = ""; }
   pause() { this.paused = true; }
   remove() { this.removed = true; }
   load() {
     if (this.autoLoad && this.src) queueMicrotask(() => {
-      if (this.src && !this.removed) this.dispatchEvent(new Event("loadeddata"));
+      if (this.src && !this.removed) {
+        this.readyState = this.loadEvent === "loadedmetadata" ? 1 : 2;
+        this.dispatchEvent(new Event(this.loadEvent));
+      }
     });
   }
   play() {
@@ -42,10 +61,15 @@ class VideoDecoder extends EventTarget {
       this.rejectNextPlay = false;
       return Promise.reject(new DOMException("Autoplay blocked", "NotAllowedError"));
     }
+    if (this.playError) {
+      const error = this.playError;
+      this.playError = null;
+      return Promise.reject(error);
+    }
     if (this.deferNextPlay) {
       this.deferNextPlay = false;
-      return new Promise<void>((resolve) => {
-        this.pendingPlay = () => { this.beginPlayback(); resolve(); };
+      return new Promise<void>((resolve, reject) => {
+        this.pendingPlays.push({ resolve: () => { this.beginPlayback(); resolve(); }, reject });
       });
     }
     this.beginPlayback();
@@ -53,14 +77,17 @@ class VideoDecoder extends EventTarget {
   }
   private beginPlayback() {
     this.paused = false;
-    this.dispatchEvent(new Event("playing"));
+    this.dispatchEvent(new Event("play"));
+    if (!this.paused) this.dispatchEvent(new Event("playing"));
   }
-  resolvePlay() { this.pendingPlay?.(); this.pendingPlay = undefined; }
+  nativePlay() { this.beginPlayback(); }
+  resolvePlay() { this.pendingPlays.shift()?.resolve(); }
+  rejectPlay(error: Error) { this.pendingPlays.shift()?.reject(error); }
   advance(seconds: number) { this.currentTime = seconds; this.dispatchEvent(new Event("timeupdate")); }
   finish() { this.currentTime = this.duration; this.paused = true; this.dispatchEvent(new Event("ended")); }
 }
 
-function setup(t: TestContext, { autoLoad = true } = {}) {
+function setup(t: TestContext, { autoLoad = true, loadEvent = "loadeddata" as "loadedmetadata" | "loadeddata" } = {}) {
   let video: VideoDecoder;
   let failures = 0;
   const controller = new AbortController();
@@ -69,7 +96,7 @@ function setup(t: TestContext, { autoLoad = true } = {}) {
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   Object.defineProperty(globalThis, "document", {
     configurable: true,
-    value: { createElement: () => (video = new VideoDecoder(autoLoad)) },
+    value: { createElement: () => (video = new VideoDecoder(autoLoad, loadEvent)) },
   });
   t.after(() => {
     controller.abort();
@@ -364,4 +391,149 @@ test("a queued end event cannot replace a newly selected earlier stage", async (
   assert.equal(h.states.at(-1), "paused");
   player.play();
   assert.equal(h.video.currentTime, 2.56, "the stale event must not turn Play into Replay");
+});
+
+test("Safari inline autoplay is configured before source assignment and starts from metadata alone", async (t) => {
+  const h = setup(t, { loadEvent: "loadedmetadata" });
+  const player = await h.create();
+  const initial = h.video.configurationAtSource;
+  assert.ok(initial?.autoplay && initial.muted && initial.defaultMuted && initial.inline);
+  for (const name of ["autoplay", "muted", "playsinline", "webkit-playsinline"]) {
+    assert.ok(initial.attributes.includes(name), `${name} must exist before src is assigned`);
+  }
+  assert.equal(h.video.readyState, 1, "the controller must not wait for loadeddata on iOS");
+  player.setVisible(true);
+  assert.equal(h.video.playCalls, 1);
+  assert.equal(h.states.at(-1), "playing");
+});
+
+test("repeated metadata and readiness events do not duplicate a pending or active play", async (t) => {
+  const h = setup(t, { loadEvent: "loadedmetadata" });
+  const player = await h.create();
+  h.video.deferNextPlay = true;
+  player.setVisible(true);
+  for (const event of ["loadedmetadata", "loadeddata", "canplay", "canplay"]) h.video.dispatchEvent(new Event(event));
+  assert.equal(h.video.playCalls, 1);
+  h.video.resolvePlay();
+  await settle();
+  for (const event of ["loadeddata", "canplay"]) h.video.dispatchEvent(new Event(event));
+  assert.equal(h.video.playCalls, 1, "readiness should not call play again while already playing");
+});
+
+test("an interrupted play retries only on readiness, with a bounded number of attempts", async (t) => {
+  const h = setup(t, { loadEvent: "loadedmetadata" });
+  const player = await h.create();
+  h.video.playError = new DOMException("Loading was interrupted", "AbortError");
+  player.setVisible(true);
+  await settle();
+  assert.equal(h.video.playCalls, 1, "AbortError must not immediately loop play calls");
+  assert.equal(h.states.includes("blocked"), false);
+  assert.equal(h.failures, 0);
+  for (let retry = 0; retry < 2; retry++) {
+    h.video.playError = new DOMException("Loading was interrupted", "AbortError");
+    h.video.dispatchEvent(new Event("canplay"));
+    await settle();
+  }
+  h.video.dispatchEvent(new Event("canplay"));
+  assert.equal(h.video.playCalls, 3, "readiness retries must be bounded");
+  assert.equal(h.failures, 0, "an interrupted browser load is not a decode failure");
+  player.play();
+  assert.equal(h.video.playCalls, 4, "an explicit visitor request still gets a fresh attempt");
+  assert.equal(h.states.at(-1), "playing");
+});
+
+test("policy rejection stays blocked through later readiness and native autoplay events", async (t) => {
+  const h = setup(t, { loadEvent: "loadedmetadata" });
+  const player = await h.create();
+  h.video.rejectNextPlay = true;
+  player.setVisible(true);
+  await settle();
+  for (const event of ["loadeddata", "canplay", "canplay"]) h.video.dispatchEvent(new Event(event));
+  h.video.nativePlay();
+  assert.equal(h.video.paused, true);
+  assert.equal(h.video.autoplay, false);
+  assert.equal(h.video.playCalls, 1);
+  assert.equal(h.states.at(-1), "blocked");
+  assert.equal(h.failures, 0);
+});
+
+test("native autoplay and readiness cannot override hidden, paused, selected, or finished states", async (t) => {
+  const h = setup(t, { loadEvent: "loadedmetadata" });
+  const player = await h.create();
+  h.video.nativePlay();
+  assert.equal(h.video.paused, true, "native autoplay must wait for the caller's visibility update");
+  assert.deepEqual(h.states, []);
+  player.setVisible(true);
+  assert.equal(h.video.paused, false);
+  for (const stop of [() => player.pause(), () => player.seek(0.5), () => player.seek(1), () => player.setVisible(false)]) {
+    stop();
+    const calls = h.video.playCalls;
+    const previousStates: HeroPlaybackState[] = [...h.states];
+    for (const event of ["loadeddata", "canplay"]) h.video.dispatchEvent(new Event(event));
+    h.video.nativePlay();
+    assert.equal(h.video.paused, true);
+    assert.equal(h.video.playCalls, calls);
+    assert.deepEqual(h.states, previousStates);
+  }
+});
+
+test("an old play resolution cannot release a newer request's in-flight guard", async (t) => {
+  const h = setup(t, { loadEvent: "loadedmetadata" });
+  const player = await h.create();
+  h.video.deferNextPlay = true;
+  player.setVisible(true);
+  player.setVisible(false);
+  h.video.deferNextPlay = true;
+  player.setVisible(true);
+  assert.equal(h.video.playCalls, 2);
+  h.video.resolvePlay();
+  await settle();
+  h.video.pause(); // Browser pauses independently while the newer request is pending.
+  h.video.dispatchEvent(new Event("canplay"));
+  assert.equal(h.video.playCalls, 2, "the old promise must not unlock a third play attempt");
+  h.video.resolvePlay();
+  await settle();
+  assert.equal(h.video.paused, false);
+});
+
+test("an old play rejection cannot block or release a newer request", async (t) => {
+  const h = setup(t, { loadEvent: "loadedmetadata" });
+  const player = await h.create();
+  h.video.deferNextPlay = true;
+  player.setVisible(true);
+  player.pause();
+  h.video.deferNextPlay = true;
+  player.play();
+  h.video.rejectPlay(new DOMException("An old request was rejected", "NotAllowedError"));
+  await settle();
+  h.video.dispatchEvent(new Event("canplay"));
+  assert.equal(h.video.playCalls, 2);
+  assert.equal(h.states.includes("blocked"), false);
+  h.video.resolvePlay();
+  await settle();
+  assert.equal(h.states.at(-1), "playing");
+});
+
+test("non-policy playback errors use media failure rather than blocked-autoplay state", async (t) => {
+  const h = setup(t, { loadEvent: "loadedmetadata" });
+  const player = await h.create();
+  h.video.playError = new DOMException("Unsupported media", "NotSupportedError");
+  player.setVisible(true);
+  await settle();
+  assert.equal(h.failures, 1);
+  assert.equal(h.states.includes("blocked"), false);
+  assert.equal(h.video.removed, true);
+  h.video.dispatchEvent(new Event("canplay"));
+  assert.equal(h.video.playCalls, 1);
+});
+
+test("invalid metadata is rejected without starting playback", async (t) => {
+  const h = setup(t, { autoLoad: false });
+  const loading = h.create();
+  h.video.duration = Infinity;
+  const rejected = assert.rejects(loading, /could not be decoded/);
+  h.video.dispatchEvent(new Event("loadedmetadata"));
+  await rejected;
+  assert.equal(h.video.playCalls, 0);
+  assert.equal(h.video.removed, true);
 });

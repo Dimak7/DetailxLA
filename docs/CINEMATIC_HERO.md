@@ -4,23 +4,30 @@
 
 The homepage presents one Porsche 911 in a normal-height cinematic hero. The
 muted film starts automatically when the hero is visible, turns through the
-wash and rinse, and holds its polished final frame. Visitors can pause, resume,
-or explicitly replay the film. Replay fades in over the matching clean still;
-there is no automatic clean-to-dirty jump. The headline and ceramic-coating and
-booking links remain stationary and readable throughout.
+wash and rinse, and holds its polished final frame. The simplified layout has
+one playback control, with no stage-selection buttons or signature strip.
+The stationary headline is followed by **Book an appointment** (`/booking`)
+and **View services & pricing** (`/services`).
 
-The four stage labels are keyboard-accessible buttons. Selecting Road-worn,
-The wash, The rinse or The reveal seeks to a representative frame (0%, 32%, 62%
-or 100%) and pauses for inspection. Play continues from an intermediate stage;
-the final reveal offers Replay. Stage selection stays paused across viewport
-and tab visibility changes. Controls are disabled while the film is unavailable,
-including loading and reduced-motion/Save-Data still-only views.
+During normal video playback, visitors can pause, resume, or explicitly replay
+the film. Replay fades in over the matching clean still; there is no automatic
+clean-to-dirty jump. Leaving the viewport or hiding the tab pauses the native
+video. Returning resumes only if the visitor has not manually paused or
+finished it.
+
+When video autoplay is denied, fails, or never starts within the bounded initial
+wait, the hero automatically loads a one-pass animated WebP of the same film.
+Its control says **Stop animation**, which ends the animation and reveals the
+matching clean still. An animated image cannot be paused at its current frame:
+leaving the viewport or hiding the tab also ends it. Returning does not restart
+it; **Replay film** is an explicit action. The fallback improves coverage of
+video-autoplay restrictions but is not a universal bypass: browser or operating
+system settings can also disable animated images.
 
 The hero has no sticky scene, long scroll section, wheel listeners, or scroll
-controlled playhead. Leaving the viewport or hiding the tab pauses playback.
-Returning resumes only if the visitor has not manually paused or finished the
-film. When a browser blocks autoplay, the visible Play film button recovers
-playback through a direct user gesture.
+controlled playhead. Reduced-motion and Save-Data preferences show the clean
+still without loading either animation. The still and both CTAs remain usable
+without JavaScript.
 
 The video is an AI detailing visualization, not footage of a customer's car.
 Porsche is the depicted vehicle make, not an affiliation or endorsement.
@@ -66,6 +73,15 @@ are extracted from the exact desktop encode's first and final frames. They are
 served without Next/Image recompression so the static/replay fallback retains
 the same crisp finish. The final video frame remains visible above the poster.
 
+The on-demand fallback, `porsche-autoplay-fallback.webp`, is converted from the
+existing high-quality mobile encode without changing its crop or graphite grade.
+It is 800×352 at 18fps, with 153 animation frames, a total RIFF duration of
+8,499ms, and loop count 1. FFmpeg's `libwebp_anim` encoder uses quality 85 and
+compression level 6; the final file is exactly 1,954,660 bytes. Resampling rounds
+the source duration slightly, while retaining its exact final source frame.
+Decoded opening, wash and final frames were visually checked for whole-car
+framing and matching color. The primary MP4 files remain the preferred media.
+
 ### Reference image prompt
 
 Photorealistic 16:9 automotive studio photograph of one dark forest-green
@@ -87,15 +103,27 @@ including roof, rear wing, headlights and wheels; remove Ferrari branding.
 ## Implementation
 
 - `CinematicHero.tsx`: visibility and motion preferences, stable marketing
-  heading, coating and booking CTAs, playback control and process progress.
-- `hero-video.ts`: dynamically loaded playback controller. Plays once, reports
-  media time, pauses offscreen, preserves manual pause, handles blocked autoplay,
-  supports paused stage selection, and holds the last frame for an explicit replay. A stale play promise cannot
-  restart a hidden or disposed film. Decode failure and stalled playback restore
-  the clean still.
-- `hero-media.ts`: same-origin desktop/mobile MP4 and poster manifest. New
-  reviewed media can replace paths without changes to the component. `null`
-  shows the existing clean studio still. Never configure missing assets.
+  heading, booking/services CTAs, and one playback control. It chooses native
+  video first and starts the image fallback on a policy rejection, media failure,
+  or initial startup timeout. Reduced-motion/Save-Data skip both motion paths.
+- `hero-video.ts`: dynamically loaded native playback controller. It configures
+  `muted`, `defaultMuted`, `autoplay`, and inline playback before assigning the
+  source, including the `autoplay`, `muted`, `playsinline`, and
+  `webkit-playsinline` attributes. Valid `loadedmetadata` is sufficient to
+  initialize playback; `loadeddata`/`canplay` can retry interrupted startup
+  without duplicating an in-flight request. Readiness retries are bounded, and
+  stale play promises cannot override hidden, manually paused, finished, or
+  disposed states. The native film plays once and holds its final frame.
+- `hero-animation.ts`: fetches the fallback only when needed, then caches that
+  Blob for the controller's lifetime. Each explicit replay creates a fresh
+  object URL and image so decoding restarts without another download. Finishing,
+  stopping, or leaving the visible page removes the image and exposes the clean
+  poster. It does not promise image pause/resume. Disposal aborts requests,
+  clears timers, revokes object URLs, and ignores late callbacks.
+- `hero-media.ts`: same-origin desktop/mobile MP4 and poster manifest, plus the
+  animation path and its measured duration. New reviewed media can replace paths
+  without changes to the component. `null` shows the existing clean studio
+  still. Never configure missing assets.
 - `CinematicHero.module.css`: graphite studio, ivory typography, pale-gold and
   copper accents, full-car framing, mobile layout and visible focus indicators.
 
@@ -112,40 +140,44 @@ the same complete composition at lower resolution; do not crop wheels or
 bumpers. Derive first/final stills from the exact film. Asset requests are
 same-origin and require no runtime Higgsfield credentials.
 
-Reduced-motion, Save-Data and decoder failure display the clean still. Without
-JavaScript, the still and service/booking links remain available. The film loads
-when at least 15% of the hero enters the viewport, and pauses if the document is
-hidden. No Three.js runtime is loaded by this hero. Unmounting removes media
-listeners, observers, timeouts and the video source. Normal page scrolling is
-unmodified.
+The film initializes when the hero intersects the viewport and the document is
+visible. A 10-second initial watchdog covers Safari cases where `play()` remains
+pending instead of rejecting. It runs only during an active initial attempt,
+clears once playback begins, and does not restart a film the visitor paused.
+The fallback has a 25-second module/download bound and its image decoder has
+a 10-second bound. If fallback loading or decoding fails, the clean still stays
+visible with a **Retry film** control. No Three.js runtime is loaded by this
+hero. Unmounting removes media listeners, observers, timeouts, video sources and
+fallback object URLs. Normal page scrolling is unmodified.
 
 ## Verification
 
-Run `pnpm typecheck`, `pnpm exec tsx --test tests/hero-video.test.ts` and
-`pnpm build`. Focused unit tests cover visibility pause/resume, manual-pause
-persistence, the final-frame hold and explicit replay, blocked-autoplay recovery,
-stale playback promises, and cancellation/failure cleanup.
+Run `pnpm typecheck`,
+`pnpm exec tsx --test tests/hero-video.test.ts tests/hero-animation.test.ts`, and
+`pnpm build`. The 36 targeted unit tests pass. They cover native visibility and
+manual-pause behavior, metadata-only startup, bounded readiness retries, stale
+play promises, held finish/replay, fallback loading and cancellation, image
+stop/replay, fresh object URLs, and failure cleanup. The production `pnpm build`
+also passes, including TypeScript validation.
 
-Inspect desktop/mobile in the supported browser UI. Check automatic muted
-playback, whole-car framing, pause/resume, replay fade, offscreen/tab pause, a
-single normal-height section, readable CTAs and no horizontal overflow. Confirm
-reduced-motion and media-failure stills retain the same car. Do not create
-production bookings or send notifications to test this visual change.
+Local verification through the supported computer-use browser UI confirmed
+actual native playback, a simulated blocked-autoplay path that automatically
+uses the animated fallback, the mobile layout, and fallback stop/replay. These
+checks do not establish physical iPhone behavior: a physical iPhone has not been
+tested. The existing `test:hero` script contains historical selectors and has
+not been validated against this simplified UI; it is not evidence of a current
+browser pass.
 
-`pnpm test:hero` now exercises the automatic film and new brand selectors. Run
-it against an isolated preview with `PGLITE_PATH=memory://hero-preview` and
-`HERO_TEST_URL=http://localhost:3107`. It checks the actual desktop/mobile media
-sources and dimensions, muted automatic playback, manual pause/resume, native
-scroll independence, offscreen pause, held finish/replay, error/retry, blocked
-autoplay recovery, reduced-motion/Save-Data/no-JavaScript stills, navigation,
-button contrast and compact layouts. Screenshots and a JSON report go into
-`artifacts/hero/`. This script has been updated and syntax-checked for the new
-experience; do not claim a browser pass until it has actually been executed.
-During this implementation, live browser verification uses the supported
-computer-use browser UI instead of shell-driven browser automation.
+For further browser checks, inspect desktop/mobile automatic playback,
+whole-car framing, native pause/resume, explicit replay, readable CTAs and no
+horizontal overflow. Check that leaving the page ends the image fallback rather
+than claiming it pauses, and that reduced-motion/Save-Data retain the clean
+still. Do not create production bookings or send notifications to test this
+visual change.
 
-Baseline before the original hero changes: TypeScript passed; the full business
-integration suite had 12/22 passing with PGlite booking errors on this machine.
-Those failures predate this hero work; do not report them as passing without a
-new result. Current build and browser verification must be recorded after the
-complete rebrand and final assets are in place.
+The current full suite reports 50 passed and 12 failed out of 62 tests. The
+platform booking path raises `This service is no longer available`, causing
+downstream failures. An isolated archive of upstream commit
+`bc32ae75a8f365b63d9716ab46026cf34f854681` reproduces the same platform result:
+5 passed and 12 failed. These failures predate this autoplay update; no
+business-workflow fix is included in this visual change.
