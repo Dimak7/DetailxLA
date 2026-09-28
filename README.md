@@ -33,6 +33,7 @@ For scheduled reminders/campaigns, add a worker service from the same repo, with
 - SMS: Twilio. Configure inbound and delivery webhooks at `/api/webhooks/sms`. Requests require a valid Twilio signature. STOP suppresses messages to the opted-out phone; marketing also requires affirmative consent.
 - Telegram: bot token, chat ID and webhook secret. Register `/api/telegram` with Telegram's secret_token. /today and /tomorrow show schedules; private admin links open authenticated management.
 - Payments: Stripe Checkout. Register `/api/webhooks/stripe` for checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed, checkout.session.expired and charge.refunded. Raw-body signature verification, invoice amount matching and event deduplication protect payment state.
+- Square: configure `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_WEBHOOK_SIGNATURE_KEY`, and `SQUARE_ENVIRONMENT=production` for real payments. Register `/api/webhooks/square` for `payment.created`, `payment.updated`, `refund.created`, and `refund.updated`; `SQUARE_WEBHOOK_URL`, when set, must exactly match the registered notification URL. Reporting requires Payments read and Locations read access. Railway environment credentials take precedence over credentials saved in Settings.
 - Google/Meta: configurable browser tags and Meta server events. Purchase events require verified payment. Google/Meta ad account reporting APIs are not connected; the dashboard explicitly distinguishes unknown spend and allows manual verified spend entries.
 
 ## Operations & scope
@@ -42,6 +43,13 @@ Appointments reserve one shared service lane, including duration and buffer. Sch
 
 Outbox delivery states include queued, sent, failed, skipped, cancelled and uncertain. Timeouts are not blindly retried, to avoid duplicate SMS. Check provider logs before resolving an uncertain delivery. Missing integrations are recorded honestly and do not undo successful bookings.
 
-Revenue is net verified payment revenue, not booked estimates. Lifetime customer spend uses the same payment ledger. Phone clicks are not answered calls. Attribution is first-touch within a browser session; manual lead-to-booking conversion retains the lead source. Consent choices and customer activity have separate audit histories.
+Revenue is net verified payment revenue, not booked estimates. Phone clicks are not answered calls. Attribution is first-touch within a browser session; manual lead-to-booking conversion retains the lead source. Consent choices and customer activity have separate audit histories.
+
+### Square revenue reconciliation
+The dashboard, reports, charts and revenue windows use `wl.revenue_payments`: completed production USD Square payments from every account location, plus other payment providers. Website Square invoices are deduplicated against the canonical `(environment, payment_id)` ledger. Unlinked POS transactions contribute to revenue without creating customers or bookings or inflating website attribution and customer averages. Sandbox, pending, failed and non-USD Square payments are excluded from USD revenue, but remain visible in Operations → Payments.
+
+Opening a financial dashboard starts an authenticated, GET-only Square history sync. The first sync covers full payment history at all locations with resumable pagination. Subsequent syncs use overlapping updated-time windows, and new locations receive a full backfill. Signed webhooks keep the ledger current; the worker or `/api/jobs` reconciles missed events. The open dashboard refreshes local totals every 30 seconds and reconciles with Square every five minutes. The sync panel shows incomplete history, failures and the last completed sync. The manual sync button resumes unfinished batches.
+
+Collections include Square tips and are reduced by cumulative refunds; fees are reported separately. Refunds revise the original payment-date cohort, not a refund-date cash-flow report. Existing appointment net sales and tips retain their booking-based meaning. Legacy Square invoices with unknown environment do not contribute until reconciled with Square. No sample revenue is seeded in production, and syncing never creates a Square charge or refund.
 
 Production payment collection, live message delivery and external advertising account reporting require business-owned credentials and provider setup. No external campaign is sent merely by deploying this code.

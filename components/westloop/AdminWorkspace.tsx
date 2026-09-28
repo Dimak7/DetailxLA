@@ -12,6 +12,8 @@ import {
   type RecordData as R,
 } from "./AdminControls";
 import { BookingWizard } from "./BookingWizard";
+import { SquareRevenue } from "./SquareRevenue";
+import type { squareRevenueStatus } from "@/lib/integrations/square-reporting";
 import {
   money,
   timeLabel,
@@ -911,15 +913,16 @@ export function AdminWorkspace({
             <button className="button">Apply dates</button>
           </form>
           <p className="small-note">
-            {rep.start} through {rep.end} · Central Time. Net sales are completed work; collections are verified payments less refunds.
+            {rep.start} through {rep.end} · Central Time. Net sales are completed website appointments; collections include all Square payments and are shown less refunds, before processing fees.
           </p>
+          {data.square != null && <SquareRevenue connection={data.square as Awaited<ReturnType<typeof squareRevenueStatus>>} summary={rep.square} />}
           <div className="stats-grid">
             {[
               ["Net sales", money(rep.net_sales), "Completed work, excluding tips"],
               ["Payments collected", money(rep.payments_collected), "Verified Stripe, Square, or manual payments less refunds"],
               ["Outstanding", money(rep.outstanding), "Completed work not yet fully collected"],
-              ["Refunds", money(rep.refunds), "Money returned in selected period"],
-              ["Tips", money(rep.tips), "Separate from service sales"],
+              ["Refunds", money(rep.refunds), "Refunds on payments in selected period"],
+              ["Appointment tips", money(rep.tips), "Tips recorded on completed website appointments"],
               ["Operating expenses", money(rep.expenses), "Recorded expenses in period"],
               ["Net operating profit", money(rep.net_operating_profit), "Revenue less operating expenses"],
               ["Operating margin", rep.operating_margin == null ? "No paid revenue" : rep.operating_margin.toFixed(1) + "%", "Not tax or full accounting profit"],
@@ -933,14 +936,14 @@ export function AdminWorkspace({
                 "Booked sessions / tracked visitors",
               ],
               [
-                "Average paid order",
+                "Average paid appointment",
                 money(rep.average_order),
-                "Net revenue / paid appointments",
+                "Linked collections / paid appointments",
               ],
               [
-                "Revenue per payer",
+                "Revenue per website payer",
                 money(rep.revenue_per_customer),
-                "Net revenue / paying customers",
+                "Linked collections / website customers",
               ],
               [
                 "New customers",
@@ -1294,7 +1297,7 @@ export function AdminWorkspace({
         ) && (
           <form className="toolbar">
             <label className="field">
-              <span>Search records</span>
+              <span>{section === "payments" ? "Search website appointments" : "Search records"}</span>
               <input
                 name="search"
                 placeholder="Name, reference..."
@@ -1304,7 +1307,7 @@ export function AdminWorkspace({
             {["bookings", "calendar", "payments"].includes(section) && (
               <>
                 <label className="field">
-                  <span>Date</span>
+                  <span>{section === "payments" ? "Appointment date" : "Date"}</span>
                   <input
                     type="date"
                     name="date"
@@ -1312,7 +1315,7 @@ export function AdminWorkspace({
                   />
                 </label>
                 <label className="field">
-                  <span>Status</span>
+                  <span>{section === "payments" ? "Appointment status" : "Status"}</span>
                   <select
                     name="status"
                     defaultValue={params.get("status") || ""}
@@ -1661,10 +1664,30 @@ export function AdminWorkspace({
         )}
       {section === "payments" && (
         <>
+          {data.square != null && <SquareRevenue connection={data.square as Awaited<ReturnType<typeof squareRevenueStatus>>} />}
+          <h2>Square transactions</h2>
+          <p className="small-note">All imported Square payments, including transactions without a website appointment. Only completed production payments in USD count toward revenue. Amounts include tips; processing fees are listed separately.</p>
+          {table(
+            ["Payment date", "Amount", "Refunded", "Tips", "Fees", "Status", "Source / location", "Transaction"],
+            rows(data.squarePayments).map((payment) => [
+              stamp(payment.paid_at || payment.created_at),
+              `${s(payment.currency)} ${(n(payment.amount_cents) / 100).toFixed(2)}`,
+              (n(payment.refunded_cents) / 100).toFixed(2),
+              (n(payment.tip_cents) / 100).toFixed(2),
+              (n(payment.processor_fee_cents) / 100).toFixed(2),
+              <>{status(payment.status)}<small>{s(payment.environment) === "sandbox" ? "Sandbox · excluded" : s(payment.currency) !== "USD" ? "Non-USD · excluded" : "Production"}</small></>,
+              <>{s(payment.source_type) || "Square"}<small>{s(payment.location_id)}</small></>,
+              <>{s(payment.payment_id)}<small>{s(payment.payment_method)}</small></>,
+            ]),
+          )}
+          <nav className="toolbar" aria-label="Square transaction pages">
+            {Number(params.get("squarePage") || 1) > 1 && <Link className="text-link" href={`/admin/payments?squarePage=${Math.max(1, Number(params.get("squarePage") || 1) - 1)}`}>Newer payments</Link>}
+            <span className="small-note">Page {Math.max(1, Number(params.get("squarePage")) || 1)} · up to 100 payments per page</span>
+            {rows(data.squarePayments).length === 100 && <Link className="text-link" href={`/admin/payments?squarePage=${Math.max(1, Number(params.get("squarePage")) || 1) + 1}`}>Older payments</Link>}
+          </nav>
+          <h2>Website payment records</h2>
           <p className="small-note">
-            Payment records are written only by signature-verified Square or
-            Stripe webhooks. A checkout redirect never marks an appointment
-            paid.
+            Website invoices are shown separately for appointment management. Square records above and their matching website invoices count once in revenue. A checkout redirect never marks an appointment paid.
           </p>
           {table(
             [

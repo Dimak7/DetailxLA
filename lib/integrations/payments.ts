@@ -7,13 +7,11 @@ import { bookingById } from "../platform/bookings";
 import { enqueue, enqueueBooking } from "../platform/outbox";
 import { metaEvent } from "./providers";
 import type { Booking, BusinessSettings } from "../platform/types";
+import {
+  SQUARE_API_VERSION, squareApiBase, squareEnvironment, retrieveSquarePayment,
+  upsertSquarePayment, type SquarePayment, type SquareMoney,
+} from "./square-reporting";
 
-const SQUARE_API_VERSION = "2026-09-16";
-function squareApiBase() {
-  return process.env.SQUARE_ENVIRONMENT?.toLowerCase() === "sandbox"
-    ? "https://connect.squareupsandbox.com"
-    : "https://connect.squareup.com";
-}
 type PaymentKind = "deposit" | "balance";
 type PaymentProvider = "square" | "stripe";
 type PaymentRow = {
@@ -24,15 +22,6 @@ type PaymentRow = {
   status: string;
   kind: PaymentKind;
   checkout_url: string;
-};
-type SquareMoney = { amount?: number; currency?: string };
-type SquarePayment = {
-  id?: string;
-  order_id?: string;
-  status?: string;
-  amount_money?: SquareMoney;
-  processing_fee?: Array<{ amount_money?: SquareMoney }>;
-  card_details?: { card?: { card_brand?: string; last_4?: string } };
 };
 type SquareRefund = {
   id?: string;
@@ -78,11 +67,22 @@ async function preparePayment(
       ["cancelled", "no_show"].includes(current.status)
     )
       throw new AppError("This appointment cannot be paid online.");
+    const environment = squareEnvironment();
+    const unclassified = (await q(
+      `SELECT id FROM wl.payments WHERE booking_id=$1 AND provider='square'
+       AND status IN ('paid','partially_refunded','refunded')
+       AND COALESCE(metadata->>'square_environment','') NOT IN ('production','sandbox') LIMIT 1`,
+      [bookingId],
+    )).rows;
+    if (unclassified.length)
+      throw new AppError("Sync Square payments before collecting this appointment balance.");
     const paid = Number(
       (
         await q<{ amount: number }>(
-          "SELECT COALESCE(SUM(amount_cents-refunded_cents),0)::int amount FROM wl.payments WHERE booking_id=$1 AND status IN ('paid','partially_refunded','refunded')",
-          [bookingId],
+          `SELECT COALESCE(SUM(amount_cents-refunded_cents),0)::int amount FROM wl.payments
+           WHERE booking_id=$1 AND status IN ('paid','partially_refunded','refunded')
+           AND (provider<>'square' OR metadata->>'square_environment'=$2)`,
+          [bookingId, environment],
         )
       ).rows[0].amount,
     );
@@ -94,15 +94,17 @@ async function preparePayment(
       throw new AppError("There is no outstanding amount for this payment.");
     const old = (
       await q<PaymentRow>(
-        "SELECT * FROM wl.payments WHERE booking_id=$1 AND provider=$2 AND status='pending' ORDER BY created_at LIMIT 1",
-        [bookingId, provider],
+        `SELECT * FROM wl.payments WHERE booking_id=$1 AND provider=$2 AND status='pending'
+         AND ($2<>'square' OR (metadata->>'square_environment'=$3 AND amount_cents=$4)) ORDER BY created_at LIMIT 1`,
+        [bookingId, provider, environment, owed],
       )
     ).rows[0];
     if (old) return old;
     return (
       await q<PaymentRow>(
-        "INSERT INTO wl.payments(id,booking_id,customer_id,amount_cents,kind,provider) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",
-        [randomUUID(), bookingId, b.customer_id, owed, kind, provider],
+        "INSERT INTO wl.payments(id,booking_id,customer_id,amount_cents,kind,provider,metadata) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb) RETURNING *",
+        [randomUUID(), bookingId, b.customer_id, owed, kind, provider,
+          JSON.stringify(provider === "square" ? { square_environment: squareEnvironment() } : {})],
       )
     ).rows[0];
   });
@@ -185,6 +187,7 @@ async function createSquareCheckout(b: Booking, p: PaymentRow) {
       p.id,
       link.url,
       JSON.stringify({
+        square_environment: squareEnvironment(),
         square_order_id: link.order_id,
         square_payment_link_id: link.id || "",
       }),
@@ -430,65 +433,52 @@ export async function verifySquareEvent(body: string, signature: string) {
 }
 
 export async function handleSquareEvent(event: SquareEvent) {
+  const environment = squareEnvironment();
+  const isRefund = ["refund.created", "refund.updated"].includes(event.type);
+  let evidence: SquarePayment | undefined;
+  if (["payment.created", "payment.updated"].includes(event.type)) {
+    evidence = event.data?.object?.payment;
+    if (!evidence?.id) throw new AppError("Square payment evidence is incomplete.", 400);
+  } else if (isRefund) {
+    const paymentId = event.data?.object?.refund?.payment_id;
+    if (!paymentId) throw new AppError("Square refund evidence is incomplete.", 400);
+    // Fetch before opening a transaction. A failed refresh must remain retryable
+    // and must never increment a cumulative refund using an individual event.
+    evidence = await retrieveSquarePayment(paymentId, environment);
+  }
   const business = await settings();
   await transaction(async (q) => {
-    const inserted = (
-      await q(
-        "INSERT INTO wl.webhooks(id,provider) VALUES($1,'square') ON CONFLICT DO NOTHING RETURNING id",
-        [event.event_id],
-      )
-    ).rows;
-    if (!inserted.length) return;
-    if (["payment.created", "payment.updated"].includes(event.type)) {
-      const payment = event.data?.object?.payment;
-      if (!payment?.id || !payment.order_id) return;
-      const p = (
-        await q<PaymentRow>(
-          "SELECT * FROM wl.payments WHERE provider='square' AND (external_id=$1 OR metadata->>'square_order_id'=$2) FOR UPDATE",
-          [payment.id, payment.order_id],
-        )
-      ).rows[0];
-      if (!p) return;
-      if (payment.status === "COMPLETED") {
-        if (
-          payment.amount_money?.amount !== p.amount_cents ||
-          payment.amount_money.currency !== "USD"
-        )
-          throw new AppError("Payment evidence does not match the invoice.");
-        const card = payment.card_details?.card,
-          method = card?.last_4
-            ? (card.card_brand || "Card") + " ending " + card.last_4
-            : "Card",
-          fees = (payment.processing_fee || []).reduce(
-            (sum, fee) => sum + Math.abs(Number(fee.amount_money?.amount || 0)),
-            0,
-          );
-        await completePayment(q, p, business, {
-          provider: "square",
-          externalId: payment.id,
-          paymentMethod: method,
-          processorFeeCents: fees,
-        });
-      } else if (["CANCELED", "FAILED"].includes(payment.status || "")) {
-        await q(
-          "UPDATE wl.payments SET status=$2,external_id=$3 WHERE id=$1 AND status='pending'",
-          [p.id, payment.status === "CANCELED" ? "expired" : "failed", payment.id],
-        );
-      }
-    }
-    if (event.type === "refund.updated") {
-      const refund = event.data?.object?.refund;
-      if (
-        refund?.status === "COMPLETED" &&
-        refund.payment_id &&
-        refund.amount_money?.currency === "USD"
-      )
-        await q(
-          `UPDATE wl.payments SET refunded_cents=LEAST(amount_cents,refunded_cents+$2),
-           status=CASE WHEN refunded_cents+$2>=amount_cents THEN 'refunded' ELSE 'partially_refunded' END
-           WHERE provider='square' AND external_id=$1`,
-          [refund.payment_id, Number(refund.amount_money.amount || 0)],
-        );
+    const inserted = (await q(
+      "INSERT INTO wl.webhooks(id,provider) VALUES($1,'square') ON CONFLICT DO NOTHING RETURNING id",
+      [`square:${environment}:${event.event_id}`],
+    )).rows;
+    if (!inserted.length || !evidence) return;
+    const payment = await upsertSquarePayment(q, evidence, environment, { reconcileInvoice: isRefund });
+    const matches = (await q<PaymentRow>(
+      `SELECT * FROM wl.payments WHERE provider='square' AND metadata->>'square_environment'=$3
+       AND (external_id=$1 OR (COALESCE(external_id,'')='' AND $2<>'' AND metadata->>'square_order_id'=$2)) FOR UPDATE`,
+      [payment.payment_id, payment.order_id, environment],
+    )).rows;
+    if (matches.length !== 1) return;
+    const p = matches[0];
+    if (payment.status === "COMPLETED") {
+      // Tips belong in the ledger gross; invoice confirmation compares principal.
+      // A split/foreign-currency payment still belongs in the ledger, but cannot
+      // on its own confirm this website invoice.
+      if (Number(payment.amount_cents) - Number(payment.tip_cents) !== p.amount_cents || payment.currency !== "USD") return;
+      await completePayment(q, p, business, {
+        provider: "square", externalId: payment.payment_id,
+        paymentMethod: payment.payment_method,
+        processorFeeCents: Math.max(0, Number(payment.processor_fee_cents)),
+      });
+      await q(`UPDATE wl.payments SET refunded_cents=LEAST(amount_cents,GREATEST(refunded_cents,$2::bigint)),
+        processor_fee_cents=GREATEST(0,$3::bigint),
+        paid_at=COALESCE($4::timestamptz,paid_at),
+        status=CASE WHEN $2::bigint>=amount_cents AND $2::bigint>0 THEN 'refunded' WHEN $2::bigint>0 THEN 'partially_refunded' ELSE status END
+        WHERE id=$1`, [p.id, payment.refunded_cents, payment.processor_fee_cents, payment.paid_at]);
+    } else if (["CANCELED", "FAILED"].includes(payment.status)) {
+      await q("UPDATE wl.payments SET status=$2,external_id=$3 WHERE id=$1 AND status='pending'",
+        [p.id, payment.status === "CANCELED" ? "expired" : "failed", payment.payment_id]);
     }
   });
 }

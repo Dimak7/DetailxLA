@@ -197,6 +197,7 @@ test("Relational platform integration", async (t) => {
         )[0];
         assert.equal(payment.provider, "square");
         assert.equal(payment.metadata.square_order_id, "square-order-checkout");
+        assert.equal(payment.metadata.square_environment, "sandbox");
         await query("DELETE FROM wl.payments WHERE booking_id=$1 AND provider='square'", [
           booking.booking.id,
         ]);
@@ -417,7 +418,7 @@ test("Relational platform integration", async (t) => {
     );
     await t.test(
       "Square webhooks verify deposits, confirm bookings, and record refunds",
-      async () => {
+      async (t) => {
         const paymentId = randomUUID(),
           orderId = "square-order-test",
           squarePaymentId = "square-payment-test";
@@ -490,6 +491,15 @@ test("Relational platform integration", async (t) => {
         assert.equal(Number(payment.processor_fee_cents), 175);
         assert.match(payment.payment_method, /4242/);
         assert.equal(confirmed.status, "confirmed");
+        process.env.SQUARE_ACCESS_TOKEN = "square-test-refund-token";
+        t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+          assert.equal(String(input), "https://connect.squareup.com/v2/payments/" + squarePaymentId);
+          assert.equal(init?.method, "GET");
+          return new Response(JSON.stringify({ payment: {
+            ...event.data.object.payment,
+            refunded_money: { amount: 1000, currency: "USD" },
+          } }), { status: 200, headers: { "Content-Type": "application/json" } });
+        });
         await handleSquareEvent({
           event_id: "square-event-refund",
           type: "refund.updated",
@@ -514,6 +524,7 @@ test("Relational platform integration", async (t) => {
         assert.equal(Number(refunded.refunded_cents), 1000);
         delete process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
         delete process.env.SQUARE_WEBHOOK_URL;
+        delete process.env.SQUARE_ACCESS_TOKEN;
       },
     );
     await t.test(

@@ -9,9 +9,9 @@ export function reportRange(params: URLSearchParams) {
   const offset = (days: number) => dateToday(new Date(Date.now() - days * 86400000));
   const todayDate = new Date(today + "T12:00:00Z");
   const weekStart = new Date(todayDate); weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
-  const monthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1));
-  const previousMonthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth() - 1, 1));
-  const previousMonthEnd = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 0));
+  const monthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1, 12));
+  const previousMonthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth() - 1, 1, 12));
+  const previousMonthEnd = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 0, 12));
   const preset = range === "yesterday" ? { start: offset(1), end: offset(1) } : range === "week" ? { start: dateToday(weekStart), end: today } : range === "month" ? { start: dateToday(monthStart), end: today } : range === "last_month" ? { start: dateToday(previousMonthStart), end: dateToday(previousMonthEnd) } : range === "year" ? { start: today.slice(0, 4) + "-01-01", end: today } : { start: offset(Math.max(1, Number(range) || 30) - 1), end: today };
   const start = params.get("from") || preset.start;
   const end = params.get("to") || preset.end;
@@ -37,6 +37,7 @@ export async function report(params: URLSearchParams) {
     performance,
     series,
     topServices,
+    square,
     labor,
   ] = await Promise.all([
     query<Row>(
@@ -48,14 +49,20 @@ export async function report(params: URLSearchParams) {
       values,
     ),
     query<Row>(
-      `SELECT COALESCE(SUM(p.amount_cents-p.refunded_cents),0)::int revenue,count(DISTINCT p.booking_id)::int paid_bookings,count(DISTINCT p.customer_id)::int paying_customers FROM wl.payments p WHERE ${payments}`,
+      `SELECT COALESCE(SUM(p.amount_cents-p.refunded_cents),0)::bigint revenue,
+        COALESCE(SUM(p.amount_cents-p.refunded_cents) FILTER(WHERE p.booking_id IS NOT NULL),0)::bigint booking_revenue,
+        COALESCE(SUM(p.amount_cents-p.refunded_cents) FILTER(WHERE p.customer_id IS NOT NULL),0)::bigint customer_revenue,
+        COALESCE(SUM(p.refunded_cents),0)::bigint refunds,
+        COALESCE(SUM(p.processor_fee_cents),0)::bigint processor_fees,
+        count(DISTINCT p.booking_id)::int paid_bookings,count(DISTINCT p.customer_id)::int paying_customers
+       FROM wl.revenue_payments p WHERE ${payments}`,
       values,
     ),
     query<Row>(
       `SELECT COALESCE(SUM(b.price_cents),0)::int net_sales,COALESCE(SUM(b.tip_cents),0)::int tips,
         COALESCE(SUM((SELECT SUM(quantity*unit_price_cents) FROM wl.booking_line_items li WHERE li.booking_id=b.id AND li.kind='upsell')),0)::int upsells,
         COALESCE(SUM((SELECT SUM(amount_cents) FROM wl.booking_discounts d WHERE d.booking_id=b.id)),0)::int discounts,
-        COALESCE(SUM(GREATEST(0,b.price_cents-COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded')),0))),0)::int outstanding,
+        COALESCE(SUM(GREATEST(0,b.price_cents-COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.revenue_payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded')),0))),0)::int outstanding,
         count(*)::int completed_jobs FROM wl.bookings b WHERE b.status='completed' AND (COALESCE(b.completed_at,b.updated_at) AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date`,
       values,
     ),
@@ -71,19 +78,31 @@ export async function report(params: URLSearchParams) {
       "SELECT COALESCE(SUM(amount_cents),0)::int total FROM wl.ad_spend WHERE spend_date BETWEEN $1 AND $2",
       values,
     ),
-    query<Row>(
+    query<{ source: string; campaign: string; leads: number; bookings: number; revenue: number | string }>(
       `SELECT a.source,a.campaign,
  (SELECT count(*)::int FROM wl.leads l WHERE l.attribution_id=a.id AND (l.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) leads,
  (SELECT count(*)::int FROM wl.bookings b WHERE b.attribution_id=a.id AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) bookings,
- COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::int FROM wl.payments p JOIN wl.bookings b ON p.booking_id=b.id WHERE b.attribution_id=a.id AND ${payments}),0)::int revenue FROM wl.attributions a`,
+ COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::bigint FROM wl.revenue_payments p JOIN wl.bookings b ON p.booking_id=b.id WHERE b.attribution_id=a.id AND ${payments}),0)::bigint revenue FROM wl.attributions a`,
+      values,
+    ),
+    query<{ day: string; revenue: number | string }>(
+      `SELECT (p.paid_at AT TIME ZONE 'America/Chicago')::date::text AS day,SUM(p.amount_cents-p.refunded_cents)::bigint revenue FROM wl.revenue_payments p WHERE ${payments} GROUP BY 1 ORDER BY 1`,
+      values,
+    ),
+    query<{ service_name: string; revenue: number | string; bookings: number }>(
+      `SELECT b.service_name,SUM(p.amount_cents-p.refunded_cents)::bigint revenue,count(DISTINCT b.id)::int bookings FROM wl.revenue_payments p JOIN wl.bookings b ON b.id=p.booking_id WHERE ${payments} GROUP BY b.service_name ORDER BY revenue DESC`,
       values,
     ),
     query<Row>(
-      `SELECT (p.paid_at AT TIME ZONE 'America/Chicago')::date::text AS day,SUM(p.amount_cents-p.refunded_cents)::int revenue FROM wl.payments p WHERE ${payments} GROUP BY 1 ORDER BY 1`,
-      values,
-    ),
-    query<Row>(
-      `SELECT b.service_name,SUM(p.amount_cents-p.refunded_cents)::int revenue,count(DISTINCT b.id)::int bookings FROM wl.payments p JOIN wl.bookings b ON b.id=p.booking_id WHERE ${payments} GROUP BY b.service_name ORDER BY revenue DESC`,
+      `SELECT COALESCE(SUM(p.amount_cents),0)::bigint gross,
+        COALESCE(SUM(p.refunded_cents),0)::bigint refunds,
+        COALESCE(SUM(p.amount_cents-p.refunded_cents),0)::bigint net,
+        COALESCE(SUM(p.processor_fee_cents),0)::bigint fees,
+        COALESCE(SUM(p.tip_cents),0)::bigint tips,
+        count(*)::int transaction_count,
+        COALESCE(SUM(p.amount_cents-p.refunded_cents) FILTER(WHERE p.booking_id IS NULL),0)::bigint unlinked_total,
+        count(*) FILTER(WHERE p.booking_id IS NULL)::int unlinked_transaction_count
+       FROM wl.revenue_payments p WHERE p.provider='square' AND ${payments}`,
       values,
     ),
     query<Row>(
@@ -115,9 +134,9 @@ export async function report(params: URLSearchParams) {
         COALESCE((SELECT SUM(b.price_cents)::int FROM wl.bookings b JOIN wl.attributions a ON a.id=b.attribution_id
           WHERE a.source='Google Ads' AND b.status NOT IN ('cancelled','no_show')
             AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date),0)::int booked_value,
-        COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::int FROM wl.payments p
+        COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::bigint FROM wl.revenue_payments p
           JOIN wl.bookings b ON b.id=p.booking_id JOIN wl.attributions a ON a.id=b.attribution_id
-          WHERE a.source='Google Ads' AND ${payments}),0)::int paid_revenue`,
+          WHERE a.source='Google Ads' AND ${payments}),0)::bigint paid_revenue`,
       values,
     )
   )[0];
@@ -125,7 +144,7 @@ export async function report(params: URLSearchParams) {
     channelSpend.find((entry) => entry.channel === "Google Ads")?.total ?? null;
   const channelPerformance = channels.map((channel) => {
     const rows = performance.filter((r) => r.source === channel),
-      sum = (key: string) => rows.reduce((n, r) => n + Number(r[key]), 0),
+      sum = (key: "leads" | "bookings" | "revenue") => rows.reduce((n, r) => n + Number(r[key]), 0),
       adSpend = channelSpend.find((s) => s.channel === channel)?.total ?? null;
     const l = sum("leads"),
       b = sum("bookings"),
@@ -143,11 +162,11 @@ export async function report(params: URLSearchParams) {
   });
   const windows = await query<Row>(
     `SELECT
- COALESCE(SUM(amount_cents-refunded_cents) FILTER(WHERE (paid_at AT TIME ZONE 'America/Chicago')::date=$1::date),0)::int AS today,
- COALESCE(SUM(amount_cents-refunded_cents) FILTER(WHERE (paid_at AT TIME ZONE 'America/Chicago')::date>=date_trunc('week',$1::date)::date),0)::int AS week,
- COALESCE(SUM(amount_cents-refunded_cents) FILTER(WHERE (paid_at AT TIME ZONE 'America/Chicago')::date>=date_trunc('month',$1::date)::date),0)::int AS month,
- COALESCE(SUM(amount_cents-refunded_cents) FILTER(WHERE (paid_at AT TIME ZONE 'America/Chicago')::date>=date_trunc('year',$1::date)::date),0)::int AS year
- FROM wl.payments WHERE status IN ('paid','partially_refunded','refunded')`,
+ COALESCE(SUM(amount_cents-refunded_cents) FILTER(WHERE (paid_at AT TIME ZONE 'America/Chicago')::date=$1::date),0)::bigint AS today,
+ COALESCE(SUM(amount_cents-refunded_cents) FILTER(WHERE (paid_at AT TIME ZONE 'America/Chicago')::date BETWEEN date_trunc('week',$1::date)::date AND $1::date),0)::bigint AS week,
+ COALESCE(SUM(amount_cents-refunded_cents) FILTER(WHERE (paid_at AT TIME ZONE 'America/Chicago')::date BETWEEN date_trunc('month',$1::date)::date AND $1::date),0)::bigint AS month,
+ COALESCE(SUM(amount_cents-refunded_cents) FILTER(WHERE (paid_at AT TIME ZONE 'America/Chicago')::date BETWEEN date_trunc('year',$1::date)::date AND $1::date),0)::bigint AS year
+ FROM wl.revenue_payments WHERE status IN ('paid','partially_refunded','refunded')`,
     [dateToday()],
   );
   const revenue = Number(paymentsTotal[0].revenue),
@@ -172,7 +191,18 @@ export async function report(params: URLSearchParams) {
     net_sales: netSales,
     payments_collected: revenue,
     outstanding: Number(salesTotal[0].outstanding),
-    refunds: await query<Row>(`SELECT COALESCE(SUM(refunded_cents),0)::int total FROM wl.payments p WHERE ${payments}`, values).then((r) => Number(r[0].total)),
+    refunds: Number(paymentsTotal[0].refunds),
+    processor_fees: Number(paymentsTotal[0].processor_fees),
+    square: {
+      gross: Number(square[0].gross),
+      refunds: Number(square[0].refunds),
+      net: Number(square[0].net),
+      fees: Number(square[0].fees),
+      tips: Number(square[0].tips),
+      transaction_count: Number(square[0].transaction_count),
+      unlinked_total: Number(square[0].unlinked_total),
+      unlinked_transaction_count: Number(square[0].unlinked_transaction_count),
+    },
     tips: Number(salesTotal[0].tips),
     upsells: Number(salesTotal[0].upsells),
     discounts: Number(salesTotal[0].discounts),
@@ -183,12 +213,12 @@ export async function report(params: URLSearchParams) {
     expense_summary: expenses,
     financial_series: [...financialSeries.values()].sort((a, b) => a.day.localeCompare(b.day)).map((row) => ({ ...row, net_operating_profit: row.revenue - row.expenses })),
     labor_cost: Number(labor[0].cost),
-    windows: windows[0],
+    windows: Object.fromEntries(Object.entries(windows[0]).map(([key, value]) => [key, Number(value)])),
     average_order: Number(paymentsTotal[0].paid_bookings)
-      ? revenue / Number(paymentsTotal[0].paid_bookings)
+      ? Number(paymentsTotal[0].booking_revenue) / Number(paymentsTotal[0].paid_bookings)
       : 0,
     revenue_per_customer: Number(paymentsTotal[0].paying_customers)
-      ? revenue / Number(paymentsTotal[0].paying_customers)
+      ? Number(paymentsTotal[0].customer_revenue) / Number(paymentsTotal[0].paying_customers)
       : 0,
     leads: Number(leads[0].count),
     spend: Number(spend[0].total),
@@ -207,8 +237,8 @@ export async function report(params: URLSearchParams) {
         ? Number(googleAds.paid_revenue) / googleAdsSpend
         : null,
     },
-    campaigns: performance,
-    series,
-    topServices,
+    campaigns: performance.map((row) => ({ ...row, revenue: Number(row.revenue) })),
+    series: series.map((row) => ({ ...row, revenue: Number(row.revenue) })),
+    topServices: topServices.map((row) => ({ ...row, revenue: Number(row.revenue) })),
   };
 }

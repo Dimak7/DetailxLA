@@ -21,6 +21,7 @@ import { payrollSummary } from "./payroll";
 import { audiences, queueCampaign, unsubscribeToken } from "./campaigns";
 import { enqueue, enqueueBooking } from "./outbox";
 import { createCheckout } from "../integrations/payments";
+import { squareRevenueStatus, syncSquarePayments } from "../integrations/square-reporting";
 import { saveAttribution } from "./attribution";
 import type { Session, Service, Customer, Row } from "./types";
 const uuid = z.uuid();
@@ -105,6 +106,7 @@ export async function adminData(
   )
     return {
       report: await report(p),
+      square: await squareRevenueStatus(),
       integrations: await integrationStatus(),
       spend: await query(
         "SELECT * FROM wl.ad_spend ORDER BY spend_date DESC LIMIT 100",
@@ -131,7 +133,7 @@ export async function adminData(
       ),
       inventory: await inventorySummary(),
     };
-  if (section === "reports") return { report: await report(p), inventory: await inventorySummary() };
+  if (section === "reports") return { report: await report(p), square: await squareRevenueStatus(), inventory: await inventorySummary() };
   if (section === "expenses") {
     const { start, end } = reportRange(p);
     return { start, end, summary: await expenseSummary(start, end), rows: await query("SELECT * FROM wl.expenses WHERE (expense_date BETWEEN $1 AND $2 OR (recurrence<>'one_time' AND COALESCE(recurring_start,expense_date)<=$2 AND COALESCE(recurring_end,$2)>=$1)) AND (vendor||' '||category||' '||description) ILIKE $3 ORDER BY expense_date DESC,created_at DESC LIMIT 200", [start,end,"%" + search + "%"]) };
@@ -283,6 +285,9 @@ export async function adminData(
     section === "calendar" ||
     section === "payments"
   ) {
+    const squarePage = Number(p.get("squarePage") || 1);
+    if (section === "payments" && (!Number.isSafeInteger(squarePage) || squarePage < 1 || !Number.isSafeInteger((squarePage - 1) * 100)))
+      throw new AppError("Choose a valid Square payment page.");
     const date = p.get("date"),
       status = p.get("status") || "",
       view = p.get("view") || "";
@@ -342,6 +347,13 @@ export async function adminData(
     return {
       rows,
       total: count,
+      ...(section === "payments" ? {
+        square: await squareRevenueStatus(),
+        squarePayments: await query(
+          "SELECT * FROM wl.square_payments ORDER BY COALESCE(paid_at,created_at) DESC NULLS LAST,payment_id,environment LIMIT 100 OFFSET $1",
+          [(squarePage - 1) * 100],
+        ),
+      } : {}),
       team,
       employees: await query(
         "SELECT e.id employee_id,e.user_id,e.name,e.position,e.phone FROM wl.employees e JOIN wl.users u ON u.id=e.user_id WHERE e.active=true AND u.active=true ORDER BY e.name",
@@ -388,6 +400,7 @@ const actionSections: Record<string, string> = {
   publish_review: "reviews",
   request_review: "reviews",
   create_payment: "payments",
+  sync_square_payments: "payments",
   save_employee: "employees",
   save_shift: "schedule",
   delete_shift: "schedule",
@@ -414,6 +427,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   if (!section || !access[section]?.includes(user.role))
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
+  if (action === "sync_square_payments") return syncSquarePayments();
   if (action === "save_booking_line_item") {
     const item = z.object({ id: uuid.optional(), booking_id: uuid, kind: z.enum(["base_service","upsell"]), name: z.string().trim().min(2).max(160), quantity: z.number().int().min(1).max(1000).default(1), unit_price_cents: z.number().int().min(0).max(100000000) }).parse(data);
     const id = item.id || randomUUID();

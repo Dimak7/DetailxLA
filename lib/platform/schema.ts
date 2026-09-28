@@ -179,6 +179,63 @@ ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS processor_fee_cents integer NOT
 ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}';
 CREATE UNIQUE INDEX IF NOT EXISTS wl_payment_provider_external_unique ON wl.payments(provider,external_id) WHERE external_id<>'';
 CREATE INDEX IF NOT EXISTS wl_payments_financial_lookup ON wl.payments(status,paid_at,booking_id,customer_id);
+CREATE TABLE IF NOT EXISTS wl.square_payments (
+ environment text NOT NULL CHECK(environment IN ('production','sandbox')), payment_id text NOT NULL,
+ location_id text NOT NULL DEFAULT '', order_id text NOT NULL DEFAULT '', status text NOT NULL,
+ amount_cents bigint NOT NULL DEFAULT 0 CHECK(amount_cents >= 0), tip_cents bigint NOT NULL DEFAULT 0 CHECK(tip_cents >= 0),
+ refunded_cents bigint NOT NULL DEFAULT 0 CHECK(refunded_cents >= 0), processor_fee_cents bigint NOT NULL DEFAULT 0,
+ currency text NOT NULL, source_type text NOT NULL DEFAULT '', payment_method text NOT NULL DEFAULT '', receipt_url text NOT NULL DEFAULT '',
+ created_at timestamptz, updated_at timestamptz, paid_at timestamptz, synced_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(environment,payment_id));
+CREATE INDEX IF NOT EXISTS wl_square_payments_financial_lookup ON wl.square_payments(environment,status,currency,paid_at);
+CREATE INDEX IF NOT EXISTS wl_square_payments_order_lookup ON wl.square_payments(environment,order_id) WHERE order_id<>'';
+CREATE INDEX IF NOT EXISTS wl_payment_square_order_lookup ON wl.payments((metadata->>'square_environment'),(metadata->>'square_order_id')) WHERE provider='square';
+CREATE TABLE IF NOT EXISTS wl.square_sync (
+ environment text PRIMARY KEY CHECK(environment IN ('production','sandbox')), cursor jsonb NOT NULL DEFAULT '{}',
+ status text NOT NULL DEFAULT 'idle', last_synced_at timestamptz, last_error text NOT NULL DEFAULT '', updated_at timestamptz NOT NULL DEFAULT now());
+-- Square is authoritative for its own payments. Linking is optional and never creates a booking or customer.
+CREATE OR REPLACE VIEW wl.revenue_payments AS
+SELECT
+ 'square:' || s.environment || ':' || s.payment_id AS id,
+ linked.booking_id, linked.customer_id, s.amount_cents, s.refunded_cents, s.processor_fee_cents,
+ CASE WHEN s.refunded_cents >= s.amount_cents AND s.refunded_cents > 0 THEN 'refunded'
+      WHEN s.refunded_cents > 0 THEN 'partially_refunded' ELSE 'paid' END AS status,
+ 'square'::text AS provider, s.paid_at, s.created_at,
+ COALESCE(linked.checkout_url,'') AS checkout_url, s.payment_id AS external_id,
+ s.payment_method, COALESCE(linked.kind,'payment') AS kind,
+ COALESCE(linked.metadata,'{}'::jsonb) || jsonb_build_object(
+   'square_environment',s.environment,'square_order_id',s.order_id,'square_location_id',s.location_id,
+   'square_source_type',s.source_type,'square_receipt_url',s.receipt_url,'square_ledger',true
+ ) AS metadata, s.tip_cents
+FROM wl.square_payments s
+LEFT JOIN LATERAL (
+ SELECT p.* FROM wl.payments p
+ WHERE p.provider='square' AND p.metadata->>'square_environment'=s.environment
+   AND (p.external_id=s.payment_id OR (
+     s.order_id<>'' AND p.metadata->>'square_order_id'=s.order_id
+     AND (SELECT count(*) FROM wl.payments other
+          WHERE other.provider='square' AND other.metadata->>'square_environment'=s.environment
+            AND other.metadata->>'square_order_id'=s.order_id)=1
+   ))
+ ORDER BY (p.external_id=s.payment_id) DESC,p.created_at,p.id
+ LIMIT 1
+) linked ON true
+WHERE s.environment='production' AND s.currency='USD' AND s.status='COMPLETED'
+UNION ALL
+SELECT p.id::text,p.booking_id,p.customer_id,p.amount_cents::bigint,p.refunded_cents::bigint,
+ p.processor_fee_cents::bigint,p.status,p.provider,p.paid_at,p.created_at,p.checkout_url,p.external_id,
+ p.payment_method,p.kind,p.metadata,0::bigint AS tip_cents
+FROM wl.payments p
+WHERE p.provider<>'square' OR (
+ p.metadata->>'square_environment'='production'
+ AND NOT EXISTS (
+   SELECT 1 FROM wl.square_payments s
+   WHERE s.environment='production' AND (
+     (p.external_id<>'' AND s.payment_id=p.external_id)
+     OR (s.order_id<>'' AND s.order_id=p.metadata->>'square_order_id')
+   )
+ )
+);
 CREATE TABLE IF NOT EXISTS wl.audit_logs (
  id uuid PRIMARY KEY, actor_id uuid REFERENCES wl.users(id), entity_type text NOT NULL, entity_id uuid, action text NOT NULL, before_data jsonb NOT NULL DEFAULT '{}', after_data jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.expenses (

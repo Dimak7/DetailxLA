@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     if (!s) throw new AppError("Please sign in.", 401);
     const body = await readJson(request);
     const result = await adminAction(body.action, body.data, s);
-    after(() =>
+    if (body.action !== "sync_square_payments") after(() =>
       processOutbox(10)
         .then(() => {})
         .catch(() => {}),
