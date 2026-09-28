@@ -98,6 +98,31 @@ export async function report(params: URLSearchParams) {
     "SELECT channel,SUM(amount_cents)::int total FROM wl.ad_spend WHERE spend_date BETWEEN $1 AND $2 GROUP BY channel",
     values,
   );
+  const googleAds = (
+    await query<Row>(
+      `SELECT
+        (SELECT count(DISTINCT a.session_id)::int FROM wl.attributions a
+          WHERE a.source='Google Ads' AND (a.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) sessions,
+        (SELECT count(DISTINCT a.session_id)::int FROM wl.attributions a
+          WHERE a.source='Google Ads' AND (a.gclid<>'' OR a.gbraid<>'' OR a.wbraid<>'')
+            AND (a.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) click_sessions,
+        (SELECT count(DISTINCT e.session_id)::int FROM wl.events e JOIN wl.attributions a ON a.id=e.attribution_id
+          WHERE a.source='Google Ads' AND e.name='booking_started'
+            AND (e.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) booking_starts,
+        (SELECT count(*)::int FROM wl.bookings b JOIN wl.attributions a ON a.id=b.attribution_id
+          WHERE a.source='Google Ads' AND b.status NOT IN ('cancelled','no_show')
+            AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) bookings,
+        COALESCE((SELECT SUM(b.price_cents)::int FROM wl.bookings b JOIN wl.attributions a ON a.id=b.attribution_id
+          WHERE a.source='Google Ads' AND b.status NOT IN ('cancelled','no_show')
+            AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date),0)::int booked_value,
+        COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::int FROM wl.payments p
+          JOIN wl.bookings b ON b.id=p.booking_id JOIN wl.attributions a ON a.id=b.attribution_id
+          WHERE a.source='Google Ads' AND ${payments}),0)::int paid_revenue`,
+      values,
+    )
+  )[0];
+  const googleAdsSpend =
+    channelSpend.find((entry) => entry.channel === "Google Ads")?.total ?? null;
   const channelPerformance = channels.map((channel) => {
     const rows = performance.filter((r) => r.source === channel),
       sum = (key: string) => rows.reduce((n, r) => n + Number(r[key]), 0),
@@ -170,6 +195,18 @@ export async function report(params: URLSearchParams) {
     conversion_rate: visits ? (totalBookings / visits) * 100 : null,
     events,
     channels: channelPerformance,
+    google_ads: {
+      sessions: Number(googleAds.sessions),
+      click_sessions: Number(googleAds.click_sessions),
+      booking_starts: Number(googleAds.booking_starts),
+      bookings: Number(googleAds.bookings),
+      booked_value: Number(googleAds.booked_value),
+      paid_revenue: Number(googleAds.paid_revenue),
+      spend: googleAdsSpend,
+      roas: googleAdsSpend
+        ? Number(googleAds.paid_revenue) / googleAdsSpend
+        : null,
+    },
     campaigns: performance,
     series,
     topServices,

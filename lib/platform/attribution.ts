@@ -10,6 +10,8 @@ export const attributionSchema = z.object({
   term: text,
   content: text,
   gclid: text,
+  gbraid: text,
+  wbraid: text,
   fbclid: text,
   landing_page: text,
   referrer: text,
@@ -18,7 +20,12 @@ export function normalizeAttribution(value: unknown): Attribution {
   const a = attributionSchema.parse(value || {});
   const src = a.source.toLowerCase(),
     medium = a.medium.toLowerCase();
-  if (a.gclid || (src.includes("google") && /cpc|paid|ppc/.test(medium)))
+  if (
+    a.gclid ||
+    a.gbraid ||
+    a.wbraid ||
+    (src.includes("google") && /cpc|paid|ppc/.test(medium))
+  )
     a.source = "Google Ads";
   else if (
     a.fbclid ||
@@ -44,8 +51,8 @@ export async function saveAttribution(
   const a = normalizeAttribution(value),
     id = randomUUID();
   await q(
-    `INSERT INTO wl.attributions(id,session_id,source,medium,campaign,term,content,gclid,fbclid,landing_page,referrer)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(session_id) DO NOTHING`,
+    `INSERT INTO wl.attributions(id,session_id,source,medium,campaign,term,content,gclid,gbraid,wbraid,fbclid,landing_page,referrer)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(session_id) DO NOTHING`,
     [
       id,
       sessionId,
@@ -55,6 +62,8 @@ export async function saveAttribution(
       a.term,
       a.content,
       a.gclid,
+      a.gbraid,
+      a.wbraid,
       a.fbclid,
       a.landing_page,
       a.referrer,

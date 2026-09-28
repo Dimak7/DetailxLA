@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS wl.rate_limits (key text PRIMARY KEY, count integer N
 CREATE TABLE IF NOT EXISTS wl.attributions (
  id uuid PRIMARY KEY, session_id text NOT NULL UNIQUE, source text NOT NULL DEFAULT 'Direct',
  medium text NOT NULL DEFAULT '', campaign text NOT NULL DEFAULT '', term text NOT NULL DEFAULT '',
- content text NOT NULL DEFAULT '', gclid text NOT NULL DEFAULT '', fbclid text NOT NULL DEFAULT '',
+ content text NOT NULL DEFAULT '', gclid text NOT NULL DEFAULT '', gbraid text NOT NULL DEFAULT '', wbraid text NOT NULL DEFAULT '', fbclid text NOT NULL DEFAULT '',
  landing_page text NOT NULL DEFAULT '', referrer text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.customers (
  id uuid PRIMARY KEY, first_name text NOT NULL, last_name text NOT NULL, email text NOT NULL UNIQUE, phone text NOT NULL,
@@ -156,6 +156,8 @@ CREATE TABLE IF NOT EXISTS wl.payroll_adjustments (
 CREATE TABLE IF NOT EXISTS wl.crm_tags (id uuid PRIMARY KEY, name text NOT NULL UNIQUE, color text NOT NULL DEFAULT '#c6a66b', created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.customer_tags (customer_id uuid NOT NULL REFERENCES wl.customers(id) ON DELETE CASCADE, tag_id uuid NOT NULL REFERENCES wl.crm_tags(id) ON DELETE CASCADE, created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(customer_id,tag_id));
 ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS trim text NOT NULL DEFAULT '';
+ALTER TABLE wl.attributions ADD COLUMN IF NOT EXISTS gbraid text NOT NULL DEFAULT '';
+ALTER TABLE wl.attributions ADD COLUMN IF NOT EXISTS wbraid text NOT NULL DEFAULT '';
 ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS color text NOT NULL DEFAULT '';
 ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS license_plate text NOT NULL DEFAULT '';
 ALTER TABLE wl.vehicles ADD COLUMN IF NOT EXISTS vin text NOT NULL DEFAULT '';

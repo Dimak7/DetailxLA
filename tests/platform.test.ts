@@ -140,9 +140,12 @@ test("Relational platform integration", async (t) => {
       process.env.SQUARE_ACCESS_TOKEN = "square-test-access-token";
       process.env.SQUARE_LOCATION_ID = "square-test-location";
       process.env.SQUARE_WEBHOOK_SIGNATURE_KEY = "square-test-signature";
+      process.env.SQUARE_ENVIRONMENT = "sandbox";
       const originalFetch = globalThis.fetch;
+      let requestUrl = "";
       let requestBody: Record<string, unknown> = {};
-      globalThis.fetch = async (_input, init) => {
+      globalThis.fetch = async (input, init) => {
+        requestUrl = String(input);
         requestBody = JSON.parse(String(init?.body || "{}"));
         return new Response(
           JSON.stringify({
@@ -159,6 +162,10 @@ test("Relational platform integration", async (t) => {
         assert.equal(
           await createCheckout(booking.booking.id, "balance"),
           "https://square.link/u/test-only",
+        );
+        assert.equal(
+          requestUrl,
+          "https://connect.squareupsandbox.com/v2/online-checkout/payment-links",
         );
         assert.ok(requestBody.idempotency_key);
         assert.equal(
@@ -198,6 +205,7 @@ test("Relational platform integration", async (t) => {
         delete process.env.SQUARE_ACCESS_TOKEN;
         delete process.env.SQUARE_LOCATION_ID;
         delete process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+        delete process.env.SQUARE_ENVIRONMENT;
       }
     });
     await t.test("job upsells and discounts calculate an auditable booking total", async () => {

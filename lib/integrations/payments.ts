@@ -9,6 +9,11 @@ import { metaEvent } from "./providers";
 import type { Booking, BusinessSettings } from "../platform/types";
 
 const SQUARE_API_VERSION = "2026-09-16";
+function squareApiBase() {
+  return process.env.SQUARE_ENVIRONMENT?.toLowerCase() === "sandbox"
+    ? "https://connect.squareupsandbox.com"
+    : "https://connect.squareup.com";
+}
 type PaymentKind = "deposit" | "balance";
 type PaymentProvider = "square" | "stripe";
 type PaymentRow = {
@@ -135,7 +140,7 @@ async function createSquareCheckout(b: Booking, p: PaymentRow) {
       receipt +
       "&payment=returned";
   const response = await fetch(
-    "https://connect.squareup.com/v2/online-checkout/payment-links",
+    squareApiBase() + "/v2/online-checkout/payment-links",
     {
       method: "POST",
       headers: {

@@ -6,9 +6,10 @@ The booking flow uses Square-hosted Checkout. Card data is entered on Square and
 
 Set these on the production service:
 
-- `SQUARE_ACCESS_TOKEN`: Production access token from the Square Developer Console.
-- `SQUARE_LOCATION_ID`: Production location that should receive booking deposits.
-- `SQUARE_WEBHOOK_SIGNATURE_KEY`: Signature key for the production webhook subscription.
+- `SQUARE_ENVIRONMENT`: `sandbox` for Square sandbox credentials, or `production` for live credentials. The default is `production`.
+- `SQUARE_ACCESS_TOKEN`: Access token from the selected Square environment.
+- `SQUARE_LOCATION_ID`: Location from the selected Square environment that should receive booking deposits.
+- `SQUARE_WEBHOOK_SIGNATURE_KEY`: Signature key for the webhook subscription in the selected Square environment.
 - `SQUARE_WEBHOOK_URL`: `https://detailxla-production.up.railway.app/api/webhooks/square`
 - `BOOKING_DEPOSIT_PERCENT`: `50`
 
@@ -16,7 +17,7 @@ All three Square credentials must be present before public checkout is enabled.
 
 ## Square webhook
 
-Create a production webhook subscription with this notification URL:
+Create a webhook subscription in the same environment as the credentials with this notification URL:
 
 `https://detailxla-production.up.railway.app/api/webhooks/square`
 
@@ -35,4 +36,3 @@ The notification URL in Square and `SQUARE_WEBHOOK_URL` must match exactly becau
 - A checkout redirect does not confirm payment.
 - Only a signature-verified completed-payment webhook marks a payment paid and changes a new booking to confirmed.
 - Completed Square refunds update the payment ledger and financial reports.
-

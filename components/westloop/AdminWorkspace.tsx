@@ -550,7 +550,12 @@ export function AdminWorkspace({
         f("google_tag_id", "Google Tag ID (GT-)"),
         f("ga4_id", "GA4 measurement (G-)"),
         f("google_ads_id", "Google Ads ID (AW-)"),
-        f("google_ads_label", "Conversion label"),
+        f("google_ads_label", "Booking conversion label", "text", {
+          hint: "From Google Ads > Goals > Conversions > booking action > tag setup",
+        }),
+        f("google_ads_phone_label", "Phone conversion label", "text", {
+          hint: "Optional separate Google Ads conversion action for phone clicks",
+        }),
         f("meta_pixel_id", "Meta Pixel ID"),
         f("meta_dataset_id", "Meta dataset ID"),
         f("meta_token", "Meta CAPI access token", "password", {
@@ -574,8 +579,8 @@ export function AdminWorkspace({
         ),
       ],
       Payments: [
-        f("square_access_token", "Square production access token", "password", {
-          hint: "Leave blank to keep the existing token",
+        f("square_access_token", "Square access token", "password", {
+          hint: "Must match the SQUARE_ENVIRONMENT Railway variable. Leave blank to keep the existing token.",
         }),
         f("square_location_id", "Square location ID", "password", {
           hint: "Leave blank to keep the existing location",

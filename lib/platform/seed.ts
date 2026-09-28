@@ -26,6 +26,7 @@ export const defaultSettings: BusinessSettings = {
   ga4_id: "",
   google_ads_id: "",
   google_ads_label: "",
+  google_ads_phone_label: "",
   meta_pixel_id: "",
   meta_dataset_id: "",
   email_from: "",

@@ -43,6 +43,7 @@ export const settingsSchema = z
     ga4_id: z.string().regex(/^(|G-[A-Z0-9]+)$/),
     google_ads_id: z.string().regex(/^(|AW-\d+)$/),
     google_ads_label: z.string().regex(/^[a-zA-Z0-9_-]*$/),
+    google_ads_phone_label: z.string().regex(/^[a-zA-Z0-9_-]*$/),
     meta_pixel_id: z.string().regex(/^\d*$/),
     meta_dataset_id: z.string().regex(/^\d*$/),
     email_from: z.string().max(240),
@@ -87,6 +88,8 @@ export async function settings(): Promise<BusinessSettings> {
     ga4_id: process.env.GOOGLE_ANALYTICS_ID || "",
     google_ads_id: process.env.GOOGLE_ADS_ID || "",
     google_ads_label: process.env.GOOGLE_ADS_CONVERSION_LABEL || "",
+    google_ads_phone_label:
+      process.env.GOOGLE_ADS_PHONE_CONVERSION_LABEL || "",
     meta_pixel_id: process.env.META_PIXEL_ID || "",
     email_from: process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || "",
     telegram_chat_id: process.env.TELEGRAM_CHAT_ID || "",
@@ -217,6 +220,11 @@ export async function integrationStatus() {
         c.square_webhook_signature_key) ||
       (c.stripe_key && c.stripe_webhook),
     google: Boolean(s.ga4_id || s.google_ads_id || s.google_tag_id),
+    google_ads_tag: Boolean(s.google_ads_id),
+    google_ads_conversion: Boolean(s.google_ads_id && s.google_ads_label),
+    google_ads_phone_conversion: Boolean(
+      s.google_ads_id && s.google_ads_phone_label,
+    ),
     meta: Boolean(s.meta_pixel_id),
     meta_capi: c.meta_token && Boolean(s.meta_dataset_id || s.meta_pixel_id),
     google_ads_reporting: false,

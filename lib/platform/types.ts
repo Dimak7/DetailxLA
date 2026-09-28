@@ -13,6 +13,8 @@ export type Attribution = {
   term: string;
   content: string;
   gclid: string;
+  gbraid: string;
+  wbraid: string;
   fbclid: string;
   landing_page: string;
   referrer: string;
@@ -55,6 +57,7 @@ export type BusinessSettings = {
   ga4_id: string;
   google_ads_id: string;
   google_ads_label: string;
+  google_ads_phone_label: string;
   meta_pixel_id: string;
   meta_dataset_id: string;
   email_from: string;

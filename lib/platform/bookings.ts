@@ -60,6 +60,8 @@ export const bookingInput = z.object({
     term: "",
     content: "",
     gclid: "",
+    gbraid: "",
+    wbraid: "",
     fbclid: "",
     landing_page: "",
     referrer: "",

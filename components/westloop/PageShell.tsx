@@ -19,6 +19,7 @@ export function PageShell({
           ga4_id: business.ga4_id,
           google_ads_id: business.google_ads_id,
           google_ads_label: business.google_ads_label,
+          google_ads_phone_label: business.google_ads_phone_label,
           meta_pixel_id: business.meta_pixel_id,
         }}
       />
