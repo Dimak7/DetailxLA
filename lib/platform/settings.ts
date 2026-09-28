@@ -61,6 +61,9 @@ const envKeys: Record<string, string[]> = {
   sms_token: ["SMS_PROVIDER_AUTH_TOKEN", "TWILIO_AUTH_TOKEN"],
   stripe_key: ["STRIPE_SECRET_KEY"],
   stripe_webhook: ["STRIPE_WEBHOOK_SECRET"],
+  square_access_token: ["SQUARE_ACCESS_TOKEN"],
+  square_location_id: ["SQUARE_LOCATION_ID"],
+  square_webhook_signature_key: ["SQUARE_WEBHOOK_SIGNATURE_KEY"],
   meta_token: ["META_ACCESS_TOKEN"],
   telegram_webhook: ["TELEGRAM_WEBHOOK_SECRET"],
 };
@@ -95,6 +98,28 @@ export async function settings(): Promise<BusinessSettings> {
   } as BusinessSettings;
   // Resolve the former default without modifying custom contact or integration fields.
   return { ...business, name: resolveBusinessName(business.name) };
+}
+export function effectiveDepositPercent(s: BusinessSettings) {
+  const configured = Number(process.env.BOOKING_DEPOSIT_PERCENT);
+  if (
+    process.env.BOOKING_DEPOSIT_PERCENT !== undefined &&
+    Number.isFinite(configured) &&
+    configured >= 0 &&
+    configured <= 100
+  )
+    return configured;
+  return s.deposit_percent > 0 ? s.deposit_percent : 50;
+}
+export async function paymentProvider() {
+  if (
+    (await secret("square_access_token")) &&
+    (await secret("square_location_id")) &&
+    (await secret("square_webhook_signature_key"))
+  )
+    return "square" as const;
+  if ((await secret("stripe_key")) && (await secret("stripe_webhook")))
+    return "stripe" as const;
+  return null;
 }
 function encryptionKey() {
   const key = process.env.SETTINGS_ENCRYPTION_KEY;
@@ -134,9 +159,17 @@ export async function saveSettings(
   if (
     s.deposit_percent > 0 &&
     !(await secret("stripe_key")) &&
-    !credentials.stripe_key
+    !credentials.stripe_key &&
+    !(
+      ((await secret("square_access_token")) ||
+        credentials.square_access_token) &&
+      ((await secret("square_location_id")) ||
+        credentials.square_location_id) &&
+      ((await secret("square_webhook_signature_key")) ||
+        credentials.square_webhook_signature_key)
+    )
   )
-    throw new Error("Connect Stripe before enabling deposits.");
+    throw new Error("Connect Square or Stripe before enabling deposits.");
   await transaction(async (q) => {
     await q("SELECT id FROM wl.schedule_guard WHERE id=1 FOR UPDATE");
     await q(
@@ -173,7 +206,16 @@ export async function integrationStatus() {
     email: c.email_key && Boolean(s.email_from),
     sms: c.sms_account && c.sms_token && Boolean(s.sms_from),
     telegram: c.telegram_token && Boolean(s.telegram_chat_id),
+    square:
+      c.square_access_token &&
+      c.square_location_id &&
+      c.square_webhook_signature_key,
     stripe: c.stripe_key && c.stripe_webhook,
+    payments:
+      (c.square_access_token &&
+        c.square_location_id &&
+        c.square_webhook_signature_key) ||
+      (c.stripe_key && c.stripe_webhook),
     google: Boolean(s.ga4_id || s.google_ads_id || s.google_tag_id),
     meta: Boolean(s.meta_pixel_id),
     meta_capi: c.meta_token && Boolean(s.meta_dataset_id || s.meta_pixel_id),

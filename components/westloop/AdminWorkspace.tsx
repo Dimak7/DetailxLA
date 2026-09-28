@@ -532,7 +532,10 @@ export function AdminWorkspace({
         f("open_time", "Open", "time"),
         f("close_time", "Close", "time"),
         f("buffer_minutes", "Buffer (minutes)", "number"),
-        f("deposit_percent", "Deposit (%)", "number", { max: 100 }),
+        f("deposit_percent", "Standard detail deposit (%)", "number", {
+          max: 100,
+          hint: "Set a custom percentage. A value of 0 uses the recommended 50% when online payments are connected.",
+        }),
         f("cancellation_policy", "Cancellation policy", "textarea", {
           wide: true,
         }),
@@ -571,6 +574,18 @@ export function AdminWorkspace({
         ),
       ],
       Payments: [
+        f("square_access_token", "Square production access token", "password", {
+          hint: "Leave blank to keep the existing token",
+        }),
+        f("square_location_id", "Square location ID", "password", {
+          hint: "Leave blank to keep the existing location",
+        }),
+        f(
+          "square_webhook_signature_key",
+          "Square webhook signature key",
+          "password",
+          { hint: "Leave blank to keep the existing key" },
+        ),
         f("stripe_key", "Stripe secret key", "password"),
         f("stripe_webhook", "Stripe webhook signing secret", "password"),
       ],
@@ -583,6 +598,9 @@ export function AdminWorkspace({
       "sms_token",
       "stripe_key",
       "stripe_webhook",
+      "square_access_token",
+      "square_location_id",
+      "square_webhook_signature_key",
       "meta_token",
     ];
     edit(
@@ -1639,8 +1657,9 @@ export function AdminWorkspace({
       {section === "payments" && (
         <>
           <p className="small-note">
-            Payment records are written by verified Stripe webhooks. Checkout
-            links do not mark appointments paid.
+            Payment records are written only by signature-verified Square or
+            Stripe webhooks. A checkout redirect never marks an appointment
+            paid.
           </p>
           {table(
             [
@@ -1656,7 +1675,7 @@ export function AdminWorkspace({
               money(n(r.amount_cents)),
               money(n(r.refunded_cents)),
               status(r.status),
-              s(r.stripe_payment_id) || "Pending",
+              s(r.provider) + (s(r.external_id) ? " · " + s(r.external_id) : " · Pending"),
               stamp(r.paid_at),
             ]),
           )}

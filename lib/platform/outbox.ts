@@ -126,12 +126,12 @@ export async function enqueueBooking(
       bookingId: b.id,
     });
   if (
-    event === "booking_confirmation" ||
+    event === "booking_request" ||
     event === "booking_cancelled" ||
     event === "payment"
   ) {
     const businessKey =
-      event === "booking_confirmation"
+      event === "booking_request"
         ? "new_booking"
         : event === "booking_cancelled"
           ? "business_cancellation"

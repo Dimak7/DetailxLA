@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { query, transaction, type Query } from "./db";
-import { settings } from "./settings";
+import {
+  effectiveDepositPercent,
+  paymentProvider,
+  settings,
+  siteUrl,
+} from "./settings";
 import { hash, AppError, receiptToken } from "./auth";
 import { saveAttribution, attributionSchema } from "./attribution";
 import { enqueue, enqueueBooking } from "./outbox";
 import { metaEvent } from "../integrations/providers";
-import { siteUrl } from "./settings";
 import {
   dateToday,
   priceFor,
@@ -63,6 +67,21 @@ export const bookingInput = z.object({
   device: z.string().max(100).default(""),
   lead_id: z.uuid().optional(),
 });
+export function bookingDepositCents(
+  service: Service,
+  price: number | null,
+  business: BusinessSettings,
+  provider: "square" | "stripe" | null,
+) {
+  const requiresQuote =
+    service.pricing_mode === "quote" || service.slug === "ceramic-coating";
+  if (price == null || requiresQuote || !provider) return 0;
+  const percent =
+    provider === "square"
+      ? effectiveDepositPercent(business)
+      : business.deposit_percent;
+  return percent > 0 ? Math.round((price * percent) / 100) : 0;
+}
 export function validDate(value: string) {
   const date = new Date(value + "T12:00:00Z");
   return (
@@ -168,7 +187,8 @@ export async function createBooking(value: unknown, admin = false) {
   const input = bookingInput.parse(value);
   if (!admin && input.lead_id) throw new AppError("Invalid booking request.");
   const fingerprint = hash(JSON.stringify(input)),
-    s = await settings();
+    s = await settings(),
+    provider = admin ? null : await paymentProvider();
   const id = randomUUID(),
     token = await receiptToken(id);
   const result = await transaction(async (q) => {
@@ -272,8 +292,7 @@ export async function createBooking(value: unknown, admin = false) {
       )
     ).rows[0];
     const price = priceFor(service, input.vehicle_type),
-      deposit =
-        price == null ? 0 : Math.round((price * s.deposit_percent) / 100);
+      deposit = bookingDepositCents(service, price, s, provider);
     const booking = (
       await q<Booking>(
         `INSERT INTO wl.bookings(id,request_key,request_hash,reference,customer_id,vehicle_id,service_id,service_name,service_snapshot,booking_date,start_minute,duration_minutes,buffer_minutes,price_cents,deposit_cents,notes,location,attribution_id,lead_id)
@@ -352,7 +371,7 @@ export async function createBooking(value: unknown, admin = false) {
       "INSERT INTO wl.events(id,name,session_id,customer_id,booking_id,attribution_id) VALUES($1,'lead_created',$2,$3,$4,$5)",
       ["lead:" + leadId, input.session_id, customerId, id, attributionId],
     );
-    await enqueueBooking(q, booking, s, token);
+    await enqueueBooking(q, booking, s, token, "booking_request");
     await enqueue(q, {
       key: "meta:booking:" + id,
       channel: "meta",
@@ -534,6 +553,15 @@ export async function updateBooking(
         s,
         token,
         "booking_cancelled",
+        randomUUID(),
+      );
+    if (status === "confirmed" && b.status !== status)
+      await enqueueBooking(
+        q,
+        next,
+        s,
+        token,
+        "booking_confirmation",
         randomUUID(),
       );
     if (status === "completed" && b.status !== status) {

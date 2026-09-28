@@ -33,6 +33,7 @@ export function BookingWizard({
   business,
   initialService,
   admin = false,
+  paymentsEnabled = false,
   lead,
   onComplete,
 }: {
@@ -40,6 +41,7 @@ export function BookingWizard({
   business: BusinessSettings;
   initialService?: string;
   admin?: boolean;
+  paymentsEnabled?: boolean;
   lead?: { id: string; name: string; email: string; phone: string };
   onComplete?: () => void;
 }) {
@@ -75,7 +77,13 @@ export function BookingWizard({
   const key = useRef({ body: "", id: "" }),
     started = useRef(false);
   const service = services.find((s) => s.id === draft.service_id),
-    price = service ? priceFor(service, draft.vehicle_type) : null;
+    price = service ? priceFor(service, draft.vehicle_type) : null,
+    quoteBased =
+      service?.pricing_mode === "quote" || service?.slug === "ceramic-coating",
+    deposit =
+      !quoteBased && paymentsEnabled && price !== null
+        ? Math.round((price * business.deposit_percent) / 100)
+        : 0;
   function set<K extends keyof Draft>(k: K, v: Draft[K]) {
     setDraft((d) => ({ ...d, [k]: v }));
     setError("");
@@ -171,6 +179,27 @@ export function BookingWizard({
         result.value_cents,
         result.event_id,
       );
+      if (!admin && result.deposit_cents > 0) {
+        const confirmation = new URL(result.confirmation_url, location.origin),
+          token = confirmation.searchParams.get("token"),
+          payment = await fetch("/api/payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: result.booking_id,
+              token,
+              kind: "deposit",
+            }),
+          }),
+          checkout = await payment.json();
+        if (payment.ok && checkout.url) {
+          window.location.assign(checkout.url);
+          return;
+        }
+        confirmation.searchParams.set("payment", "unavailable");
+        window.location.assign(confirmation.toString());
+        return;
+      }
       window.location.assign(result.confirmation_url);
     } catch (e) {
       setError(
@@ -369,7 +398,7 @@ export function BookingWizard({
               <div className="booking-review-grid">
                 <div><span>Care</span><strong>{service?.name}</strong><small>{draft.vehicle_type}</small></div>
                 <div><span>When</span><strong>{draft.date}</strong><small>{timeLabel(draft.start_minute)} CT</small></div>
-                <div className="booking-review-price"><span>{service?.pricing_mode === "starting" ? "Starting at" : "Your estimate"}</span><strong>{money(price)}</strong></div>
+                <div className="booking-review-price"><span>{service?.pricing_mode === "starting" ? "Starting at" : "Your estimate"}</span><strong>{money(price)}</strong>{deposit > 0 && <small>{money(deposit)} due now</small>}</div>
               </div>
             </section>
             <h3 className="booking-details-heading">YOUR DETAILS</h3>
@@ -422,17 +451,24 @@ export function BookingWizard({
           )}
           <button className="button" disabled={busy || !services.length}>
             {busy
-              ? "Reserving..."
+              ? deposit > 0
+                ? "Opening secure payment..."
+                : "Sending request..."
               : step === 3
-                ? "CONFIRM APPOINTMENT"
+                ? deposit > 0
+                  ? "CONTINUE TO SECURE PAYMENT"
+                  : quoteBased
+                    ? "REQUEST A QUOTE & APPOINTMENT"
+                    : "CONFIRM APPOINTMENT"
                 : "Continue"}
           </button>
         </div>
         <p className="small-note">
-          No card details required to reserve.{" "}
-          {business.deposit_percent > 0
-            ? "Any required deposit is paid securely after confirmation."
-            : "Payment details are confirmed with your appointment."}
+          {quoteBased
+            ? "No payment is collected now. We will inspect the vehicle and confirm the ceramic coating scope and final quote with you."
+            : deposit > 0
+              ? `A ${business.deposit_percent}% deposit of ${money(deposit)} is required to confirm this appointment. Card details are entered securely on Square.`
+              : "No card details are required right now. Payment details are confirmed with your appointment."}
         </p>
       </form>
       <aside className="booking-summary paper">
@@ -470,12 +506,10 @@ export function BookingWizard({
           </span>
           <strong>{service ? money(price) : "—"}</strong>
         </div>
-        {business.deposit_percent > 0 && price !== null && (
+        {deposit > 0 && (
           <div className="summary-row">
-            <span>Deposit</span>
-            <strong>
-              {money(Math.round((price * business.deposit_percent) / 100))}
-            </strong>
+            <span>Due now to confirm</span>
+            <strong>{money(deposit)}</strong>
           </div>
         )}
         <p className="small-note">{business.cancellation_policy}</p>

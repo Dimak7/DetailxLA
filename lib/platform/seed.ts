@@ -202,6 +202,10 @@ export async function seed(q: Query) {
     "INSERT INTO wl.settings(key,value) VALUES ('catalog_initialized','true') ON CONFLICT DO NOTHING",
   );
   const templates = {
+    booking_request: [
+      "We received your appointment request",
+      "Hi {{customer_name}},\nWe received your {{service_name}} request for {{booking_date}} at {{booking_time}} (Chicago time).\nVehicle: {{vehicle}}\nEstimate: {{total}}\nYour appointment is confirmed after any required deposit or quote approval.\n{{booking_url}}",
+    ],
     booking_confirmation: [
       "Your appointment at {{business_name}}",
       "Hi {{customer_name}},\nYour {{service_name}} appointment is reserved for {{booking_date}} at {{booking_time}} (Chicago time).\nVehicle: {{vehicle}}\nEstimate: {{total}}\n{{booking_url}}",

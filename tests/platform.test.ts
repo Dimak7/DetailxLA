@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import { query, closeDatabase, transaction } from "../lib/platform/db";
 import {
   createBooking,
+  bookingDepositCents,
   availability,
   updateBooking,
 } from "../lib/platform/bookings";
@@ -25,6 +26,9 @@ import { jobFinancials } from "../lib/platform/job-financials";
 import {
   verifyStripeEvent,
   handleStripeEvent,
+  verifySquareEvent,
+  handleSquareEvent,
+  createCheckout,
 } from "../lib/integrations/payments";
 import type { Service, Session } from "../lib/platform/types";
 import { POST as employeeClock } from "../app/api/employee/clock/route";
@@ -114,6 +118,87 @@ test("Relational platform integration", async (t) => {
         assert.ok(await verifyReceipt(booking.booking.id, booking.token));
       },
     );
+    await t.test(
+      "Square-enabled standard details require 50 percent while ceramic remains quote-based",
+      async () => {
+        const business = await settings();
+        assert.equal(
+          bookingDepositCents(services[0], 12000, business, "square"),
+          6000,
+        );
+        const ceramic = services.find(
+          (service) => service.slug === "ceramic-coating",
+        )!;
+        assert.equal(
+          bookingDepositCents(ceramic, 50000, business, "square"),
+          0,
+        );
+      },
+    );
+    await t.test("Square checkout uses a hosted idempotent payment link", async () => {
+      process.env.SQUARE_ACCESS_TOKEN = "square-test-access-token";
+      process.env.SQUARE_LOCATION_ID = "square-test-location";
+      process.env.SQUARE_WEBHOOK_SIGNATURE_KEY = "square-test-signature";
+      const originalFetch = globalThis.fetch;
+      let requestBody: Record<string, unknown> = {};
+      globalThis.fetch = async (_input, init) => {
+        requestBody = JSON.parse(String(init?.body || "{}"));
+        return new Response(
+          JSON.stringify({
+            payment_link: {
+              id: "square-link-test",
+              order_id: "square-order-checkout",
+              url: "https://square.link/u/test-only",
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      };
+      try {
+        assert.equal(
+          await createCheckout(booking.booking.id, "balance"),
+          "https://square.link/u/test-only",
+        );
+        assert.ok(requestBody.idempotency_key);
+        assert.equal(
+          (
+            requestBody.order as {
+              location_id: string;
+              line_items: Array<{
+                base_price_money: { amount: number; currency: string };
+              }>;
+            }
+          ).location_id,
+          "square-test-location",
+        );
+        assert.equal(
+          (
+            requestBody.order as {
+              line_items: Array<{
+                base_price_money: { amount: number; currency: string };
+              }>;
+            }
+          ).line_items[0].base_price_money.amount,
+          12000,
+        );
+        const payment = (
+          await query<{ provider: string; metadata: Record<string, string> }>(
+            "SELECT provider,metadata FROM wl.payments WHERE booking_id=$1 AND provider='square'",
+            [booking.booking.id],
+          )
+        )[0];
+        assert.equal(payment.provider, "square");
+        assert.equal(payment.metadata.square_order_id, "square-order-checkout");
+        await query("DELETE FROM wl.payments WHERE booking_id=$1 AND provider='square'", [
+          booking.booking.id,
+        ]);
+      } finally {
+        globalThis.fetch = originalFetch;
+        delete process.env.SQUARE_ACCESS_TOKEN;
+        delete process.env.SQUARE_LOCATION_ID;
+        delete process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+      }
+    });
     await t.test("job upsells and discounts calculate an auditable booking total", async () => {
       await adminAction("save_booking_line_item", {
         booking_id: booking.booking.id,
@@ -319,6 +404,107 @@ test("Relational platform integration", async (t) => {
         assert.equal((await report(new URLSearchParams())).revenue, 10000);
         delete process.env.STRIPE_SECRET_KEY;
         delete process.env.STRIPE_WEBHOOK_SECRET;
+      },
+    );
+    await t.test(
+      "Square webhooks verify deposits, confirm bookings, and record refunds",
+      async () => {
+        const paymentId = randomUUID(),
+          orderId = "square-order-test",
+          squarePaymentId = "square-payment-test";
+        await query("UPDATE wl.bookings SET status='new' WHERE id=$1", [
+          booking.booking.id,
+        ]);
+        await query(
+          "INSERT INTO wl.payments(id,booking_id,customer_id,amount_cents,kind,provider,metadata) VALUES($1,$2,$3,5000,'deposit','square',$4::jsonb)",
+          [
+            paymentId,
+            booking.booking.id,
+            booking.booking.customer_id,
+            JSON.stringify({ square_order_id: orderId }),
+          ],
+        );
+        process.env.SQUARE_WEBHOOK_SIGNATURE_KEY =
+          "square-test-webhook-signature-key";
+        process.env.SQUARE_WEBHOOK_URL =
+          "https://example.test/api/webhooks/square";
+        const event = {
+          event_id: "square-event-payment",
+          type: "payment.updated",
+          data: {
+            object: {
+              payment: {
+                id: squarePaymentId,
+                order_id: orderId,
+                status: "COMPLETED",
+                amount_money: { amount: 5000, currency: "USD" },
+                processing_fee: [
+                  { amount_money: { amount: 175, currency: "USD" } },
+                ],
+                card_details: {
+                  card: { card_brand: "VISA", last_4: "4242" },
+                },
+              },
+            },
+          },
+        };
+        const body = JSON.stringify(event),
+          signature = createHmac(
+            "sha256",
+            process.env.SQUARE_WEBHOOK_SIGNATURE_KEY,
+          )
+            .update(process.env.SQUARE_WEBHOOK_URL + body)
+            .digest("base64");
+        await assert.rejects(
+          () => verifySquareEvent(body, "invalid"),
+          /signature/,
+        );
+        const verified = await verifySquareEvent(body, signature);
+        await handleSquareEvent(verified);
+        await handleSquareEvent(verified);
+        const payment = (
+            await query<{
+              status: string;
+              external_id: string;
+              processor_fee_cents: number;
+              payment_method: string;
+            }>("SELECT * FROM wl.payments WHERE id=$1", [paymentId])
+          )[0],
+          confirmed = (
+            await query<{ status: string }>(
+              "SELECT status FROM wl.bookings WHERE id=$1",
+              [booking.booking.id],
+            )
+          )[0];
+        assert.equal(payment.status, "paid");
+        assert.equal(payment.external_id, squarePaymentId);
+        assert.equal(Number(payment.processor_fee_cents), 175);
+        assert.match(payment.payment_method, /4242/);
+        assert.equal(confirmed.status, "confirmed");
+        await handleSquareEvent({
+          event_id: "square-event-refund",
+          type: "refund.updated",
+          data: {
+            object: {
+              refund: {
+                id: "square-refund-test",
+                payment_id: squarePaymentId,
+                status: "COMPLETED",
+                amount_money: { amount: 1000, currency: "USD" },
+              },
+            },
+          },
+        });
+        const refunded = (
+          await query<{ status: string; refunded_cents: number }>(
+            "SELECT status,refunded_cents FROM wl.payments WHERE id=$1",
+            [paymentId],
+          )
+        )[0];
+        assert.equal(refunded.status, "partially_refunded");
+        assert.equal(Number(refunded.refunded_cents), 1000);
+        delete process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+        delete process.env.SQUARE_WEBHOOK_URL;
       },
     );
     await t.test(

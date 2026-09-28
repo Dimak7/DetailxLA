@@ -1,6 +1,10 @@
 import { publicData } from "@/lib/platform/public";
 import { PageShell } from "@/components/westloop/PageShell";
 import { BookingWizard } from "@/components/westloop/BookingWizard";
+import {
+  effectiveDepositPercent,
+  paymentProvider,
+} from "@/lib/platform/settings";
 export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Book Your Visit",
@@ -12,6 +16,17 @@ export default async function Page({
   searchParams: Promise<{ service?: string }>;
 }) {
   const d = await publicData();
+  const provider = await paymentProvider();
+  const bookingBusiness = {
+    ...d.business,
+    deposit_percent:
+      provider === "square"
+        ? effectiveDepositPercent(d.business)
+        : d.business.deposit_percent,
+  };
+  const paymentsEnabled =
+    provider === "square" ||
+    (provider === "stripe" && bookingBusiness.deposit_percent > 0);
   const requestedService = (await searchParams).service;
   const selectedService = d.services.find((service) => service.id === requestedService || service.slug === requestedService);
   return (
@@ -25,7 +40,8 @@ export default async function Page({
       </section>
       <BookingWizard
         services={d.services}
-        business={d.business}
+        business={bookingBusiness}
+        paymentsEnabled={paymentsEnabled}
         initialService={selectedService?.id}
       />
     </PageShell>

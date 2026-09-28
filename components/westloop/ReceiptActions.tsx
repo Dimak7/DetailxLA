@@ -8,12 +8,14 @@ export function ReceiptActions({
   deposit,
   canPay,
   payments,
+  provider,
 }: {
   id: string;
   token: string;
   deposit: boolean;
   canPay: boolean;
   payments: Array<{ id: string; amount_cents: number }>;
+  provider: "square" | "stripe" | null;
 }) {
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -49,7 +51,7 @@ export function ReceiptActions({
               disabled={busy}
               onClick={() => pay("deposit")}
             >
-              Pay deposit securely
+              Pay deposit securely{provider === "square" ? " with Square" : ""}
             </button>
           )}
           <button
@@ -57,7 +59,7 @@ export function ReceiptActions({
             disabled={busy}
             onClick={() => pay("balance")}
           >
-            Pay balance
+            Pay balance{provider === "square" ? " with Square" : ""}
           </button>
         </div>
       )}
