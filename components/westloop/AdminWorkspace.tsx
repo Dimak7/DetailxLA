@@ -1867,7 +1867,22 @@ export function AdminWorkspace({
             </p>
           </section>
           <section className="paper">
-            <h2>Integration readiness</h2>
+            <div className="section-heading">
+              <h2>Integration readiness</h2>
+              <button
+                className="button outline"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    "test_telegram",
+                    {},
+                    "Telegram test notification queued.",
+                  )
+                }
+              >
+                Send Telegram test
+              </button>
+            </div>
             <IntegrationStatus value={data.integrations as R} />
           </section>
           <section className="paper">

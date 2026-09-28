@@ -30,7 +30,8 @@ import {
   handleSquareEvent,
   createCheckout,
 } from "../lib/integrations/payments";
-import type { Service, Session } from "../lib/platform/types";
+import { deliver } from "../lib/integrations/providers";
+import type { Message, Service, Session } from "../lib/platform/types";
 import { POST as employeeClock } from "../app/api/employee/clock/route";
 process.env.PGLITE_PATH = "memory://";
 delete process.env.DATABASE_URL;
@@ -582,6 +583,41 @@ test("Relational platform integration", async (t) => {
         );
       },
     );
+    await t.test("Telegram connection test queues a business alert", async () => {
+      const business = await settings();
+      await saveSettings(
+        { ...business, telegram_chat_id: "123456789" },
+        { telegram_token: "test-not-a-real-secret" },
+      );
+      await adminAction("test_telegram", {}, owner!);
+      const message = (
+        await query<Message>(
+          "SELECT * FROM wl.messages WHERE subject='Telegram notifications connected' ORDER BY created_at DESC LIMIT 1",
+        )
+      )[0];
+      assert.equal(message.channel, "telegram");
+      assert.equal(message.recipient, "123456789");
+      assert.equal(message.status, "queued");
+      const originalFetch = globalThis.fetch;
+      let requestUrl = "",
+        requestBody: Record<string, unknown> = {};
+      globalThis.fetch = async (input, init) => {
+        requestUrl = String(input);
+        requestBody = JSON.parse(String(init?.body || "{}"));
+        return new Response(
+          JSON.stringify({ ok: true, result: { message_id: 777 } }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      };
+      try {
+        assert.equal(await deliver(message), "777");
+        assert.match(requestUrl, /api\.telegram\.org\/bot/);
+        assert.equal(requestBody.chat_id, "123456789");
+        assert.match(String(requestBody.text), /Booking alerts are ready/);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
     await t.test("employee scheduling, self-service time clock, hours and payroll work end to end", async () => {
       const sunday = new Date();
       sunday.setUTCDate(sunday.getUTCDate() + ((7 - sunday.getUTCDay()) % 7));

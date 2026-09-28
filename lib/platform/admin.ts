@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { query, transaction, type Query } from "./db";
 import { access, AppError, addUser, passwordHash, receiptToken } from "./auth";
-import { settings, saveSettings, integrationStatus, siteUrl } from "./settings";
+import {
+  settings,
+  saveSettings,
+  integrationStatus,
+  secret,
+  siteUrl,
+} from "./settings";
 import {
   createBooking,
   updateBooking,
@@ -368,6 +374,7 @@ const actionSections: Record<string, string> = {
   block_time: "calendar",
   remove_block: "calendar",
   save_settings: "settings",
+  test_telegram: "settings",
   save_user: "team",
   save_template: "messages",
   send_message: "messages",
@@ -768,6 +775,23 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       data.settings,
       z.record(z.string(), z.string().max(4096)).parse(data.credentials || {}),
     );
+  if (action === "test_telegram") {
+    const business = await settings();
+    if (!(await secret("telegram_token")) || !business.telegram_chat_id)
+      throw new AppError(
+        "Connect the Telegram bot token and chat ID before sending a test.",
+      );
+    await transaction((q) =>
+      enqueue(q, {
+        key: "telegram-test:" + randomUUID(),
+        channel: "telegram",
+        recipient: business.telegram_chat_id,
+        subject: "Telegram notifications connected",
+        body:
+          "Booking alerts are ready. New appointment requests will appear here with the customer, vehicle, service, time, estimate, and workspace link.",
+      }),
+    );
+  }
   if (action === "save_user") {
     const u = z
       .object({
