@@ -198,4 +198,18 @@ CREATE TABLE IF NOT EXISTS wl.inventory_movements (
  quantity numeric NOT NULL CHECK(quantity<>0), unit_cost_cents integer, occurred_on text NOT NULL, notes text NOT NULL DEFAULT '', expense_id uuid UNIQUE REFERENCES wl.expenses(id), created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS wl_inventory_movements_item_date ON wl.inventory_movements(item_id,occurred_on DESC);
 INSERT INTO wl.migrations(version) VALUES (1) ON CONFLICT DO NOTHING;
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (2)
+  ON CONFLICT DO NOTHING
+  RETURNING version
+)
+UPDATE wl.settings
+SET value = jsonb_set(
+      jsonb_set(value, '{close_time}', '"20:00"'::jsonb),
+      '{hours_label}',
+      '"Monday-Saturday, 8:00 AM-8:00 PM"'::jsonb
+    ),
+    updated_at = now()
+WHERE key = 'business'
+  AND EXISTS (SELECT 1 FROM migration);
 `;
