@@ -13,12 +13,15 @@ export async function createHeroAnimation(
   if (!Number.isFinite(source.durationMs) || source.durationMs <= 0) {
     throw new RangeError("The hero animation needs a positive duration");
   }
+  if (signal.aborted) throw new DOMException("Hero animation cancelled", "AbortError");
 
-  const request = new AbortController();
   let blob: Blob | null = null;
   let image: HTMLImageElement | null = null;
   let objectUrl: string | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let replayTimer: ReturnType<typeof setTimeout> | undefined;
+  let replayRequest: AbortController | null = null;
+  let replayGeneration = 0;
   let disposed = false;
   let visible = false;
   let started = false;
@@ -38,11 +41,19 @@ export async function createHeroAnimation(
     objectUrl = null;
   }
 
+  function cancelReplay() {
+    replayGeneration++;
+    clearTimeout(replayTimer);
+    replayTimer = undefined;
+    replayRequest?.abort();
+    replayRequest = null;
+  }
+
   function dispose() {
     if (disposed) return;
     disposed = true;
     signal.removeEventListener("abort", dispose);
-    request.abort();
+    cancelReplay();
     clearImage();
     blob = null;
   }
@@ -51,6 +62,7 @@ export async function createHeroAnimation(
     if (disposed || finished) return;
     started = true;
     finished = true;
+    cancelReplay();
     clearImage();
     events.onProgress(1);
     if (!disposed) events.onState("ended");
@@ -62,27 +74,23 @@ export async function createHeroAnimation(
     events.onFailure();
   }
 
-  function play() {
-    if (disposed || !visible || image || !blob) return;
-    started = true;
-    finished = false;
+  function showImage(src: string) {
     try {
-      // A new URL restarts image decoding, without downloading the film again.
-      objectUrl = URL.createObjectURL(blob);
       const nextImage = document.createElement("img");
       image = nextImage;
       nextImage.alt = "";
       nextImage.setAttribute("aria-hidden", "true");
-      nextImage.style.visibility = "hidden";
+      nextImage.fetchPriority = "high";
+      nextImage.loading = "eager";
+      nextImage.style.visibility = "visible";
       let loaded = false;
       nextImage.onload = () => {
         if (disposed || image !== nextImage || !visible || loaded) return;
         loaded = true;
         clearTimeout(timer);
-        nextImage.style.visibility = "visible";
+        // The image can animate while downloading; retaining it for a full
+        // duration after load conservatively holds its final frame.
         timer = setTimeout(finish, source.durationMs);
-        events.onProgress(0);
-        if (!disposed && image === nextImage) events.onState("playing");
       };
       nextImage.onerror = () => {
         if (!disposed && image === nextImage) failed();
@@ -91,33 +99,71 @@ export async function createHeroAnimation(
       timer = setTimeout(() => {
         if (!disposed && image === nextImage && !loaded) failed();
       }, 10000);
-      nextImage.src = objectUrl;
+      nextImage.src = src;
+      if (disposed || image !== nextImage) return;
+      // Expose streamed frames immediately, without waiting for the entire
+      // download. The component keeps its clean still beneath this image.
+      events.onProgress(0);
+      if (!disposed && image === nextImage) events.onState("playing");
     } catch {
       failed();
     }
   }
 
-  if (signal.aborted) throw new DOMException("Hero animation cancelled", "AbortError");
-  signal.addEventListener("abort", dispose, { once: true });
-  try {
-    const response = await fetch(source.src, { signal: request.signal, mode: "same-origin" });
-    if (!response.ok) throw new Error(`The hero animation could not be loaded (${response.status})`);
-    blob = await response.blob();
-    if (disposed) {
-      blob = null;
-      throw new DOMException("Hero animation cancelled", "AbortError");
+  function replayFromBlob() {
+    if (!blob || disposed || !visible || finished) return;
+    try {
+      objectUrl = URL.createObjectURL(blob);
+      showImage(objectUrl);
+    } catch {
+      failed();
     }
-  } catch (error) {
-    dispose();
-    throw error;
   }
 
+  async function loadReplay() {
+    const generation = ++replayGeneration;
+    const request = new AbortController();
+    replayRequest = request;
+    const deadline = setTimeout(() => {
+      if (!disposed && generation === replayGeneration && replayRequest === request) failed();
+    }, 15000);
+    replayTimer = deadline;
+    try {
+      // Only replay needs a fresh decoder URL. The initial image request has
+      // already populated the browser cache, so no upfront blob fetch is used.
+      const response = await fetch(source.src, { signal: request.signal, mode: "same-origin", cache: "force-cache" });
+      if (!response.ok) throw new Error(`The hero animation could not be loaded (${response.status})`);
+      const result = await response.blob();
+      if (disposed || generation !== replayGeneration || request.signal.aborted || !visible || finished) return;
+      blob = result;
+      replayRequest = null;
+      replayFromBlob();
+    } catch {
+      if (!disposed && generation === replayGeneration && !request.signal.aborted) failed();
+    } finally {
+      clearTimeout(deadline);
+      if (generation === replayGeneration) replayTimer = undefined;
+      if (replayRequest === request) replayRequest = null;
+    }
+  }
+
+  function play() {
+    if (disposed || !visible || image || replayRequest) return;
+    const firstPlay = !started;
+    started = true;
+    finished = false;
+    if (firstPlay) showImage(source.src);
+    else if (blob) replayFromBlob();
+    else void loadReplay();
+  }
+
+  signal.addEventListener("abort", dispose, { once: true });
   return {
     setVisible(nextVisible) {
       if (disposed || visible === nextVisible) return;
       visible = nextVisible;
       if (visible && !started) play();
-      else if (!visible && image) finish();
+      else if (!visible && (image || replayRequest)) finish();
     },
     play,
     pause: finish,

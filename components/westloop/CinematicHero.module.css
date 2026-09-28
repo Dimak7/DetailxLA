@@ -32,7 +32,9 @@
 .canvas { opacity: 0; transition: opacity .7s ease; }
 .canvas :is(video,img) { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 .hero[data-frame-ready="true"] .canvas { opacity: 1; }
-.hero[data-frame-ready="true"] .poster { opacity: 0; }
+.hero[data-frame-ready="true"][data-media-mode="video"] .poster { opacity: 0; }
+/* Direct images paint progressively over the clean still, with no extra fade. */
+.hero[data-media-mode="animation"] .canvas { transition: none; }
 .hero[data-playback="ended"] .poster,.mediaFrame:has(.canvas[data-replaying="true"]) .poster { opacity: 1; }
 .canvas[data-replaying="true"] { animation: replay-in .7s ease both; }
 .filmControls { position: absolute; z-index: 3; right: 0; bottom: 18px; }

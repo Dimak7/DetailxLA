@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { heroVideoMedia } from "./hero-media";
+import { heroVideoMedia, mobileHeroMediaQuery } from "./hero-media";
+import { createHeroAnimation } from "./hero-animation";
 import type { HeroPlayback, HeroPlaybackState } from "./hero-video";
 import styles from "./CinematicHero.module.css";
 
@@ -23,6 +24,7 @@ export function CinematicHero() {
   useEffect(() => {
     const root = section.current!;
     const host = stage.current!;
+    const mobileAnimation = window.matchMedia(mobileHeroMediaQuery).matches;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
     const abort = new AbortController();
@@ -75,11 +77,12 @@ export function CinematicHero() {
       setFrameReady(false);
       setMediaMode("animation");
       setStatus("loading");
-      const source = heroVideoMedia?.animation;
+      const source = mobileAnimation
+        ? heroVideoMedia?.mobileAnimation ?? heroVideoMedia?.animation
+        : heroVideoMedia?.animation;
       if (!source) { staticView(true); return; }
       fallbackTimeout = setTimeout(() => staticView(true), 25000);
       try {
-        const { createHeroAnimation } = await import("./hero-animation");
         if (abort.signal.aborted) return;
         const result = await createHeroAnimation(host, source, abort.signal, {
           onProgress: () => {},
@@ -104,6 +107,8 @@ export function CinematicHero() {
       if (starting || abort.signal.aborted || !heroVideoMedia) return;
       starting = true;
       setStatus("loading");
+      // Mobile starts with the image animation; it never waits for MP4 policy.
+      if (mobileAnimation) { await useAnimationFallback(); return; }
       syncVisibility();
       try {
         const { createHeroVideo } = await import("./hero-video");
@@ -146,7 +151,12 @@ export function CinematicHero() {
       syncVisibility();
     }
     if (!heroVideoMedia || motion.matches || connection?.saveData) staticView();
-    else observer.observe(root);
+    else {
+      const bounds = root.getBoundingClientRect();
+      visible = bounds.bottom > 0 && bounds.top < window.innerHeight;
+      if (visible && !document.hidden) void start();
+      observer.observe(root);
+    }
     document.addEventListener("visibilitychange", visibilityChanged);
     motion.addEventListener("change", motionChanged);
     return () => {
