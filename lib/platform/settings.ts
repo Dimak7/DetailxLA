@@ -133,6 +133,10 @@ function encryptionKey() {
   return createHash("sha256").update(key).digest();
 }
 export async function secret(key: string) {
+  const environmentValue = (envKeys[key] || [])
+    .map((environmentKey) => process.env[environmentKey])
+    .find(Boolean);
+  if (environmentValue) return environmentValue;
   const row = (
     await query<{ ciphertext: string }>(
       "SELECT ciphertext FROM wl.secrets WHERE key=$1",
@@ -152,7 +156,7 @@ export async function secret(key: string) {
       decipher.final(),
     ]).toString();
   }
-  return (envKeys[key] || []).map((k) => process.env[k]).find(Boolean) || "";
+  return "";
 }
 export async function saveSettings(
   input: unknown,

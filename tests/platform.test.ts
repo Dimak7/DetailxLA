@@ -577,6 +577,10 @@ test("Relational platform integration", async (t) => {
         const b = await settings();
         await saveSettings(b, { telegram_token: "test-not-a-real-secret" });
         assert.equal(await secret("telegram_token"), "test-not-a-real-secret");
+        process.env.TELEGRAM_BOT_TOKEN = "environment-secret-wins";
+        assert.equal(await secret("telegram_token"), "environment-secret-wins");
+        delete process.env.TELEGRAM_BOT_TOKEN;
+        assert.equal(await secret("telegram_token"), "test-not-a-real-secret");
         assert.ok(
           !(
             await query<{ ciphertext: string }>(
