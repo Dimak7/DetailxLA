@@ -84,6 +84,7 @@ export function AdminWorkspace({
     [notice, setNotice] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
+    [recordFiltersOpen, setRecordFiltersOpen] = useState(() => Boolean(params.get("search") || params.get("date") || params.get("status"))),
     [scheduleView, setScheduleView] = useState<"week" | "staff" | "day">("week"),
     [scheduleDay, setScheduleDay] = useState("");
   const list = rows(data.rows),
@@ -638,28 +639,50 @@ export function AdminWorkspace({
       },
     );
   }
-  function table(headers: string[], values: React.ReactNode[][]) {
+  function table(
+    headers: string[],
+    values: React.ReactNode[][],
+    options: { comparison?: boolean; label?: string } = {},
+  ) {
     return values.length ? (
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
+      <>
+      {options.comparison && <p className="admin-table-hint">Scroll horizontally to compare all columns.</p>}
+      <div
+        className={`table-scroll admin-table-wrap admin-table-wrap--${options.comparison ? "comparison" : "cards"}`}
+        role={options.comparison ? "region" : undefined}
+        tabIndex={options.comparison ? 0 : undefined}
+        aria-label={options.comparison ? `${options.label || "Comparison table"}. Scroll horizontally for all columns.` : undefined}
+      >
+        <table className="admin-record-table" role="table">
+          <thead role="rowgroup">
+            <tr role="row">
               {headers.map((h) => (
-                <th key={h}>{h}</th>
+                <th key={h} scope="col" role="columnheader">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {values.map((cells, i) => (
-              <tr key={i}>
-                {cells.map((x, j) => (
-                  <td key={j}>{x}</td>
-                ))}
+              <tr className="admin-record-row" key={i} role="row">
+                {cells.map((x, j) => {
+                  const actions = /^(Actions?|Approval)$/.test(headers[j]);
+                  return (
+                    <td
+                      key={j}
+                      role="cell"
+                      data-label={headers[j]}
+                      className={`admin-record-cell${j === 0 ? " admin-record-main" : ""}${actions ? " admin-record-actions" : ""}`}
+                    >
+                      <div className={`admin-record-value${actions ? " admin-record-actions-content" : ""}`}>{x}</div>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      </>
     ) : (
       <div className="empty-state">
         <h3>No records yet</h3>
@@ -676,7 +699,7 @@ export function AdminWorkspace({
         "Appointment",
         "Customer / vehicle",
         "Date & time",
-        "Assignment",
+        ...(!staff ? ["Assignment"] : []),
         "Status",
         ...(!staff ? ["Job total"] : []),
         "Actions",
@@ -843,7 +866,7 @@ export function AdminWorkspace({
           <div className="section-heading"><div><p className="eyebrow">PAYROLL ESTIMATE</p><h2>Worked hours and estimated gross pay</h2></div><div className="button-row"><button onClick={() => compensationEdit()}>Configure pay</button><button onClick={() => payRuleEdit()}>Service rule +</button><a className="button" href={`/api/manage?section=payroll&export=csv&start=${encodeURIComponent(s(data.start))}&end=${encodeURIComponent(s(data.end))}`}>Export CSV</a></div></div>
           <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
           <p className="small-note">Paid hours use completed clock entries when present. If none exist for an employee in this period, scheduled shift hours are used as the payable fallback. Detailers use $10/hr + a shared 30% completed-job commission pool + allocated tips.</p>
-          {table(["Employee", "Scheduled", "Actual", "Paid hours", "Hourly pay", "Commissionable revenue", "Commission", "Tips", "Adjustments", "Total pay"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)} · {s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small></>, (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents))]))}
+          {table(["Employee", "Scheduled", "Actual", "Paid hours", "Hourly pay", "Commissionable revenue", "Commission", "Tips", "Adjustments", "Total pay"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)} · {s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small></>, (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents))]), { comparison: true, label: "Employee payroll" })}
           <h3>Service-specific rules</h3>{table(["Employee", "Service", "Rule", "Value", "Status", "Action"], rows(data.rules).map((rule) => [s(rule.employee_name),s(rule.service_name) || "All services",title(s(rule.rule_type)),s(rule.rule_type) === "commission_percent" ? (n(rule.value) / 100).toFixed(2) + "%" : money(n(rule.value)),s(rule.active) === "true" || rule.active ? "Active" : "Inactive",<button onClick={() => payRuleEdit(rule)}>Edit</button>]))}
         </section>
       )}
@@ -855,7 +878,7 @@ export function AdminWorkspace({
           {table(["Employee", "Paid hours", "Completed jobs", "Revenue attributed", "Commission", "Tips", "Hourly pay", "Total pay", "Revenue / hour", "Average job"], list.map((r) => {
             const hours = n(r.minutes) / 60, jobs = n(r.jobs_completed), revenue = n(r.attributed_revenue);
             return [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, hours.toFixed(2) + "h", s(jobs), money(revenue), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.hourly_earnings_cents)), money(n(r.total_earnings_cents)), hours ? money(Math.round(revenue / hours)) : "No paid hours", jobs ? money(Math.round(revenue / jobs)) : "No completed jobs"];
-          }))}
+          }), { comparison: true, label: "Employee performance" })}
         </section>
       )}
       {section === "my_schedule" && !data.employee && (
@@ -1144,6 +1167,7 @@ export function AdminWorkspace({
                 r.cpa == null ? "—" : money(r.cpa),
                 r.roas == null ? "—" : r.roas.toFixed(2) + "×",
               ]),
+              { comparison: true, label: "Channel performance" },
             )}
             <p className="small-note">
               Spend is manually entered unless an ad reporting connector is
@@ -1303,7 +1327,18 @@ export function AdminWorkspace({
         ["bookings", "customers", "leads", "calendar", "payments"].includes(
           section,
         ) && (
-          <form className="toolbar">
+          <>
+          <button
+            className="admin-filter-toggle"
+            aria-label="Search & filters"
+            type="button"
+            aria-expanded={recordFiltersOpen}
+            aria-controls="admin-record-filters"
+            onClick={() => setRecordFiltersOpen((open) => !open)}
+          >
+            Search &amp; filters
+          </button>
+          <form id="admin-record-filters" className={`toolbar admin-filter-panel${recordFiltersOpen ? " is-open" : ""}`}>
             <label className="field">
               <span>{section === "payments" ? "Search website appointments" : "Search records"}</span>
               <input
@@ -1341,6 +1376,7 @@ export function AdminWorkspace({
               Clear
             </Link>
           </form>
+          </>
         )}
       {section === "bookings" && (
         <>
@@ -2100,7 +2136,7 @@ function Calendar({
         Central Time. Select a date above to focus the calendar. Blocks and
         assigned visits are shown below.
       </p>
-      <div className="calendar-scroll">
+      <div className="calendar-scroll" data-view={view}>
         <div
           className="calendar-grid"
           style={

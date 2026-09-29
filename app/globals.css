@@ -2452,3 +2452,187 @@ td small {
     scroll-behavior: auto !important;
   }
 }
+
+/* Mobile business workspace. Keep these rules after the public-site breakpoints. */
+.admin-mobile-nav, .admin-mobile-search-toggle, .admin-mobile-search { display: none; }
+.admin-mobile-menu nav { display: grid; gap: 8px; }
+.admin-mobile-menu nav a { display: grid; gap: 5px; padding: 15px 16px; background: #fff; border: 1px solid var(--line); border-radius: 12px; font-weight: 650; }
+.admin-mobile-menu nav a.active { background: #e8f2ec; border-color: #b6d4c4; color: #215e49; }
+.admin-mobile-menu nav a span { font-size: 12px; font-weight: 400; line-height: 1.5; color: var(--muted); }
+.admin-menu-intro { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+.admin-menu-user { display: grid; gap: 4px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.admin-menu-user span { font-size: 12px; color: var(--muted); text-transform: capitalize; }
+
+@media (max-width: 760px) {
+  .admin-shell { --ink: #1b3028; --muted: #63736c; --line: #e0e7e2; --paper: #f3f6f3; --gold: #245b46; background: var(--paper); min-height: 100dvh; }
+  .admin-shell .app-body { display: block; min-height: calc(100dvh - 68px); }
+  .admin-shell .admin-sidebar { display: none; }
+  .admin-shell .app-global-bar { min-height: 68px; gap: 12px; padding: max(10px, env(safe-area-inset-top)) 16px 10px; background: #fff; border-bottom: 1px solid var(--line); color: var(--ink); }
+  .admin-shell .app-brand { min-width: 0; }
+  .admin-shell .app-brand .wordmark { color: var(--ink); font-size: 10px; gap: 10px; }
+  .admin-shell .app-brand .ceramics-mark { width: 31px; height: 36px; }
+  .admin-shell .app-business-name, .admin-shell .admin-global-search, .admin-shell .admin-quick-menu { display: none; }
+  .admin-shell .app-global-actions { gap: 6px; }
+  .admin-shell .admin-mobile-search-toggle { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: #fff; padding: 0; }
+  .admin-shell .app-profile summary { display: grid; place-items: center; width: 44px; height: 44px; font-size: 14px; background: #e5eee7; color: #245b46; }
+  .admin-shell .app-profile > div { top: 52px; width: min(280px, calc(100vw - 32px)); border-radius: 16px; padding: 18px; color: var(--ink); }
+  .admin-shell .app-profile small { font-size: 12px; overflow-wrap: anywhere; }
+  .admin-shell .app-profile a, .admin-shell .app-profile button { min-height: 44px; display: flex; align-items: center; font-size: 14px; }
+  .admin-shell .admin-mobile-search { display: flex; gap: 8px; padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--line); }
+  .admin-mobile-search input { min-width: 0; flex: 1; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--paper); color: var(--ink); font-size: 16px; }
+  .admin-mobile-search button { border: 0; border-radius: 12px; padding: 0 16px; background: var(--gold); color: #fff; font-size: 14px; }
+  .admin-shell .admin-main { width: 100%; min-width: 0; padding: 20px 16px calc(98px + env(safe-area-inset-bottom)); }
+  .admin-shell .admin-topbar { border: 0; padding: 0; margin-bottom: 8px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+  .admin-shell .admin-topbar strong { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: .02em; }
+  .admin-shell .admin-heading { align-items: flex-start; flex-wrap: wrap; gap: 16px; margin: 12px 0 24px; }
+  .admin-shell .admin-heading > div { flex: 1 1 100%; min-width: 0; }
+  .admin-shell .admin-heading h1 { font-size: 32px; line-height: 1.15; letter-spacing: -.045em; font-weight: 650; }
+  .admin-shell .admin-heading p { font-size: 13px; line-height: 1.6; margin-top: 8px; color: var(--muted); }
+  .admin-shell .admin-heading > .button { flex: 1; }
+  .admin-shell .workspace-tabs { gap: 6px; padding: 0 0 14px; margin-bottom: 4px; border: 0; scrollbar-width: none; }
+  .admin-shell .workspace-tabs a { display: flex; align-items: center; min-height: 44px; padding: 9px 16px; border: 1px solid var(--line); border-radius: 100px; background: #fff; font-size: 13px; color: var(--muted); }
+  .admin-shell .workspace-tabs a.active { background: #245b46; color: #fff; border-color: #245b46; font-weight: 600; }
+  .admin-shell .admin-main .paper { padding: 18px; border: 1px solid var(--line); border-radius: 18px; margin-bottom: 16px; box-shadow: 0 3px 16px #1b302805; min-width: 0; }
+  .admin-shell .admin-main h2, .admin-shell .admin-main .section-heading h2 { font-size: 19px; line-height: 1.35; letter-spacing: -.025em; }
+  .admin-shell .admin-main h3 { font-family: var(--font-body); font-size: 16px; line-height: 1.4; }
+  .admin-shell .section-heading { align-items: flex-start; flex-direction: column; gap: 14px; margin: 0 0 20px; }
+  .admin-shell .section-heading > div { min-width: 0; max-width: 100%; margin: 0; }
+  .admin-shell .section-heading .eyebrow { font-size: 10px; line-height: 1.5; margin: 0 0 7px; color: #617869; }
+  .admin-shell .button-row { flex-wrap: wrap; gap: 8px; margin: 0; max-width: 100%; }
+  .admin-shell .button-row > * { flex: 1 1 auto; }
+  .admin-shell .admin-main .button, .admin-shell .modal .button { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.4; white-space: normal; text-align: center; }
+  .admin-shell .admin-main .button.outline { background: #fff; border-color: #cddbd1; color: #245b46; }
+  .admin-shell .toolbar { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; margin: 16px 0 20px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+  .admin-shell .paper .toolbar { padding: 0; border: 0; border-radius: 0; }
+  .admin-shell .toolbar .field { flex: 1 1 130px; min-width: 0; width: auto; }
+  .admin-shell .toolbar .field:first-child { flex-basis: 100%; }
+  .admin-shell .toolbar > button { min-height: 44px; padding: 10px 20px; border-radius: 10px; border: 1px solid #245b46; background: #245b46; color: #fff; font-size: 13px; }
+  .admin-shell .toolbar > a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 12px; font-size: 13px; }
+  .admin-shell .field { min-width: 0; }
+  .admin-shell .field > span { font-size: 12px; font-weight: 550; color: #52655a; margin-bottom: 8px; }
+  .admin-shell .field input:not([type="checkbox"]), .admin-shell .field select, .admin-shell .field textarea, .admin-shell input.control, .admin-shell select.control { width: 100%; min-width: 0; min-height: 46px; padding: 11px 12px; border: 1px solid #d4dfd6; border-radius: 10px; background: #fff; color: var(--ink); font-size: 16px; color-scheme: light; }
+  .admin-shell .field select option { color: var(--ink); background: #fff; }
+  .admin-shell input[type="checkbox"] { accent-color: #245b46; min-width: 20px; min-height: 20px; }
+  .admin-shell .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .admin-shell .stat { border-radius: 16px; border: 1px solid var(--line); padding: 16px 14px; box-shadow: 0 2px 8px #19362503; }
+  .admin-shell .stat p { color: #56665d; font-size: 12px; line-height: 1.45; margin: 0 0 10px; }
+  .admin-shell .stat strong { display: block; font-size: 26px; font-weight: 650; line-height: 1.2; overflow-wrap: anywhere; }
+  .admin-shell .stat small { font-size: 11px; line-height: 1.5; margin-top: 9px; color: var(--muted); }
+  .admin-shell .admin-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .admin-shell .small-note { font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+  .admin-shell .filter-tabs { flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 0 10px; margin: 12px 0; }
+  .admin-shell .filter-tabs a, .admin-shell .filter-tabs .button { flex: 0 0 auto; min-height: 42px; display: inline-flex; align-items: center; padding: 9px 14px; font-size: 12px; border-radius: 10px; }
+  .admin-shell .summary-row { gap: 12px; align-items: flex-start; }
+  .admin-shell .summary-row span { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+  .admin-shell .summary-row strong { font-size: 16px; flex-shrink: 0; }
+  .admin-shell .chart { max-width: 100%; overflow-x: auto; gap: 2px; }
+  .admin-shell .chart > div { min-width: 2px; }
+  .admin-shell .integration-list, .admin-shell .settings-group, .admin-shell .profile-details { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell .integration-list > div { border-radius: 12px; padding: 16px; font-size: 13px; }
+  .admin-shell .status-pill, .admin-shell .inventory-status { display: inline-block; font-size: 10px; line-height: 1.4; padding: 5px 9px; border-radius: 100px; }
+  .admin-shell .table-scroll { max-width: 100%; min-width: 0; }
+  .admin-shell .admin-table-wrap--cards { border: 0; border-radius: 0; overflow: visible; background: none; margin: 16px 0 24px; }
+  .admin-shell .admin-table-wrap--cards table, .admin-shell .admin-table-wrap--cards tbody { display: block; width: 100%; }
+  .admin-shell .admin-table-wrap--cards thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .admin-shell .admin-table-wrap--cards .admin-record-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; border: 1px solid var(--line); border-radius: 18px; background: #fff; padding: 18px; margin-bottom: 12px; box-shadow: 0 3px 16px #1b302805; }
+  .admin-shell .admin-table-wrap--cards .admin-record-cell { display: block; min-width: 0; max-width: none; width: auto; padding: 0; border: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+  .admin-shell .admin-table-wrap--cards .admin-record-cell::before { content: attr(data-label); display: block; color: #738279; font-size: 10px; letter-spacing: .045em; text-transform: uppercase; font-weight: 600; margin-bottom: 6px; }
+  .admin-shell .admin-record-value { min-width: 0; }
+  .admin-shell .admin-table-wrap--cards .admin-record-main { grid-column: 1 / -1; padding-bottom: 14px; border-bottom: 1px solid #eef2ee; font-weight: 600; font-size: 15px; }
+  .admin-shell .admin-table-wrap--cards .admin-record-main::before { display: none; }
+  .admin-shell .admin-table-wrap--cards .admin-record-actions { grid-column: 1 / -1; padding-top: 14px; border-top: 1px solid #eef2ee; }
+  .admin-shell .admin-table-wrap--cards .admin-record-actions::before { display: none; }
+  .admin-shell .admin-record-actions-content { display: flex; flex-wrap: wrap; gap: 8px; }
+  .admin-shell .admin-record-actions-content button, .admin-shell .admin-record-actions-content a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; margin: 0; padding: 10px 12px; border: 1px solid #d9e3dc; border-radius: 10px; background: #f5f8f5; color: #2a5c46; font-size: 12px; flex: 1 1 auto; }
+  .admin-shell .admin-record-actions-content button:first-child { background: #245b46; border-color: #245b46; color: #fff; font-weight: 600; }
+  .admin-shell .admin-record-cell small { font-size: 11px; line-height: 1.5; margin-top: 4px; color: var(--muted); }
+  .admin-shell .admin-record-cell .text-link { font-size: inherit; }
+  .admin-shell .admin-table-wrap--comparison { border-radius: 14px; }
+  .admin-shell .admin-table-wrap--comparison th, .admin-shell .admin-table-wrap--comparison td { padding: 14px; font-size: 12px; min-width: 105px; }
+  .admin-shell .admin-table-wrap--comparison th:first-child, .admin-shell .admin-table-wrap--comparison td:first-child { position: sticky; left: 0; z-index: 1; min-width: 130px; max-width: 160px; background: #f7faf7; border-right: 1px solid var(--line); }
+  .admin-shell .admin-table-hint { display: block; font-size: 11px; color: var(--muted); }
+  .admin-shell .calendar-scroll, .admin-shell .staff-calendar-scroll, .admin-shell .staffing-board-scroll, .admin-shell .day-timeline-scroll { min-width: 0; max-width: 100%; border-radius: 14px; overscroll-behavior-x: contain; }
+  .admin-shell .calendar-scroll[data-view="week"] .calendar-grid { grid-template-columns: minmax(0, 1fr); min-width: 0; border: 0; background: none; gap: 10px; }
+  .admin-shell .calendar-scroll[data-view="week"] .calendar-grid .calendar-day { min-height: 76px; border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .admin-shell .calendar-day > span { font-size: 12px; font-weight: 600; }
+  .admin-shell .calendar-event { min-height: 44px; border-radius: 8px; padding: 10px; font-size: 12px; }
+  .admin-shell .calendar-event strong { font-size: 13px; }
+  .admin-shell .schedule-view-tabs, .admin-shell .day-picker { gap: 6px; }
+  .admin-shell .schedule-view-tabs button, .admin-shell .day-picker button { min-height: 44px; border-radius: 10px; background: #fff; color: #52655a; font-size: 12px; padding: 9px 13px; }
+  .admin-shell .schedule-view-tabs button.active, .admin-shell .day-picker button.active { background: #245b46; border-color: #245b46; color: #fff; }
+  .admin-shell .staffing-board { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .admin-shell .staffing-day { min-height: 150px; padding: 16px; border-radius: 14px; background: #fff; }
+  .admin-shell .staffing-day-heading { color: var(--ink); min-height: 44px; gap: 6px; }
+  .admin-shell .staffing-day-heading strong { font-size: 14px; }
+  .admin-shell .staffing-day-heading span { color: #245b46; font-size: 12px; }
+  .admin-shell .staffing-day-heading small { font-size: 11px; }
+  .admin-shell .staffing-chip, .admin-shell .staffing-more, .admin-shell .staffing-add { min-height: 44px; border-radius: 8px; background: #edf4ee; color: #245b46; border-color: #cddfd2; font-size: 12px; }
+  .admin-shell .staffing-chip span { color: #516958; font-size: 11px; }
+  .admin-shell .staffing-person { position: sticky; left: 0; z-index: 3; background: #15231b; }
+  .admin-shell .roster-day { background: #fff; color: var(--ink); }
+  .admin-shell .modal-backdrop { padding: 0; align-items: flex-end; background: #14271f99; backdrop-filter: blur(4px); }
+  .admin-shell .modal, .admin-shell .modal.wide-modal { width: 100%; max-width: 100%; max-height: 92dvh; padding: 22px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; background: #f6f8f5; overscroll-behavior: contain; }
+  .admin-shell .modal-header { position: sticky; top: -22px; z-index: 4; gap: 12px; padding: 18px 0 14px; margin: -18px 0 18px; background: #f6f8f5; border-bottom: 1px solid var(--line); }
+  .admin-shell .modal-header h2 { font-family: var(--font-body); font-size: 20px; line-height: 1.35; margin: 0; }
+  .admin-shell .modal-header button { min-height: 44px; padding: 10px 14px; background: #fff; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); font-size: 13px; }
+  .admin-shell .modal .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell .modal .availability-day { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .admin-shell .availability-day label { grid-column: 1 / -1; }
+  .admin-shell .admin-mobile-nav { display: flex; position: fixed; z-index: 45; bottom: 0; left: 0; right: 0; gap: 4px; padding: 9px 12px max(10px, env(safe-area-inset-bottom)); border-top: 1px solid #dce7de; background: #ffffffed; backdrop-filter: blur(18px); box-shadow: 0 -4px 20px #18312006; }
+  .admin-shell .admin-mobile-nav a, .admin-shell .admin-mobile-nav button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 52px; gap: 5px; padding: 6px 4px; border: 0; border-radius: 14px; background: none; color: #748177; font-size: 10px; font-weight: 550; line-height: 1.2; }
+  .admin-shell .admin-mobile-nav .active { color: #245b46; background: #eaf2ec; font-weight: 700; }
+  .admin-shell :focus-visible { outline: 2px solid #368668; outline-offset: 3px; }
+}
+@media (max-width: 360px) {
+  .admin-shell .admin-main { padding-left: 12px; padding-right: 12px; }
+  .admin-shell .app-global-bar { padding-left: 12px; padding-right: 12px; }
+  .admin-shell .stat { padding: 14px 12px; }
+  .admin-shell .stat strong { font-size: 23px; }
+  .admin-shell .admin-table-wrap--cards .admin-record-row { padding: 16px; }
+}
+.admin-filter-toggle, .admin-table-hint { display: none; }
+@media (max-width: 760px) {
+  .admin-shell .admin-filter-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 48px; margin: 6px 0 14px; padding: 12px 16px; background: #fff; color: #365b45; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; text-align: left; font-weight: 550; }
+  .admin-shell .admin-filter-toggle::after { content: '+'; font-size: 20px; font-weight: 400; }
+  .admin-shell .admin-filter-toggle[aria-expanded="true"]::after { content: '−'; }
+  .admin-shell .toolbar.admin-filter-panel:not(.is-open) { display: none; }
+  .admin-shell .toolbar:empty { display: none; }
+}
+@media (max-width: 760px) {
+  .admin-shell .staffing-matrix, .admin-shell .day-timeline, .admin-shell .staff-calendar { background: #fff; }
+  .admin-shell .staffing-matrix-head, .admin-shell .calendar-axis, .admin-shell .calendar-head, .admin-shell .day-time-heading, .admin-shell .day-track-heading { color: #45604d; background: #f0f5ef; font-size: 12px; }
+  .admin-shell .calendar-head button { color: #245b46; }
+  .admin-shell .staffing-person { background: #f4f8f2; color: var(--ink); }
+  .admin-shell .matrix-shift { color: #245b46; background: #e7f1e9; }
+  .admin-shell .matrix-off { color: #849085; background: #fff; }
+  .admin-shell .day-track, .admin-shell .staff-calendar-day { background: repeating-linear-gradient(to bottom, #fff 0 59px, #e8eee8 60px); }
+  .admin-shell .day-time-labels span, .admin-shell .calendar-times span { color: #718074; border-bottom-color: #e8eee8; }
+  .admin-shell .shift-event { background: #e5f1e8; color: #214e36; border-color: #abcdb4; border-left-color: #42845a; }
+  .admin-shell .shift-event small, .admin-shell .shift-event span { color: #42674d; }
+  .admin-shell .appointment-event { background: #f5efde; color: #63502b; border-color: #ded0ab; }
+  .admin-shell .appointment-event span { color: #806c45; }
+  .admin-shell .staffing-board-scroll::before, .admin-shell .day-timeline-scroll::before, .admin-shell .staff-calendar-scroll::before { content: 'Swipe to view the full schedule'; display: block; font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+}
+@media (max-width: 760px) {
+  .admin-shell .booking-main { --booking-line: #d9e3d9; --booking-text: #1b3028; --booking-muted: #63736c; --booking-accent: #245b46; background: #fff; color: #1b3028; box-shadow: none; }
+  .admin-shell .booking-main .field > span { color: #52655a; }
+  .admin-shell .booking-main .field input::placeholder, .admin-shell .booking-main .field textarea::placeholder { color: #738178; }
+  .admin-shell .booking-main .button { color: #fff; letter-spacing: normal; }
+  .admin-shell .booking-main .button.outline { background: #fff; color: #245b46; border-color: #ccdbd1; }
+  .admin-shell .booking-main .booking-progress span { color: #738178; border-color: #d9e3d9; }
+  .admin-shell .booking-main .booking-progress .active { color: #245b46; border-color: #245b46; }
+  .admin-shell .booking-main .service-option { background: #fff; color: #1b3028; border-color: #d9e3d9; border-radius: 12px; }
+  .admin-shell .booking-main .service-option small { color: #63736c; }
+  .admin-shell .booking-main .service-option:has(input:checked) { background: #edf5ee; border-color: #639574; }
+  .admin-shell .booking-main .service-option input { accent-color: #245b46; }
+  .admin-shell .time-grid button { background: #fff; color: #245b46; border-color: #d9e3d9; border-radius: 10px; min-height: 44px; }
+  .admin-shell .time-grid button.selected { background: #245b46; color: #fff; border-color: #245b46; }
+  .admin-shell .booking-review { background: #edf5ee; border-color: #d1e0d4; border-radius: 14px; }
+  .admin-shell .booking-review-grid :is(strong,small), .admin-shell .booking-consent strong { color: #1b3028; }
+  .admin-shell .booking-review-grid span { color: #63736c; }
+  .admin-shell .booking-review-price { border-color: #d1e0d4; }
+  .admin-shell .booking-consent { background: #fff; border-color: #d9e3d9; border-radius: 12px; color: #63736c; }
+  .admin-shell .booking-consent.required { background: #edf5ee; border-color: #accab4; }
+  .admin-shell .booking-consent .text-link { color: #245b46; border-color: #639574; }
+  .admin-shell .booking-main .error-message { background: #ffebe6; color: #893c2a; border-left-color: #be5d44; }
+}
