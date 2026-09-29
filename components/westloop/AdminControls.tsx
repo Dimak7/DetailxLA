@@ -13,6 +13,7 @@ export type Field = {
   max?: number;
   step?: number | "any";
   hint?: string;
+  visibleWhen?: (values: RecordData) => boolean;
 };
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const clockValue = (minutes: number) =>
@@ -28,6 +29,8 @@ export type EditorSpec = {
   initial: RecordData;
   transform?: (d: RecordData) => RecordData;
   selectChanges?: (key: string, value: string) => RecordData | undefined;
+  description?: React.ReactNode;
+  preview?: (values: RecordData) => React.ReactNode;
 };
 export async function action(name: string, data: RecordData) {
   const r = await fetch("/api/manage", {
@@ -129,6 +132,7 @@ export function Editor({
   }
   return (
     <Modal title={spec.title} onClose={onClose} wide={spec.fields.some((f) => f.type === "availability")}>
+      {spec.description}
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -162,7 +166,7 @@ export function Editor({
         }}
       >
         <div className="form-grid">
-          {spec.fields.map((f) => (
+          {spec.fields.filter((f) => !f.visibleWhen || f.visibleWhen(v)).map((f) => (
             <label key={f.key} className={"field" + (f.wide ? " wide" : "")}>
               <span>{f.label}</span>
               {f.type === "checkbox" ? (
@@ -254,6 +258,7 @@ export function Editor({
             </label>
           ))}
         </div>
+        {spec.preview?.(v)}
         {error && (
           <p className="error-message" role="alert">
             {error}

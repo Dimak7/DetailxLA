@@ -271,4 +271,23 @@ SET value = jsonb_set(
     updated_at = now()
 WHERE key = 'business'
   AND EXISTS (SELECT 1 FROM migration);
+-- Preserve the old effective plan once, before employee settings become authoritative.
+-- Rules that the old calculator ignored remain saved but inactive until a manager enables them.
+-- Paid payroll records are historical snapshots and are deliberately untouched.
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (3)
+  ON CONFLICT DO NOTHING
+  RETURNING version
+), inactive_legacy_rules AS (
+  UPDATE wl.employee_pay_rules r SET active=false,updated_at=now()
+  FROM wl.employees e
+  WHERE r.employee_id=e.id AND r.active=true AND EXISTS (SELECT 1 FROM migration)
+    AND (lower(e.position)='detailer' OR e.compensation_model='hourly'
+      OR (r.rule_type='flat_job' AND e.compensation_model<>'flat_job')
+      OR (r.rule_type='commission_percent' AND e.compensation_model='flat_job'))
+  RETURNING r.id
+)
+UPDATE wl.employees
+SET hourly_rate_cents=1000,compensation_model='hourly_commission',default_commission_bps=3000,updated_at=now()
+WHERE lower(position)='detailer' AND EXISTS (SELECT 1 FROM migration);
 `;

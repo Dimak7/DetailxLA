@@ -26,7 +26,7 @@ import {
   type Service,
 } from "@/lib/platform/types";
 import { layoutOverlappingShifts } from "@/lib/platform/schedule-layout";
-import { compensationEditorValues, dateTimeLocalValue } from "@/lib/platform/admin-editor-values";
+import { compensationModels, compensationEditorValues, compensationEditorPayload, compensationPlanLabel, compensationSample, dateTimeLocalValue } from "@/lib/platform/admin-editor-values";
 import type { report } from "@/lib/platform/reporting";
 type Report = Awaited<ReturnType<typeof report>>;
 type CalendarShift = R & { start_minute: number; end_minute: number };
@@ -453,7 +453,7 @@ export function AdminWorkspace({
   }
   function employeeEdit(r: R = {}) {
     const availability = Array.isArray(r.availability) ? r.availability : Array.from({ length: 7 }, (_, weekday) => ({ weekday, available: weekday > 0 && weekday < 6, start_minute: 480, end_minute: 1020 }));
-    edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", hourly_rate_cents: 10, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : "Login password (12+ characters)", "password", { required: !r.user_id }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"] }), f("hourly_rate_cents", "Hourly pay ($)", "money", { hint: "Detailers are paid the standard $10/hr plan in payroll." }), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, hire_date: d.hire_date || null }));
+    edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", hourly_rate_cents: 10, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : "Login password (12+ characters)", "password", { required: !r.user_id }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"] }), f("hourly_rate_cents", "Starting hourly rate ($)", "money", { hint: "New Detailers start on an hourly + 30% plan. Use Pay settings after saving to customize the plan.", visibleWhen: (values) => !values.id }), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => { const { hourly_rate_cents, ...profile } = d; return { ...profile, ...(!profile.id ? { hourly_rate_cents } : {}), hire_date: d.hire_date || null }; });
   }
   function expenseEdit(r: R = {}) {
     edit(r.id ? "Edit expense" : "Add expense", "save_expense", { expense_date: dateToday(), amount_cents: 0, category: "Supplies", vendor: "", description: "", payment_method: "Card", recurrence: "one_time", recurring_start: "", recurring_end: "", receipt_url: "", notes: "", ...r, ...(r.amount_cents != null ? { amount_cents: n(r.amount_cents) / 100 } : {}) }, [f("expense_date", "Date", "date", { required: true }), f("amount_cents", "Amount ($)", "money", { required: true }), f("category", "Category", "select", { options: ["Rent", "Utilities", "Payroll", "Chemicals", "Equipment", "Supplies", "Insurance", "Advertising", "Software", "Vehicle", "Repairs", "Taxes / Fees", "Other"] }), f("vendor", "Vendor"), f("payment_method", "Payment method", "select", { options: ["Card", "Cash", "ACH", "Check", "Other"] }), f("recurrence", "Frequency", "select", { options: [{ value: "one_time", label: "One-time" }, { value: "weekly", label: "Weekly" }, { value: "monthly", label: "Monthly" }, { value: "yearly", label: "Yearly" }] }), f("recurring_start", "Recurring start", "date"), f("recurring_end", "Recurring end (optional)", "date"), f("receipt_url", "Receipt", "upload"), f("description", "Description", "textarea", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, recurring_start: d.recurring_start || null, recurring_end: d.recurring_end || null }));
@@ -462,20 +462,58 @@ export function AdminWorkspace({
     edit(r.id ? "Edit inventory item" : "Add inventory item", "save_inventory_item", { name: "", sku: "", category: "Chemicals", opening_quantity: 0, unit: "units", unit_cost_cents: 0, supplier: "", minimum_stock: 0, reorder_quantity: 0, last_purchase_date: "", notes: "", active: true, ...r, ...(r.unit_cost_cents != null ? { unit_cost_cents: n(r.unit_cost_cents) / 100 } : {}) }, [f("name", "Product name", "text", { required: true }), f("sku", "SKU"), f("category", "Category", "select", { options: ["Chemicals", "Equipment", "Supplies", "Accessories", "Other"] }), ...(!r.id ? [f("opening_quantity", "Opening quantity", "number", { min: 0, step: 0.0001 })] : []), f("unit", "Unit", "select", { options: ["units", "bottles", "gallons", "ounces", "packs", "towels", "pairs"] }), f("unit_cost_cents", "Cost per unit ($)", "money"), f("supplier", "Supplier"), f("minimum_stock", "Minimum stock", "number", { min: 0, step: 0.0001 }), f("reorder_quantity", "Reorder quantity", "number", { min: 0, step: 0.0001 }), f("last_purchase_date", "Last purchase", "date"), f("active", "Active item", "checkbox"), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, last_purchase_date: d.last_purchase_date || null }));
   }
   function compensationEdit(r: R = {}) {
-    const employees = rows(data.employees);
+    if (!allowedSections.includes("payroll") || staff) return;
+    const employees = section === "employees" ? list : rows(data.employees);
     const employee = employees.find((item) => item.id === (r.employee_id || r.id)) || employees[0];
     if (!employee) {
       setError("Add an employee before configuring compensation.");
       return;
     }
-    edit("Employee compensation", "save_employee_compensation", compensationEditorValues(employee), [f("employee_id", "Employee", "select", { options: employees.map((item) => ({ value: s(item.id), label: s(item.name) })) }), f("compensation_model", "Pay model", "select", { options: ["hourly", "commission", "hourly_commission", "flat_job"] }), f("default_commission_bps", "Default commission (%)", "number", { min: 0, max: 100, step: 0.01 }), f("flat_job_pay_cents", "Flat pay per completed job ($)", "money")], (d) => ({ ...d, default_commission_bps: Math.round(n(d.default_commission_bps) * 100) }), (key, value) => {
-      if (key !== "employee_id") return;
-      const selected = employees.find((item) => s(item.id) === value);
-      return selected ? compensationEditorValues(selected) : undefined;
+    setEditor({
+      title: "Employee pay settings",
+      action: "save_employee_compensation",
+      initial: compensationEditorValues(employee),
+      description: <p className="small-note">Set this employee’s default plan. Percentage pay uses the final agreed service price, excluding tips. On shared jobs, percentage and flat job pay follow the employee’s allocation. Service rules can replace the default job pay; tips are allocated separately.</p>,
+      fields: [
+        f("employee_id", "Employee", "select", { options: employees.map((item) => ({ value: s(item.id), label: s(item.name) })) }),
+        f("compensation_model", "Pay model", "select", { options: compensationModels }),
+        f("hourly_rate_cents", "Hourly rate ($)", "number", { required: true, min: 0, max: 1_000_000, step: 0.01, visibleWhen: (values) => ["hourly", "hourly_commission"].includes(s(values.compensation_model)) }),
+        f("default_commission_bps", "Percentage per completed job (%)", "number", { required: true, min: 0, max: 100, step: 0.01, visibleWhen: (values) => ["commission", "hourly_commission"].includes(s(values.compensation_model)) }),
+        f("flat_job_pay_cents", "Flat amount per completed job ($)", "number", { required: true, min: 0, max: 1_000_000, step: 0.01, visibleWhen: (values) => values.compensation_model === "flat_job" }),
+      ],
+      transform: compensationEditorPayload,
+      selectChanges: (key, value) => {
+        if (key !== "employee_id") return;
+        const selected = employees.find((item) => s(item.id) === value);
+        return selected ? compensationEditorValues(selected) : undefined;
+      },
+      preview: (values) => {
+        const sample = compensationSample(values);
+        return <aside className="employee-pay-preview" aria-live="polite" aria-atomic="true">
+          <strong>Example: a $200 completed service</strong>
+          <p>{money(sample.jobCents)} in job pay{sample.hourlyCents !== null ? `, plus ${money(sample.hourlyCents)} per paid hour.` : "."}</p>
+          <small>Assumes 100% job allocation. A 50% allocation halves the job pay. Tips, service rules and job-level overrides are not included.</small>
+        </aside>;
+      },
     });
   }
   function payRuleEdit(r: R = {}) {
-    edit("Service pay rule", "save_pay_rule", { employee_id: rows(data.employees)[0]?.id || "", service_id: "", rule_type: "commission_percent", active: true, ...r, value: n(r.value) / 100 }, [f("employee_id", "Employee", "select", { options: rows(data.employees).map((employee) => ({ value: s(employee.id), label: s(employee.name) })) }), f("service_id", "Service", "nullable-select", { options: [{ value: "", label: "All services" }, ...rows(data.services).map((service) => ({ value: s(service.id), label: s(service.name) }))] }), f("rule_type", "Rule type", "select", { options: ["commission_percent", "flat_job"] }), f("value", "Rate (% or flat dollars)", "number", { min: 0, step: 0.01 }), f("active", "Active", "checkbox")], (d) => ({ ...d, value: Math.round(n(d.value) * 100) }));
+    if (!allowedSections.includes("payroll") || staff) return;
+    setEditor({
+      title: "Service pay rule",
+      action: "save_pay_rule",
+      initial: { employee_id: rows(data.employees)[0]?.id || "", service_id: "", rule_type: "commission_percent", active: true, ...r, percentage: r.rule_type === "flat_job" ? 0 : n(r.value) / 100, flat_amount: r.rule_type === "flat_job" ? n(r.value) / 100 : 0 },
+      description: <p className="small-note">Replace this employee’s default job pay with a percentage or flat amount for the selected service. Hourly pay still applies when their plan includes it. A specific service rule takes priority over an all-services rule. Saving an active rule replaces the other active rule for the same employee and service.</p>,
+      fields: [
+        f("employee_id", "Employee", "select", { required: true, options: rows(data.employees).map((employee) => ({ value: s(employee.id), label: s(employee.name) })) }),
+        f("service_id", "Service", "nullable-select", { options: [{ value: "", label: "All services" }, ...rows(data.services).map((service) => ({ value: s(service.id), label: s(service.name) }))] }),
+        f("rule_type", "Job pay", "select", { options: [{ value: "commission_percent", label: "Percentage per job" }, { value: "flat_job", label: "Flat amount per job" }] }),
+        f("percentage", "Percentage per completed job (%)", "number", { required: true, min: 0, max: 100, step: 0.01, hint: "Based on final service price, excluding tips, then adjusted by the employee’s job allocation.", visibleWhen: (values) => values.rule_type === "commission_percent" }),
+        f("flat_amount", "Flat amount per completed job ($)", "number", { required: true, min: 0, max: 1_000_000, step: 0.01, hint: "Adjusted by the employee’s job allocation. Tips are separate.", visibleWhen: (values) => values.rule_type === "flat_job" }),
+        f("active", "Active rule", "checkbox"),
+      ],
+      transform: (values) => ({ id: values.id, employee_id: values.employee_id, service_id: values.service_id, rule_type: values.rule_type, active: values.active, value: Math.round(n(values.rule_type === "flat_job" ? values.flat_amount : values.percentage) * 100) }),
+    });
   }
   function movementEdit(item: R) {
     edit("Record movement: " + s(item.name), "record_inventory_movement", { item_id: item.id, movement_type: "purchase", direction: "in", quantity: 1, occurred_on: dateToday(), unit_cost_cents: n(item.unit_cost_cents) / 100, supplier: s(item.supplier), notes: "", create_expense: true, expense_amount_cents: 0 }, [f("movement_type", "Movement type", "select", { options: ["purchase", "usage", "adjustment", "return", "waste", "correction"] }), f("direction", "Direction", "select", { options: [{ value: "in", label: "Add stock" }, { value: "out", label: "Remove stock" }] }), f("quantity", "Quantity", "number", { min: 0.0001, step: 0.0001, required: true }), f("occurred_on", "Date", "date", { required: true }), f("unit_cost_cents", "Unit cost ($)", "money"), f("supplier", "Supplier"), f("create_expense", "Record purchase as operating expense", "checkbox"), f("expense_amount_cents", "Expense amount ($)", "money", { hint: "Leave at zero to calculate quantity x unit cost." }), f("notes", "Notes", "textarea", { wide: true })]);
@@ -830,7 +868,13 @@ export function AdminWorkspace({
         <section className="paper">
           <div className="section-heading"><div><p className="eyebrow">TEAM</p><h2>{list.filter((r) => r.active).length} active employees</h2></div><button className="button" onClick={() => employeeEdit()}>Add employee +</button></div>
           <p className="small-note">Each employee gets a separate staff login and can only view their own schedule and time clock. Scheduled hours are separate from actual paid clocked hours.</p>
-          {table(["Employee", "Role", "Phone", "Status", "Rate", "Scheduled this week", "Actions"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>, s(r.position), s(r.phone) || "Not set", status(r.active ? "active" : "inactive"), s(r.position).toLowerCase() === "detailer" ? "$10/hr + 30%" : money(n(r.hourly_rate_cents)), (n(r.scheduled_minutes) / 60).toFixed(1) + "h", <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit</button>]))}
+          {table(["Employee", "Role", "Phone", "Status", "Default pay plan", "Scheduled this week", "Actions"], list.map((r) => [
+            <><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>,
+            s(r.position), s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
+            compensationPlanLabel(r), (n(r.scheduled_minutes) / 60).toFixed(1) + "h",
+            <><button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit profile</button>
+              {allowedSections.includes("payroll") && !staff && <button className="button" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button>}</>,
+          ]))}
         </section>
       )}
       {section === "schedule" && (
@@ -861,13 +905,20 @@ export function AdminWorkspace({
           {table(["Employee", "Clock in", "Clock out", "Break", "Worked", "Approval"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "Currently clocked in", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h", r.approved ? "Approved" : <button disabled={busy || !r.clock_out} onClick={() => run("approve_time", { id: r.id }, "Time entry approved.")}>Approve</button>]))}
         </section>
       )}
-      {section === "payroll" && (
+      {section === "payroll" && allowedSections.includes("payroll") && !staff && (
         <section className="paper">
-          <div className="section-heading"><div><p className="eyebrow">PAYROLL ESTIMATE</p><h2>Worked hours and estimated gross pay</h2></div><div className="button-row"><button onClick={() => compensationEdit()}>Configure pay</button><button onClick={() => payRuleEdit()}>Service rule +</button><a className="button" href={`/api/manage?section=payroll&export=csv&start=${encodeURIComponent(s(data.start))}&end=${encodeURIComponent(s(data.end))}`}>Export CSV</a></div></div>
+          <div className="section-heading"><div><p className="eyebrow">PAYROLL ESTIMATE</p><h2>Worked hours and estimated gross pay</h2></div><div className="button-row"><button disabled={!rows(data.employees).length} onClick={() => compensationEdit()}>Employee pay settings</button><button disabled={!rows(data.employees).length} onClick={() => payRuleEdit()}>Add service pay rule</button><a className="button" href={`/api/manage?section=payroll&export=csv&start=${encodeURIComponent(s(data.start))}&end=${encodeURIComponent(s(data.end))}`}>Export CSV</a></div></div>
           <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
-          <p className="small-note">Paid hours use completed clock entries when present. If none exist for an employee in this period, scheduled shift hours are used as the payable fallback. Detailers use $10/hr + a shared 30% completed-job commission pool + allocated tips.</p>
-          {table(["Employee", "Scheduled", "Actual", "Paid hours", "Hourly pay", "Commissionable revenue", "Commission", "Tips", "Adjustments", "Total pay"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)} · {s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small></>, (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents))]), { comparison: true, label: "Employee payroll" })}
-          <h3>Service-specific rules</h3>{table(["Employee", "Service", "Rule", "Value", "Status", "Action"], rows(data.rules).map((rule) => [s(rule.employee_name),s(rule.service_name) || "All services",title(s(rule.rule_type)),s(rule.rule_type) === "commission_percent" ? (n(rule.value) / 100).toFixed(2) + "%" : money(n(rule.value)),s(rule.active) === "true" || rule.active ? "Active" : "Inactive",<button onClick={() => payRuleEdit(rule)}>Edit</button>]))}
+          <p className="small-note">Paid hours use completed clock entries when present. If none exist for an employee in this period, scheduled shift hours are used as the payable fallback. Job pay follows each employee’s saved plan or service rule, using the final service price excluding tips and the employee’s share of the job. Tips are allocated separately.</p>
+          {table(["Employee", "Scheduled", "Actual", "Paid hours", "Hourly pay", "Attributed service revenue", "Job pay", "Tips", "Adjustments", "Total pay"], list.map((r) => [
+            <><strong>{s(r.name)}</strong><small>{s(r.position)} · {s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small>
+              <small>Default plan: {compensationPlanLabel(rows(data.employees).find((employee) => employee.id === r.id) || r)}</small>
+              {allowedSections.includes("payroll") && !staff && <button className="link-button employee-pay-action" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button>}</>,
+            (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents)),
+          ]), { comparison: true, label: "Employee payroll" })}
+          <h3>Service pay overrides</h3>
+          <p className="small-note">An active rule replaces the default job pay for that service, regardless of pay model. It keeps applicable hourly pay. Specific service rules take priority over all-services rules; an explicit job-level pay override takes priority over both.</p>
+          {table(["Employee", "Service", "Job pay", "Value", "Status", "Action"], rows(data.rules).map((rule) => [s(rule.employee_name), s(rule.service_name) || "All services", rule.rule_type === "commission_percent" ? "Percentage per job" : "Flat amount per job", rule.rule_type === "commission_percent" ? (n(rule.value) / 100).toFixed(2) + "%" : money(n(rule.value)), rule.active === true || rule.active === "true" ? "Active" : "Inactive", <button onClick={() => payRuleEdit(rule)}>Edit rule</button>]))}
         </section>
       )}
       {section === "performance" && (

@@ -62,7 +62,7 @@ test("financial dashboards handle high-value jobs, month-end costs and consisten
     const customer = randomUUID(), vehicle = randomUUID(), booking = randomUUID(), employee = randomUUID();
     await query("INSERT INTO wl.customers(id,first_name,last_name,email,phone) VALUES($1,'Audit','Customer',$2,'')", [customer, `${customer}@example.test`]);
     await query("INSERT INTO wl.vehicles(id,customer_id,make,model,year,type) VALUES($1,$2,'Test','Coupe',2025,'Sedan')", [vehicle, customer]);
-    await query("INSERT INTO wl.employees(id,name,position,hourly_rate_cents) VALUES($1,'Coating detailer','Detailer',1000)", [employee]);
+    await query("INSERT INTO wl.employees(id,name,position,hourly_rate_cents,compensation_model,default_commission_bps) VALUES($1,'Coating detailer','Detailer',1000,'hourly_commission',3000)", [employee]);
     await query(`INSERT INTO wl.bookings(id,request_key,request_hash,reference,customer_id,vehicle_id,
       service_id,service_name,service_snapshot,booking_date,start_minute,duration_minutes,status,price_cents)
       VALUES($1::uuid,$1::text,'fixture',$1::text,$2,$3,$4,'Ceramic coating','{}','2026-08-14',600,180,'completed',300000)`,
@@ -106,7 +106,7 @@ test("financial dashboards handle high-value jobs, month-end costs and consisten
     await query("UPDATE wl.employees SET compensation_model='flat_job',flat_job_pay_cents=1000 WHERE id=$1", [manager]);
     await query("INSERT INTO wl.employee_pay_rules(id,employee_id,rule_type,value) VALUES($1,$2,'flat_job',1500)", [randomUUID(), manager]);
     assert.equal(Number((await payrollSummary("2026-08-15", "2026-08-15")).find((entry) => entry.id === manager)!.commission_cents), 1500);
-    t.diagnostic("all-service pay rules apply once, exact active rules override them, and rule types stay separate");
+    t.diagnostic("all-service pay rules apply once, exact active rules override them, and the latest active rule wins within a scope");
 
     await query(`INSERT INTO wl.expenses(id,expense_date,amount_cents,category,recurrence,recurring_start)
       VALUES($1,'2026-01-31',300000,'Rent','monthly','2026-01-31')`, [randomUUID()]);

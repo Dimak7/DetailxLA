@@ -2,6 +2,14 @@ import type { Service } from "./platform/types";
 
 type Question = { question: string; answer: string };
 type Step = { title: string; body: string };
+type ServiceGuide = {
+  eyebrow: string;
+  heading: string;
+  introduction: string;
+  choices: { label: string; title: string; body: string; points: string[] }[];
+  note: string;
+  boundaries: Step[];
+};
 export type ServiceContent = {
   eyebrow: string;
   headline: string;
@@ -16,11 +24,15 @@ export type ServiceContent = {
   faqs: Question[];
   related: string[];
   metadata: string;
+  guide?: ServiceGuide;
 };
 
 // General coating/correction distinctions checked against Gtechniq's coating
 // guide (https://gtechniq.com/ceramiccoatings/) and Meguiar's FAQ
-// (https://www.meguiars.com/faq). These are educational sources, not supplied brands.
+// (https://www.meguiars.com/faq). Polishing stages/preparation also checked against
+// https://gtechniq.com/service-builder/auto-service-builder-us/ and
+// https://gtechniq.com/5-common-diy-paint-correction-mistakes/.
+// These are educational sources, not supplied brands or certifications.
 export const careStages = [
   { number: "01", title: "Clean", service: "Exterior Detail", slug: "exterior-detail", purpose: "Remove the everyday.", detail: "A hand wash lifts surface dirt. Wheel, tire and glass care bring the exterior together.", boundary: "For a cleaner car. Existing paint swirls may remain." },
   { number: "02", title: "Refine", service: "Paint Correction", slug: "paint-correction", purpose: "Bring back the reflection.", detail: "Machine polishing addresses suitable surface defects to improve paint clarity and depth.", boundary: "For dullness and swirls. Results depend on paint condition." },
@@ -53,27 +65,45 @@ export const serviceContent: Record<string, ServiceContent> = {
     metadata: "Explore ceramic coating in Chicago: surface preparation, application, aftercare, current starting prices and a clear consultation before work begins.",
   },
   "paint-correction": {
-    eyebrow: "CLARITY, RESTORED",
+    eyebrow: "PAINT CORRECTION IN CHICAGO",
     headline: "Let the paint\ncatch the light again.",
-    introduction: "A closer look at the finish. Paint correction uses machine polishing to improve suitable surface defects and bring more clarity to the reflection.",
-    overview: "Swirls and fine surface marks can soften the appearance of otherwise clean paint. Correction refines the finish rather than simply covering it. Paint condition, previous repairs and the depth of a defect determine what can be improved safely. We agree a realistic scope before polishing begins.",
+    introduction: "When a freshly washed car still looks hazy, the paint may need more than cleaning. Carefully assessed machine polishing can soften suitable swirls and fine marks, bringing clarity back to the reflection.",
+    overview: "Paint correction works on defects in glossy paint rather than dirt sitting on top of it. Abrasive polishing refines a small amount of the surface, so the goal is a worthwhile improvement while preserving the finish. Paint history, defect depth and the condition of each panel guide the work. We discuss what can improve, what should remain and the agreed price before starting.",
     image: "/portfolio/black-porsche-studio.jpg",
     imageAlt: "Reflections following the hood and front fender of a black Porsche",
-    bestFor: ["Visible swirls or light marks in glossy paint", "A finish that looks dull even after washing", "Refining the appearance before a ceramic coating"],
+    bestFor: ["Fine wash swirls visible in sunlight or direct lighting", "Glossy paint that still looks hazy after a careful wash", "A used car with paintwork you want assessed before investing in protection", "Refining the appearance before a separately agreed ceramic coating"],
     process: [
-      { title: "Inspect", body: "Look at the paint and discuss visible defects, previous repairs and the result you are hoping for." },
-      { title: "Decontaminate", body: "Prepare the surface so polishing addresses the finish rather than working over contamination." },
-      { title: "Refine", body: "Machine polish within the agreed scope, with the paint's condition guiding the approach." },
-      { title: "Review", body: "Inspect the finish and discuss suitable ongoing care or a separate protection service." },
+      { title: "Assess the paint", body: "Review swirls, deeper marks, previous polishing and repaired panels. Agree priorities and realistic limits for the finish." },
+      { title: "Prepare the surface", body: "Wash and decontaminate the paint as required. A clean surface allows the polishing approach to be assessed without working over bonded dirt." },
+      { title: "Polish with purpose", body: "Choose the polishing stages around the paint's response and agreed scope. More aggressive work is not automatically the better choice." },
+      { title: "Inspect and protect", body: "Review clarity and any remaining defects. Confirm the protection included in your scope and how to maintain the finish after collection." },
     ],
-    preparation: ["Share any history of repainting, previous correction or existing protection.", "Identify specific marks you would like assessed.", "Mention matte or satin finishes before booking; conventional correction is not suitable for every finish."],
+    preparation: ["Share the vehicle's age and any history of repainting, polishing, coatings or paint protection film.", "Point out the marks that bother you most. Clear photos help start the conversation; the car still needs an in-person assessment.", "Tell us about matte or satin paint, wraps and damaged finishes before booking so we can discuss appropriate care."],
+    guide: {
+      eyebrow: "CHOOSING THE RIGHT LEVEL",
+      heading: "One step or more?\nStart with the paint.",
+      introduction: "Polishing stages describe the approach, not a guaranteed result. You do not need to diagnose your paint or choose a package yourself: the condition and the finish you want guide the recommendation.",
+      choices: [
+        { label: "LIGHTER REFINEMENT", title: "Single-step polishing", body: "One polishing stage balances improvement and finish quality. It may suit paint with lighter swirls or mild haze when a stronger gloss is the main goal.", points: ["Focuses on clarity and an overall improvement", "Deeper isolated marks may remain", "Suitability depends on how the paint responds"] },
+        { label: "MORE INVOLVED REFINEMENT", title: "Multi-step correction", body: "A more involved approach separates defect reduction from finer finishing. It may be appropriate for more noticeable defects when the paint can support the additional work.", points: ["A correction stage followed by finer polishing", "More time and preparation may be needed", "Scope and estimate agreed after assessment"] },
+      ],
+      note: "These are approaches we can discuss, not two fixed packages. The listed service price does not promise a specific number of stages or a percentage of defect removal.",
+      boundaries: [
+        { title: "What may improve", body: "Suitable wash swirls, fine surface scratches and polishing haze. Some water marks or dullness may respond, depending on their cause and depth." },
+        { title: "What polishing cannot replace", body: "Paint repair for chips, deep scratches, peeling clear coat or damaged paint. Chasing every mark can remove too much material; some defects are best left alone." },
+        { title: "Keep the result looking good", body: "Use careful washing and clean, suitable wash materials. Correction does not make paint scratch-proof, and ceramic coating is separate unless agreed in your scope." },
+      ],
+    },
     faqs: [
       { question: "Can every scratch be removed?", answer: "No. Deep damage, chips and defects beyond the safely correctable surface may remain. The inspection helps distinguish improvements we can make from damage that may require paint repair." },
       { question: "Is this the same as a wash or wax?", answer: "A wash cleans the surface, while wax adds temporary protection. Paint correction uses polishing to refine suitable defects in the finish. Each serves a different purpose." },
+      { question: "Do I need single-step or multi-step correction?", answer: "That depends on the defects, paint condition and the result you want. A single polishing stage can be suitable for lighter refinement; more involved correction separates defect reduction and finishing. We assess the car before agreeing the approach, timing and price." },
+      { question: "How long does paint correction take?", answer: "The appointment estimate above is a starting point for planning. Vehicle size, paint condition and the polishing scope can change the time required. We confirm the expected collection time when the work is agreed." },
+      { question: "Can matte paint, wraps or paint protection film be corrected?", answer: "Conventional polishing is intended for suitable glossy paint. Matte and satin finishes, wraps and film need their own care approach. Tell us what is on the car before choosing this service." },
       { question: "Should I coat the car after correction?", answer: "Coating can be a useful next step once you are happy with the finish. It is quoted and booked separately unless your confirmed scope includes both services." },
     ],
-    related: ["ceramic-coating", "exterior-detail", "maintenance-detail"],
-    metadata: "Paint correction in Chicago for suitable swirls, light surface marks and dull finishes. Explore the process, current starting price and booking options.",
+    related: ["ceramic-coating", "full-detail", "maintenance-detail"],
+    metadata: "Paint correction in Chicago's West Loop. Understand swirl removal, single-step polishing, multi-step assessment and realistic results. See current pricing and book.",
   },
   "exterior-detail": {
     eyebrow: "THE EVERYDAY, RECONSIDERED",
@@ -122,9 +152,9 @@ export const serviceContent: Record<string, ServiceContent> = {
     metadata: "Interior car detailing in Chicago with vacuuming, seat and carpet cleaning, dashboard and vent care, and condition-based stain treatment. View prices and book.",
   },
   "full-detail": {
-    eyebrow: "THE COMPLETE RESET",
+    eyebrow: "FULL SERVICE DETAILING IN CHICAGO",
     headline: "The whole car.\nConsidered together.",
-    introduction: "A complete interior and exterior detail for the days when your car needs a fresh beginning, inside and out.",
+    introduction: "Interior and exterior care in one visit. Full service detailing brings the cabin, paintwork, wheels and finishing touches together for a car that feels cared for throughout.",
     overview: "Full Detail combines cabin care with an exterior hand wash, wheels and tires, trim attention and wax protection. It is a practical way to address the whole car in one appointment. More involved paint correction, ceramic coating or deep interior work can be discussed separately if needed.",
     image: "/portfolio/black-porsche-driveway.jpg",
     imageAlt: "Black Porsche parked on a stone driveway with reflections across its bodywork",
@@ -136,13 +166,30 @@ export const serviceContent: Record<string, ServiceContent> = {
       { title: "Bring it together", body: "Review the car as a whole and discuss how to maintain the finish." },
     ],
     preparation: ["Remove valuables and loose belongings from the cabin and cargo area.", "Share any particular stains, paint concerns or existing coatings.", "Plan around the appointment estimate and confirm collection arrangements."],
+    guide: {
+      eyebrow: "INSIDE AND OUT",
+      heading: "One appointment.\nTwo sides of a cleaner car.",
+      introduction: "Choose Full Detail when both the cabin and exterior need attention. The service brings the two areas together; the included steps above remain the reference for your appointment.",
+      choices: [
+        { label: "THE CABIN", title: "Interior attention", body: "A whole-cabin clean built around the surfaces you use every day, with methods chosen for the material and its condition.", points: ["Vacuuming and accessible interior surfaces", "Seat, carpet, dashboard, door and vent care within the agreed scope", "Discuss stains and odor concerns before the visit"] },
+        { label: "THE EXTERIOR", title: "A considered finish", body: "An exterior reset that brings together clean bodywork, wheels and tires, with the finishing protection listed for your service.", points: ["Exterior hand wash and wheel and tire care", "Trim attention and the listed wax protection", "Existing coatings or special finishes reviewed first"] },
+      ],
+      note: "Full service describes combined interior and exterior detailing. Machine paint correction, ceramic coating and more extensive interior restoration are separate unless explicitly included in your confirmed scope.",
+      boundaries: [
+        { title: "A clean car can still have swirls", body: "If the paint looks marked after washing, Paint Correction is the service to discuss. A full detail does not promise scratch or swirl removal." },
+        { title: "Heavy interior concerns need a closer look", body: "Significant pet hair, embedded stains or persistent odors may require Deep Interior Cleaning or additional work. Share the condition so the scope can be agreed first." },
+        { title: "Protect it on your terms", body: "Wax protection and ceramic coating are different services. If you want ceramic protection, we discuss preparation, pricing and aftercare separately." },
+      ],
+    },
     faqs: [
       { question: "Does Full Detail include paint correction?", answer: "No. Full Detail focuses on cleaning and the listed finishing steps. Machine polishing is offered through Paint Correction, with its own assessment and price." },
       { question: "Is ceramic coating included?", answer: "The listed protection for Full Detail is wax. Ceramic Coating is a separate surface-protection service with different preparation and aftercare requirements." },
       { question: "What if the interior needs more extensive work?", answer: "Tell us about heavy staining, pet hair or embedded dirt before the visit. We can assess whether Deep Interior Cleaning or an adjusted scope would better suit the car." },
+      { question: "Is a full detail the same as a car wash?", answer: "A full detail gives attention to both interior and exterior surfaces, with the cleaning and finishing steps listed above. It is broader than an exterior wash, but it does not automatically include paint correction or specialist restoration." },
+      { question: "Is this a good choice before selling a car?", answer: "It can be a useful way to present a cleaner cabin and exterior. Tell us about your timing and priorities. Detailing does not repair worn materials or paint damage, and we do not promise a change in resale value." },
     ],
-    related: ["ceramic-coating", "deep-interior-cleaning", "maintenance-detail"],
-    metadata: "Full car detailing in Chicago: interior care, an exterior hand wash, wheels, trim and wax protection in one appointment. View live pricing and availability.",
+    related: ["paint-correction", "deep-interior-cleaning", "ceramic-coating"],
+    metadata: "Full service car detailing in Chicago's West Loop. Explore interior and exterior care, wheel and trim attention, wax protection, inclusions and current booking prices.",
   },
   "deep-interior-cleaning": {
     eyebrow: "TIME FOR A DEEPER RESET",

@@ -124,6 +124,21 @@
 .preparationList li::before { content: "0" counter(preparation); color: #886340; font-size: 10px; padding-top: 3px; }
 .faqSection { border-top: 1px solid #d9d1c4; }
 .filmLayout { display: grid; grid-template-columns: 1.15fr 1fr; align-items: center; gap: 7%; padding-bottom: 0; }
+.guideSection { border-top: 1px solid #d9d1c4; }
+.headingLine { display: block; }
+.guideSection .sectionHeading > p { max-width: 440px; }
+.guideChoices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.guideChoice { background: #f8f5ee; border: 1px solid #d4cabb; padding: 34px; min-width: 0; }
+.guideChoice h3 { font-size: 36px; letter-spacing: -.025em; margin: 15px 0 20px; }
+.guideChoice > p:not(.eyebrow), .guideChoice li { color: #5d594f; font-size: 14px; line-height: 1.8; }
+.guideChoice ul { border-top: 1px solid #ddd4c6; padding: 20px 0 0 18px; margin: 23px 0 0; }
+.guideChoice li { padding-left: 5px; margin-bottom: 8px; }
+.guideChoice li::marker { color: #986b43; }
+.guideNote { background: #e8e1d5; padding: 20px 24px; margin: 18px 0 34px; color: #5b5247; font-size: 13px; line-height: 1.85; }
+.guideBoundaries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+.guideBoundaries > article { min-width: 0; border-top: 1px solid #cbbda9; padding-top: 22px; }
+.guideBoundaries h3 { font-family: var(--font-body), sans-serif; font-size: 15px; font-weight: 650; line-height: 1.5; margin: 0 0 12px; }
+.guideBoundaries p { color: #615b52; font-size: 13px; line-height: 1.85; margin: 0; }
 .page :is(a,button,summary):focus-visible,.serviceCollection :is(a,button,summary):focus-visible { outline: 2px solid #936339; outline-offset: 5px; }
 .consultation :is(a,button):focus-visible { outline-color: #f2efe8; }
 .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
@@ -140,6 +155,10 @@
   .processGrid h3 { font-size: 25px; }
 }
 @media (max-width: 800px) {
+  .guideChoices, .guideBoundaries { grid-template-columns: minmax(0, 1fr); }
+  .guideChoice { padding: 26px; }
+  .guideChoice h3 { font-size: 33px; }
+  .guideNote { padding: 19px 21px; }
   .menuHero,.detailHero { grid-template-columns: 1fr; }
   .menuHeroCopy { padding: 48px 24px 40px; }
   .menuHeroImage { min-height: 420px; }

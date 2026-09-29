@@ -68,6 +68,16 @@ export default async function Page({ params }: PageProps) {
           <aside className={styles.fitPanel}><p className={styles.eyebrow}>WHO IT’S FOR</p><h3>A good fit for</h3><ul>{content.bestFor.map((item) => <li key={item}>{item}</li>)}</ul><div className={styles.fitPricing}><h4>Clear scope. Considered care.</h4><p>{service.pricing_mode === "quote" ? "We discuss your vehicle, the work required and the price before confirming your service." : "Prices shown are for sedans. Condition and vehicle size can affect the final scope."}</p>{service.pricing_mode !== "quote" && <p className={styles.vehiclePrices}>{service.pricing_mode === "starting" ? "Starting prices: " : ""}SUV {money(service.price_cents + service.suv_extra_cents)} · Truck {money(service.price_cents + service.truck_extra_cents)}</p>}<Link className={styles.textLink} href="/contact">Ask about your vehicle</Link></div></aside>
         </section>
 
+        {content.guide && <section className={`${styles.section} ${styles.guideSection}`} aria-labelledby="service-guide-heading">
+          <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>{content.guide.eyebrow}</p><h2 id="service-guide-heading">{content.guide.heading.split("\n").map((line) => <span className={styles.headingLine} key={line}>{line}</span>)}</h2></div><p>{content.guide.introduction}</p></div>
+          <div className={styles.guideChoices}>{content.guide.choices.map((choice) => <article className={styles.guideChoice} key={choice.title}>
+            <p className={styles.eyebrow}>{choice.label}</p><h3>{choice.title}</h3><p>{choice.body}</p><ul>{choice.points.map((point) => <li key={point}>{point}</li>)}</ul>
+          </article>)}</div>
+          <p className={styles.guideNote}>{content.guide.note}</p>
+          <div className={styles.guideBoundaries}>{content.guide.boundaries.map((boundary) => <article key={boundary.title}><h3>{boundary.title}</h3><p>{boundary.body}</p></article>)}</div>
+          <div className={styles.actions}><Link className={styles.primaryLink} href={bookingHref}>Book {service.name.toLowerCase()}</Link><Link className={styles.textLink} href="/contact">Discuss your vehicle first</Link></div>
+        </section>}
+
         <section className={styles.processSection} aria-labelledby="process-heading"><div className={styles.sectionHeading}><div><p className={styles.eyebrow}>A CONSIDERED PROCESS</p><h2 id="process-heading">Care, from start to finish.</h2></div><p>Every vehicle has a different starting point. The agreed scope guides the work.</p></div><ol className={styles.processGrid}>{content.process.map((step, index) => <li key={step.title}><span className={styles.stepNumber}>{String(index + 1).padStart(2, "0")}</span><h3>{step.title}</h3><p>{step.body}</p></li>)}</ol></section>
 
         {isCoating && <>

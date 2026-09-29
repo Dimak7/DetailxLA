@@ -2636,3 +2636,10 @@ td small {
   .admin-shell .booking-consent .text-link { color: #245b46; border-color: #639574; }
   .admin-shell .booking-main .error-message { background: #ffebe6; color: #893c2a; border-left-color: #be5d44; }
 }
+
+/* Employee compensation editor and saved-plan actions. */
+.admin-shell .employee-pay-preview { margin: 20px 0; padding: 18px; border: 1px solid #cbdcd1; border-radius: 14px; background: #eaf2ed; color: #234b39; overflow-wrap: anywhere; }
+.admin-shell .employee-pay-preview strong { display: block; font-size: 14px; line-height: 1.5; }
+.admin-shell .employee-pay-preview p { margin: 8px 0; font-size: 16px; line-height: 1.5; }
+.admin-shell .employee-pay-preview small { display: block; font-size: 12px; line-height: 1.6; }
+.admin-shell .employee-pay-action { display: block; min-height: 44px; margin-top: 6px; text-align: left; }

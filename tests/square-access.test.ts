@@ -5,6 +5,7 @@ import { closeDatabase, query } from "../lib/platform/db";
 import { POST as manage } from "../app/api/manage/route";
 import { POST as jobs } from "../app/api/jobs/route";
 import type { Session } from "../lib/platform/types";
+import { workAsyncStorage, type WorkStore } from "next/dist/server/app-render/work-async-storage.external";
 
 process.env.PGLITE_PATH = "memory://square-access";
 Object.assign(process.env, { NODE_ENV: "test" });
@@ -14,7 +15,9 @@ process.env.SQUARE_ENVIRONMENT = "production";
 process.env.SQUARE_ACCESS_TOKEN = "square-access-test-token";
 process.env.CRON_SECRET = "square-access-test-cron-secret";
 
-test("Square synchronization requires financial access and only reads the configured account", async () => {
+test("Square synchronization requires financial access and only reads the configured account", async (t) => {
+  // Direct route calls still provide the request scope normally owned by Next.
+  t.mock.method(workAsyncStorage, "getStore", () => ({ afterContext: { after() {} } }) as unknown as WorkStore);
   const originalFetch = globalThis.fetch;
   const requests: string[] = [];
   globalThis.fetch = async (input, init) => {

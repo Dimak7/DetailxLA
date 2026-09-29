@@ -36,15 +36,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     assertOrigin(request);
+    // Register while the request context is intact, before database adapters may
+    // cross an async boundary. A committed save must not become a failed response
+    // merely because scheduling background delivery lost that context.
+    let deliverAfterResponse = false;
+    after(async () => {
+      if (deliverAfterResponse) await processOutbox(10).catch(() => {});
+    });
     const s = await requestSession(request);
     if (!s) throw new AppError("Please sign in.", 401);
     const body = await readJson(request);
     const result = await adminAction(body.action, body.data, s);
-    if (body.action !== "sync_square_payments") after(() =>
-      processOutbox(10)
-        .then(() => {})
-        .catch(() => {}),
-    );
+    deliverAfterResponse = body.action !== "sync_square_payments";
     return NextResponse.json({ ok: true, result });
   } catch (e) {
     return apiError(e);

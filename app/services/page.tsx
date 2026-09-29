@@ -4,12 +4,13 @@ import Link from "next/link";
 import { publicData } from "@/lib/platform/public";
 import { PageShell } from "@/components/westloop/PageShell";
 import { ServiceCards } from "@/components/westloop/ServiceCards";
+import { DetailingSpotlight } from "@/components/westloop/DetailingSpotlight";
 import { careStages, servicePrice } from "@/lib/service-content";
 import styles from "@/components/westloop/ServiceDetails.module.css";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Ceramic Coating & Detailing Services in Chicago",
+  title: "Paint Correction, Full Detailing & Ceramic Coating in Chicago",
   alternates: { canonical: "/services" },
   description: "Find the right care for your car. Explore ceramic coating, paint correction and interior and exterior detailing, with current pricing and online booking.",
 };
@@ -17,15 +18,17 @@ export const metadata: Metadata = {
 export default async function Page() {
   const d = await publicData();
   const coating = d.services.find((service) => service.slug === "ceramic-coating");
-  const orderedServices = [...d.services].sort((a, b) => Number(b.slug === "ceramic-coating") - Number(a.slug === "ceramic-coating"));
+  const priority = ["paint-correction", "full-detail", "ceramic-coating"];
+  const rank = (slug: string) => priority.includes(slug) ? priority.indexOf(slug) : priority.length;
+  const orderedServices = [...d.services].sort((a, b) => rank(a.slug) - rank(b.slug));
   return (
     <PageShell business={d.business}>
       <div className={styles.page}>
         <section className={styles.menuHero}>
           <div className={styles.menuHeroCopy}>
             <p className={styles.eyebrow}>THE WEST LOOP CERAMICS SERVICE COLLECTION</p>
-            <h1>Protect the finish.<br /><em>Enjoy the drive.</em></h1>
-            <p className={styles.lead}>From the first careful wash to a thoughtfully protected finish. Find the right attention for your car, and a care routine that fits your life.</p>
+            <h1>Clean. Correct.<br /><em>Protect.</em></h1>
+            <p className={styles.lead}>Full service detailing for the whole car. Paint correction for a clearer reflection. Ceramic coating for a prepared finish. Find the right care for what you want to improve.</p>
             <a className={styles.textLink} href="#all-services">View every service</a>
             {coating && (
               <div className={styles.flagship}>
@@ -41,6 +44,8 @@ export default async function Page() {
             <figcaption>THE ART OF A CONSIDERED FINISH <span>Editorial imagery</span></figcaption>
           </figure>
         </section>
+
+        <DetailingSpotlight services={d.services} />
 
         <section className={styles.section} aria-labelledby="right-care-heading">
           <div className={styles.sectionHeading}>

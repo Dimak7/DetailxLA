@@ -10,6 +10,7 @@ import { CinematicHero } from "@/components/westloop/CinematicHero";
 import { ServiceCards } from "@/components/westloop/ServiceCards";
 import { ServiceFinder } from "@/components/westloop/ServiceFinder";
 import { CeramicFilm } from "@/components/westloop/CeramicFilm";
+import { DetailingSpotlight } from "@/components/westloop/DetailingSpotlight";
 import styles from "./Home.module.css";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export const metadata = {
 };
 
 const questions = [
+  ["Should I book a full detail or paint correction?", "Choose Full Detail for interior and exterior cleaning in one visit. If swirls, fine marks or haze in glossy paint are the concern, explore Paint Correction. We assess the finish and agree the scope; cleaning alone does not correct paint defects."],
   ["Is ceramic coating right for my car?", "It can be a good fit if you want enhanced gloss, water repellency and easier routine cleaning. We assess the paint first and recommend the preparation it needs. The right choice depends on the vehicle’s condition, how you use it and how you plan to maintain it."],
   ["Does my car need paint correction before coating?", "Coating protects the finish underneath it; it does not remove scratches or swirl marks. Paint correction may be recommended first to improve clarity. We discuss that work and the price before you commit."],
   ["Will ceramic coating prevent scratches and stone chips?", "Ceramic coating is not scratch-proof and does not replace paint protection film. Careful washing still matters. Its role is to add a protective surface and make ongoing care easier."],
@@ -31,7 +33,7 @@ export default async function Home() {
   const [{ business, services, reviews }, requestHeaders] = await Promise.all([publicData(), headers()]);
   const mobileAnimation = heroVideoMedia?.mobileAnimation ?? heroVideoMedia?.animation;
   const coating = services.find((s) => s.slug === "ceramic-coating");
-  const featured = ["ceramic-coating", "paint-correction", "full-detail"].flatMap((slug) => services.filter((s) => s.slug === slug));
+  const featured = ["paint-correction", "full-detail", "ceramic-coating"].flatMap((slug) => services.filter((s) => s.slug === slug));
   const coatingBooking = coating ? `/booking?service=${coating.id}` : "/contact";
   const schema = {
     "@context": "https://schema.org", "@type": "AutomotiveBusiness",
@@ -46,6 +48,7 @@ export default async function Home() {
       )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
       <CinematicHero />
+      <DetailingSpotlight services={services} />
       <section className={`${styles.coating} wrap`} id="ceramic-coating">
         <div className={styles.featureHeading}>
           <p className="eyebrow">CERAMIC COATING</p><h2>Exceptional gloss.<br /><em>Considered protection.</em></h2>
