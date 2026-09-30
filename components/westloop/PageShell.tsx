@@ -6,10 +6,12 @@ export function PageShell({
   business,
   children,
   showBookingCTA = true,
+  mobileBookingCTA = showBookingCTA,
 }: {
   business: BusinessSettings;
   children: React.ReactNode;
   showBookingCTA?: boolean;
+  mobileBookingCTA?: boolean;
 }) {
   return (
     <div className="ceramics-site">
@@ -26,7 +28,7 @@ export function PageShell({
         }}
       />
       <main id="main">{children}</main>
-      <PublicFooter business={business} showBookingCTA={showBookingCTA} />
+      <PublicFooter business={business} showBookingCTA={showBookingCTA} mobileBookingCTA={mobileBookingCTA} />
     </div>
   );
 }

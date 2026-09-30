@@ -29,8 +29,8 @@ export function CallLink({ phone, className = "" }: { phone: string; className?:
 }
 
 const navigation = [
-  { href: "/services/ceramic-coating", label: "Ceramic coatings", feature: true },
-  { href: "/services", label: "Services" },
+  { href: "/services", label: "Services & prices", feature: true },
+  { href: "/#detailing", label: "Detailing" },
   { href: "/#process", label: "Our process" },
   { href: "/gallery", label: "Our work" },
   { href: "/contact", label: "Contact" },
@@ -85,7 +85,7 @@ export function PublicHeader({ business }: { business: BusinessSettings }) {
   );
 }
 
-export function PublicFooter({ business, showBookingCTA = true }: { business: BusinessSettings; showBookingCTA?: boolean }) {
+export function PublicFooter({ business, showBookingCTA = true, mobileBookingCTA = showBookingCTA }: { business: BusinessSettings; showBookingCTA?: boolean; mobileBookingCTA?: boolean }) {
   return (
     <>
       {showBookingCTA && <section className="ceramics-final-cta" aria-labelledby="final-cta-heading">
@@ -97,14 +97,14 @@ export function PublicFooter({ business, showBookingCTA = true }: { business: Bu
       <footer className="ceramics-footer">
         <div className="wrap ceramics-footer-grid">
           <div className="ceramics-footer-brand"><Link href="/" aria-label={`${business.name} home`}><Wordmark /></Link><p>Considered care.<br />An exceptional finish.</p><span className="ceramics-footer-location">WEST LOOP, CHICAGO</span></div>
-          <div><h3>Care & protection</h3><Link href="/services/ceramic-coating">Ceramic coatings</Link><Link href="/services/paint-correction">Paint correction</Link><Link href="/services/interior-detail">Interior detailing</Link><Link href="/services/exterior-detail">Exterior detailing</Link><Link href="/services">All services & pricing</Link></div>
+          <div><h3>Detailing & protection</h3><Link href="/services/full-detail">Full detailing</Link><Link href="/services/interior-detail">Interior detailing</Link><Link href="/services/exterior-detail">Exterior detailing</Link><Link href="/services/paint-correction">Paint correction</Link><Link href="/services/ceramic-coating">Ceramic coatings</Link><Link href="/services">All services & pricing</Link></div>
           <div><h3>The studio</h3><Link href="/#process">Our process</Link><Link href="/gallery">Our work</Link><Link href="/booking">Book an appointment</Link><Link href="/contact">Talk to the team</Link>{business.instagram_url ? <a href={business.instagram_url} target="_blank" rel="noreferrer">Instagram</a> : null}</div>
           <div className="ceramics-footer-contact"><h3>Plan your visit</h3><p>{business.address || "West Loop, Chicago"}</p><p>{business.hours_label || "By appointment"}</p>{business.phone ? <a href={"tel:" + business.phone.replace(/[^+\d]/g, "")} onClick={() => track("phone_clicked")}>{business.phone}</a> : null}{business.email ? <a href={"mailto:" + business.email}>{business.email}</a> : null}{!business.address ? <p className="ceramics-visit-note">Your appointment location is confirmed before your visit.</p> : null}</div>
           <div className="ceramics-service-area"><span>SERVING CHICAGO</span><p>{business.service_area || "West Loop and the surrounding Chicago neighborhoods."}</p></div>
           <div className="ceramics-footer-bottom"><span>© {new Date().getFullYear()} {business.name}</span><div><Link href="/privacy-notice">Privacy notice</Link><Link href="/service-rules">Service terms</Link><a href="/hero/credits.txt" target="_blank" rel="noreferrer">Visual credits</a><Link href="/admin">Team access</Link></div></div>
         </div>
       </footer>
-      <div className="mobile-bar ceramics-mobile-bar"><Link className="button" href={showBookingCTA ? "/booking" : "/contact"}>{showBookingCTA ? "Book appointment" : "Contact the studio"}</Link><CallLink phone={business.phone} className="button outline" /></div>
+      <div className="mobile-bar ceramics-mobile-bar"><Link className="button" href={mobileBookingCTA ? "/booking" : "/contact"}>{mobileBookingCTA ? "Book appointment" : "Contact the studio"}</Link><CallLink phone={business.phone} className="button outline" /></div>
     </>
   );
 }

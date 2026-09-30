@@ -3,37 +3,42 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { heroVideoMedia, mobileHeroMediaQuery } from "@/components/westloop/hero-media";
 import { publicData } from "@/lib/platform/public";
-import { money } from "@/lib/platform/types";
+import { servicePrice } from "@/lib/service-content";
 import { siteUrl } from "@/lib/platform/settings";
 import { PageShell } from "@/components/westloop/PageShell";
 import { CinematicHero } from "@/components/westloop/CinematicHero";
-import { ServiceCards } from "@/components/westloop/ServiceCards";
-import { ServiceFinder } from "@/components/westloop/ServiceFinder";
 import { CeramicFilm } from "@/components/westloop/CeramicFilm";
-import { DetailingSpotlight } from "@/components/westloop/DetailingSpotlight";
 import styles from "./Home.module.css";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: { absolute: "West Loop Ceramics | Ceramic Coating & Detailing in Chicago" },
-  description: "A better finish starts with thoughtful preparation. Discover ceramic coating, paint correction and premium detailing in Chicago’s West Loop. Explore services and book online.",
+  title: { absolute: "West Loop Ceramics | Car Detailing, Paint Correction & Coating" },
+  description: "Interior and exterior car detailing, paint correction and ceramic coating in Chicago’s West Loop. Compare services and prices, then book your visit.",
   alternates: { canonical: "/" },
 };
 
 const questions = [
-  ["Should I book a full detail or paint correction?", "Choose Full Detail for interior and exterior cleaning in one visit. If swirls, fine marks or haze in glossy paint are the concern, explore Paint Correction. We assess the finish and agree the scope; cleaning alone does not correct paint defects."],
-  ["Is ceramic coating right for my car?", "It can be a good fit if you want enhanced gloss, water repellency and easier routine cleaning. We assess the paint first and recommend the preparation it needs. The right choice depends on the vehicle’s condition, how you use it and how you plan to maintain it."],
-  ["Does my car need paint correction before coating?", "Coating protects the finish underneath it; it does not remove scratches or swirl marks. Paint correction may be recommended first to improve clarity. We discuss that work and the price before you commit."],
-  ["Will ceramic coating prevent scratches and stone chips?", "Ceramic coating is not scratch-proof and does not replace paint protection film. Careful washing still matters. Its role is to add a protective surface and make ongoing care easier."],
-  ["What will my appointment cost?", "Each service page shows the current price or starting price. Vehicle size, condition and preparation can change the final scope. Your booking shows an estimate, and any additional work is discussed before we begin."],
-  ["What happens after I book?", "Choose your service, add your vehicle and select an available time. You’ll review the appointment before confirming. For coating, we also discuss preparation, curing and aftercare so you know what to expect."],
+  ["Which detail should I choose?", "Choose Full Detail for interior and exterior care together. Interior Detail focuses on the cabin; Exterior Detail focuses on the body, wheels and glass. For heavier interior cleaning, explore Deep Interior Cleaning."],
+  ["Will detailing remove scratches?", "Cleaning removes dirt; paint correction uses machine polishing to improve suitable swirls, fine marks and haze. We inspect the paint and agree the scope first. Deep scratches may need a different repair."],
+  ["What does ceramic coating do?", "It adds protection, gloss and water repellency to prepared paint, making routine cleaning easier. It does not remove scratches or prevent stone chips. We discuss preparation and aftercare with you."],
+  ["Is the listed price the final price?", "Prices are based on a sedan. Vehicle size, condition and the work needed can affect the final price. Any additional work is discussed before we begin."],
+  ["What happens after I book?", "Choose a service, add your vehicle and select a time. Your confirmation shows your booking and payment status. Consultation services are reviewed with you before the scope and appointment are confirmed."],
 ];
 
 export default async function Home() {
   const [{ business, services, reviews }, requestHeaders] = await Promise.all([publicData(), headers()]);
   const mobileAnimation = heroVideoMedia?.mobileAnimation ?? heroVideoMedia?.animation;
   const coating = services.find((s) => s.slug === "ceramic-coating");
-  const featured = ["paint-correction", "full-detail", "ceramic-coating"].flatMap((slug) => services.filter((s) => s.slug === slug));
+  const fullDetail = services.find((s) => s.slug === "full-detail");
+  const detailing = ["interior-detail", "exterior-detail"].flatMap((slug) => services.filter((s) => s.slug === slug));
+  const featured = [
+    { slug: "full-detail", purpose: "Clean the whole car", copy: "Interior and exterior detailing in one visit." },
+    { slug: "paint-correction", purpose: "Improve the paint", copy: "Polishing to reduce light swirls, haze and fine marks." },
+    { slug: "ceramic-coating", purpose: "Protect the finish", copy: "Prepared paint, lasting gloss and easier upkeep." },
+  ].flatMap((item) => {
+    const service = services.find((s) => s.slug === item.slug);
+    return service ? [{ ...item, service }] : [];
+  });
   const coatingBooking = coating ? `/booking?service=${coating.id}` : "/contact";
   const schema = {
     "@context": "https://schema.org", "@type": "AutomotiveBusiness",
@@ -48,30 +53,36 @@ export default async function Home() {
       )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
       <CinematicHero />
-      <DetailingSpotlight services={services} />
-      <section className={`${styles.coating} wrap`} id="ceramic-coating">
-        <div className={styles.featureHeading}>
-          <p className="eyebrow">CERAMIC COATING</p><h2>Exceptional gloss.<br /><em>Considered protection.</em></h2>
-          <p className={styles.lead}>For the way it looks today.<br />And the way you care for it tomorrow.</p>
-          <p>Ceramic coating brings a new depth to your paint and helps make regular washing easier. The difference starts before the coating touches the car: thoughtful preparation, a clean surface and attention to every panel.</p>
-          <div className={styles.featurePrice}><span>{coating && coating.pricing_mode !== "quote" ? `${coating.pricing_mode === "starting" ? "From " : ""}${money(coating.price_cents)}` : "Tailored to your vehicle"}</span><small>Preparation and vehicle condition guide the final scope.</small></div>
-          <div className={styles.links}><Link className="button" href={coatingBooking}>Book ceramic coating</Link><Link className="text-link" href="/services/ceramic-coating">See coating details</Link></div>
-        </div>
-        <div className={styles.featureVisual}><CeramicFilm /><div className={styles.benefits}>
-          <div><h3>A richer finish</h3><p>Gloss and clarity that reward a closer look.</p></div>
-          <div><h3>Easier upkeep</h3><p>A water-repellent surface for a simpler wash routine.</p></div>
-          <div><h3>A considered plan</h3><p>Preparation and aftercare matched to your vehicle.</p></div>
-        </div></div>
-      </section>
-      <section className={styles.services} id="services"><div className="wrap">
-        <div className={styles.sectionHeading}><div><p className="eyebrow">SERVICES</p><h2>Refine. Protect.<br /><em>Enjoy the drive.</em></h2></div><div><p>From a complete detail to a carefully prepared coating, find the service that fits your car.</p><Link className="text-link" href="/services">View all {services.length} services</Link></div></div>
-        <ServiceCards services={featured} compact />
-        <ServiceFinder services={services.map(({ id, slug, name, price_cents, pricing_mode }) => ({ id, slug, name, price_cents, pricing_mode }))} />
+      <section className={styles.quickServices} id="detailing" aria-labelledby="choose-care-heading"><div className="wrap" id="services">
+        <div className={styles.quickHeading}><div><p className="eyebrow">YOUR CAR. THE RIGHT CARE.</p><h2 id="choose-care-heading">What does your car need?</h2></div><Link className="text-link" href="/services">All services &amp; prices</Link></div>
+        <div className={styles.quickGrid}>{featured.map(({ purpose, copy, service }) => <article className={styles.quickCard} key={service.id}>
+          <p className={styles.purpose}>{purpose}</p><h3>{service.name}</h3><p>{copy}</p>
+          <div className={styles.quickPrice}><strong>{servicePrice(service)}</strong><Link href={`/services/${service.slug}`}>See details</Link></div>
+          <Link className={styles.quickBook} href={`/booking?service=${encodeURIComponent(service.id)}`}>{service.slug === "ceramic-coating" || service.pricing_mode === "quote" ? "Request a consultation" : `Book ${service.name.toLowerCase()}`}</Link>
+        </article>)}</div>
       </div></section>
+      {fullDetail && <section className={`${styles.detailingFeature} wrap`} id="full-detail" aria-labelledby="detailing-heading">
+        <div className={styles.detailingImage}><Image src="/portfolio/tan-interior-detail.jpg" alt="Clean leather seating and carefully finished interior details" fill sizes="(max-width: 760px) 100vw, 48vw" /></div>
+        <div className={styles.detailingCopy}><p className="eyebrow">FULL SERVICE DETAILING</p><h2 id="detailing-heading">A clean cabin.<br /><em>A fresh exterior.</em></h2>
+          <p>Everyday dust, road grime and the places a quick wash misses. Our full detail brings interior and exterior care together, so your whole car feels cared for.</p>
+          <div className={styles.detailingPrice}><strong>{servicePrice(fullDetail)}</strong><span>Interior + exterior · {fullDetail.name}</span></div>
+          <div className={styles.links}><Link className="button" href={`/booking?service=${encodeURIComponent(fullDetail.id)}`}>{fullDetail.pricing_mode === "quote" ? "Request full detailing" : "Book a full detail"}</Link><Link className="text-link" href={`/services/${fullDetail.slug}`}>What’s included</Link></div>
+          {detailing.length > 0 && <div className={styles.focusedDetails}><p>Only need one area?</p>{detailing.map((service) => <Link key={service.id} href={`/services/${service.slug}`}><span>{service.name}</span><strong>{servicePrice(service)}</strong></Link>)}</div>}
+        </div>
+      </section>}
+      {coating && <section className={`${styles.coating} wrap`} id="ceramic-coating">
+        <div className={styles.featureHeading}>
+          <p className="eyebrow">CERAMIC COATING</p><h2>Love the finish?<br /><em>Help protect it.</em></h2>
+          <p>Add gloss and a water-repellent surface after the paint is properly prepared. We’ll assess your car, explain any correction it needs and agree the scope before coating.</p>
+          <div className={styles.featurePrice}><span>{servicePrice(coating)}</span><small>Preparation and vehicle condition guide the final scope.</small></div>
+          <div className={styles.links}><Link className="button" href={coatingBooking}>Request a consultation</Link><Link className="text-link" href="/services/ceramic-coating">See coating details</Link></div>
+        </div>
+        <div className={styles.featureVisual}><CeramicFilm /></div>
+      </section>}
       <section className={`${styles.process} wrap`} id="process">
         <div className={styles.processImage}><Image src="/portfolio/black-porsche-studio.jpg" alt="Light tracing the contours of a polished black Porsche" fill sizes="(max-width: 760px) 100vw, 44vw" /></div>
         <div className={styles.processCopy}><p className="eyebrow">OUR PROCESS</p><h2>The finish matters.<br /><em>So does the process.</em></h2><p>Premium care should feel clear from the first conversation to the first drive home.</p>
-          {[["01", "Understand your vehicle", "We start with the condition of the paint, the way you drive and the finish you want."], ["02", "Prepare with purpose", "A careful wash, decontamination and any agreed paint correction establish the right foundation."], ["03", "Finish. Inspect. Advise.", "We check the finish and explain the care it needs, including coating cure and maintenance guidance."]].map(([n, title, body]) => <div className={styles.processStep} key={n}><span>{n}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}
+          {[["01", "Understand your vehicle", "Tell us what you want cleaned or improved. We help you choose the right service."], ["02", "Agree the details", "We confirm the price and what is included before work begins."], ["03", "Finish. Inspect. Advise.", "We check the completed work, then share simple aftercare advice."]].map(([n, title, body]) => <div className={styles.processStep} key={n}><span>{n}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}
           <Link className="text-link" href="/contact">Ask about your vehicle</Link>
         </div>
       </section>

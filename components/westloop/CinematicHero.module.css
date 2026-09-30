@@ -14,7 +14,7 @@
 .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse at 50% 63%, #a7805d18 0%, transparent 54%), linear-gradient(180deg, #181a1b 0%, #111314 100%); }
 .heading { position: relative; z-index: 2; text-align: center; }
 .eyebrow { margin: 0 0 18px; color: #d6b98f; font-size: 11px; letter-spacing: .17em; font-weight: 600; }
-.heading h1 { max-width: 1000px; margin: 0 auto; color: #f4f0e8; font-family: var(--font-display), Georgia, serif; font-weight: 400; font-size: clamp(64px, 6.4vw, 104px); line-height: .96; letter-spacing: -.048em; }
+.heading h1 { max-width: 1000px; margin: 0 auto; color: #f4f0e8; font-family: var(--font-display), Georgia, serif; font-weight: 400; font-size: clamp(60px, 5.7vw, 88px); line-height: .96; letter-spacing: -.048em; }
 .heading h1 em { color: #d7b487; font-weight: 400; }
 .description { max-width: 680px; margin: 22px auto 0; color: #c8c6c0; font-size: 15px; line-height: 1.7; }
 .mobileBreak { display: none; }
@@ -46,7 +46,7 @@
 @media (max-width: 760px) {
   .hero { grid-template-rows: auto auto; height: auto; min-height: 0; max-height: none; padding: 44px 22px 20px; }
   .eyebrow { margin-bottom: 16px; font-size: 10px; letter-spacing: .13em; }
-  .heading h1 { max-width: 580px; font-size: clamp(52px, 12vw, 72px); line-height: .98; }
+  .heading h1 { max-width: 580px; font-size: clamp(40px, 10.8vw, 58px); line-height: .98; }
   .heading h1 em { display: block; }
   .description { max-width: 460px; margin-top: 20px; font-size: 14px; line-height: 1.65; }
   .mobileBreak { display: block; }

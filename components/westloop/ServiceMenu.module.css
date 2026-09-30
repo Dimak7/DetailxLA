@@ -1,0 +1,62 @@
+.page { background: #f2efe8; color: #151719; padding: 34px max(24px, 5vw) 40px; }
+.heading,.menu,.priceNote,.help { max-width: 1280px; margin-left: auto; margin-right: auto; }
+.heading { margin-bottom: 23px; }
+.eyebrow { color: #795337; font-size: 10px; font-weight: 650; letter-spacing: .14em; margin: 0 0 9px; }
+.heading h1 { font-family: var(--font-display), Georgia, serif; font-weight: 400; font-size: clamp(38px, 4.2vw, 56px); line-height: 1.06; letter-spacing: -.025em; margin: 0 0 12px; }
+.heading > p:last-child { color: #5f5a52; font-size: 14px; line-height: 1.6; margin: 0; }
+.menu { scroll-margin-top: 110px; }
+.menuBar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button { font: inherit; font-size: 12px; font-weight: 550; min-height: 44px; border: 1px solid #c9c1b4; padding: 9px 14px; color: #554d43; background: transparent; cursor: pointer; }
+.filters button:hover { background: #e6dfd3; }
+.filters button[aria-pressed="true"] { color: #f8f5ee; background: #151719; border-color: #151719; }
+.count { color: #70685c; font-size: 12px; margin: 0; white-space: nowrap; }
+.menuNote { color: #6a6257; font-size: 12px; line-height: 1.6; margin: 0 0 12px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.card { border: 1px solid #d8d0c2; background: #faf7f1; padding: 18px 20px 13px; min-width: 0; display: flex; flex-direction: column; }
+.cardTop { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.card h2 { font-family: var(--font-display), Georgia, serif; font-weight: 400; font-size: 26px; line-height: 1.1; letter-spacing: -.02em; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.card h2 a { color: inherit; text-decoration: none; }
+.card h2 a:hover { color: #795337; }
+.price { flex-shrink: 0; max-width: 43%; font-size: 17px; font-weight: 550; line-height: 1.4; color: #765035; text-align: right; margin: 0; }
+.summary { color: #625c53; font-size: 13px; line-height: 1.6; margin: 9px 0 9px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.cardBottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin-top: auto; }
+.duration { color: #6b6357; font-size: 12px; line-height: 1.6; }
+.actions { display: flex; align-items: center; gap: 16px; }
+.actions a { display: inline-flex; justify-content: center; align-items: center; min-height: 44px; text-decoration: none; font-size: 12px; font-weight: 600; }
+.details { color: #5f4935; padding: 4px 0; }
+.details:hover { text-decoration: underline; text-underline-offset: 4px; }
+.book { color: #f8f5ee; background: #202222; padding: 8px 22px; }
+.book:hover { background: #765035; }
+.priceNote { color: #6a6257; font-size: 12px; line-height: 1.7; margin-top: 17px; margin-bottom: 0; }
+.help { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-top: 23px; margin-top: 25px; border-top: 1px solid #d5ccbe; }
+.help h2 { font-family: var(--font-display), Georgia, serif; font-weight: 400; font-size: 27px; line-height: 1.2; margin: 0 0 5px; }
+.help p { color: #625b51; font-size: 13px; line-height: 1.6; margin: 0; }
+.help > a { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #bba88d; padding: 8px 19px; color: #684b31; text-decoration: none; font-size: 13px; font-weight: 600; }
+.help > a:hover { background: #e8dfd0; }
+.empty { max-width: 1280px; margin: 28px auto; font-size: 15px; line-height: 1.7; }
+.empty a { color: #765035; text-underline-offset: 4px; }
+.page :is(a,button):focus-visible { outline: 2px solid #936339; outline-offset: 4px; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 800px) {
+  .page { padding: 27px 20px 32px; }
+  .heading { margin-bottom: 19px; }
+  .heading > p:last-child { font-size: 13px; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .menuBar { align-items: flex-start; }
+  .count { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+  .filters { gap: 6px; }
+  .filters button { padding: 8px 12px; }
+  .card { padding: 16px 17px 11px; }
+  .card h2 { font-size: 25px; }
+  .help { margin-top: 22px; }
+}
+@media (max-width: 380px) {
+  .page { padding-left: 15px; padding-right: 15px; }
+  .card { padding-left: 13px; padding-right: 13px; }
+  .cardTop { gap: 9px; }
+  .card h2 { font-size: 23px; }
+  .price { font-size: 15px; }
+  .actions { gap: 12px; }
+  .book { padding-left: 18px; padding-right: 18px; }
+}
