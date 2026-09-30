@@ -2846,3 +2846,25 @@ td small {
 .admin-shell .employee-pay-preview p { margin: 8px 0; font-size: 16px; line-height: 1.5; }
 .admin-shell .employee-pay-preview small { display: block; font-size: 12px; line-height: 1.6; }
 .admin-shell .employee-pay-action { display: block; min-height: 44px; margin-top: 6px; text-align: left; }
+
+/* Keep employee details readable while payroll figures scroll beside them. */
+.admin-shell .admin-payroll-table-hint { display: block; margin: 0 0 10px; color: var(--muted); font-size: 11px; }
+.admin-shell .admin-payroll-table table { min-width: 1120px; }
+.admin-shell .admin-payroll-table :is(th, td) { min-width: 88px; }
+.admin-shell .admin-payroll-table td:not(:first-child) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.admin-shell .admin-payroll-table :is(th, td):first-child { position: sticky; left: 0; z-index: 1; width: 240px; min-width: 240px; max-width: 240px; border-right: 1px solid var(--line); overflow-wrap: normal; }
+.admin-shell .admin-payroll-table th:first-child { background: #f4f7f1; }
+.admin-shell .admin-payroll-table td:first-child { background: #fff; }
+.admin-shell .payroll-employee { display: grid; gap: 5px; white-space: normal; overflow-wrap: break-word; word-break: normal; }
+.admin-shell .payroll-employee strong { font-size: 14px; line-height: 1.45; }
+.admin-shell .payroll-employee small { margin: 0; line-height: 1.5; }
+.admin-shell .payroll-employee .payroll-employee-role { color: var(--ink); }
+.admin-shell .payroll-employee .payroll-employee-plan { margin-top: 4px; }
+.admin-shell .payroll-employee .employee-pay-action { justify-self: start; width: auto; margin-top: 7px; padding: 8px 13px; white-space: nowrap; text-decoration: none; }
+@media (max-width: 760px) {
+  .admin-shell .admin-payroll-table table { min-width: 1080px; }
+  .admin-shell .admin-payroll-table :is(th, td):first-child { width: 190px; min-width: 190px; max-width: 190px; }
+}
+@media (max-width: 360px) {
+  .admin-shell .admin-payroll-table :is(th, td):first-child { width: 160px; min-width: 160px; max-width: 160px; }
+}

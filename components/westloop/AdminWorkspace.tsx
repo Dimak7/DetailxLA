@@ -685,13 +685,13 @@ export function AdminWorkspace({
   function table(
     headers: string[],
     values: React.ReactNode[][],
-    options: { comparison?: boolean; label?: string } = {},
+    options: { comparison?: boolean; label?: string; className?: string } = {},
   ) {
     return values.length ? (
       <>
-      {options.comparison && <p className="admin-table-hint">Scroll horizontally to compare all columns.</p>}
+      {options.comparison && <p className={`admin-table-hint${options.className ? ` ${options.className}-hint` : ""}`}>Scroll horizontally to compare all columns.</p>}
       <div
-        className={`table-scroll admin-table-wrap admin-table-wrap--${options.comparison ? "comparison" : "cards"}`}
+        className={`table-scroll admin-table-wrap admin-table-wrap--${options.comparison ? "comparison" : "cards"}${options.className ? ` ${options.className}` : ""}`}
         role={options.comparison ? "region" : undefined}
         tabIndex={options.comparison ? 0 : undefined}
         aria-label={options.comparison ? `${options.label || "Comparison table"}. Scroll horizontally for all columns.` : undefined}
@@ -916,11 +916,15 @@ export function AdminWorkspace({
           <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
           <p className="small-note">Paid hours use completed clock entries when present. If none exist for an employee in this period, scheduled shift hours are used as the payable fallback. Job pay follows each employee’s saved plan or service rule, using the final service price excluding tips and the employee’s share of the job. Tips are allocated separately.</p>
           {table(["Employee", "Scheduled", "Actual", "Paid hours", "Hourly pay", "Attributed service revenue", "Job pay", "Tips", "Adjustments", "Total pay"], list.map((r) => [
-            <><strong>{s(r.name)}</strong><small>{s(r.position)} · {s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small>
-              <small>Default plan: {compensationPlanLabel(rows(data.employees).find((employee) => employee.id === r.id) || r)}</small>
-              {allowedSections.includes("payroll") && !staff && <button className="link-button employee-pay-action" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button>}</>,
+            <div className="payroll-employee">
+              <strong>{s(r.name)}</strong>
+              <small className="payroll-employee-role">{s(r.position)}</small>
+              <small>{s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small>
+              <small className="payroll-employee-plan">Default plan: {compensationPlanLabel(rows(data.employees).find((employee) => employee.id === r.id) || r)}</small>
+              {allowedSections.includes("payroll") && !staff && <button className="link-button employee-pay-action" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button>}
+            </div>,
             (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents)),
-          ]), { comparison: true, label: "Employee payroll" })}
+          ]), { comparison: true, label: "Employee payroll", className: "admin-payroll-table" })}
           <h3>Service pay overrides</h3>
           <p className="small-note">An active rule replaces the default job pay for that service, regardless of pay model. It keeps applicable hourly pay. Specific service rules take priority over all-services rules; an explicit job-level pay override takes priority over both.</p>
           {table(["Employee", "Service", "Job pay", "Value", "Status", "Action"], rows(data.rules).map((rule) => [s(rule.employee_name), s(rule.service_name) || "All services", rule.rule_type === "commission_percent" ? "Percentage per job" : "Flat amount per job", rule.rule_type === "commission_percent" ? (n(rule.value) / 100).toFixed(2) + "%" : money(n(rule.value)), rule.active === true || rule.active === "true" ? "Active" : "Inactive", <button onClick={() => payRuleEdit(rule)}>Edit rule</button>]))}
