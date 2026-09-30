@@ -85,15 +85,15 @@ export function PublicHeader({ business }: { business: BusinessSettings }) {
   );
 }
 
-export function PublicFooter({ business }: { business: BusinessSettings }) {
+export function PublicFooter({ business, showBookingCTA = true }: { business: BusinessSettings; showBookingCTA?: boolean }) {
   return (
     <>
-      <section className="ceramics-final-cta" aria-labelledby="final-cta-heading">
+      {showBookingCTA && <section className="ceramics-final-cta" aria-labelledby="final-cta-heading">
         <div className="wrap ceramics-final-inner">
           <div><p className="eyebrow">READY WHEN YOU ARE</p><h2 id="final-cta-heading">Give your car the finish it deserves.</h2><p>Choose a service and reserve a time online. We will confirm the details before your visit.</p></div>
           <div className="ceramics-final-actions"><Link href="/booking" className="button">Book an appointment</Link><Link href="/services" className="text-link">View services & pricing</Link></div>
         </div>
-      </section>
+      </section>}
       <footer className="ceramics-footer">
         <div className="wrap ceramics-footer-grid">
           <div className="ceramics-footer-brand"><Link href="/" aria-label={`${business.name} home`}><Wordmark /></Link><p>Considered care.<br />An exceptional finish.</p><span className="ceramics-footer-location">WEST LOOP, CHICAGO</span></div>
@@ -104,7 +104,7 @@ export function PublicFooter({ business }: { business: BusinessSettings }) {
           <div className="ceramics-footer-bottom"><span>© {new Date().getFullYear()} {business.name}</span><div><Link href="/privacy-notice">Privacy notice</Link><Link href="/service-rules">Service terms</Link><a href="/hero/credits.txt" target="_blank" rel="noreferrer">Visual credits</a><Link href="/admin">Team access</Link></div></div>
         </div>
       </footer>
-      <div className="mobile-bar ceramics-mobile-bar"><Link className="button" href="/booking">Book appointment</Link><CallLink phone={business.phone} className="button outline" /></div>
+      <div className="mobile-bar ceramics-mobile-bar"><Link className="button" href={showBookingCTA ? "/booking" : "/contact"}>{showBookingCTA ? "Book appointment" : "Contact the studio"}</Link><CallLink phone={business.phone} className="button outline" /></div>
     </>
   );
 }

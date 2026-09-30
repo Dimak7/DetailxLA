@@ -9,6 +9,7 @@ import {
   type BusinessSettings,
 } from "@/lib/platform/types";
 import { visitor, track, confirmedConversion } from "./Tracking";
+import { bookingDestination } from "@/lib/booking-handoff";
 type Draft = {
   service_id: string;
   make: string;
@@ -174,33 +175,12 @@ export function BookingWizard({
         throw Error(
           "We could not verify the confirmation. Please retry without changing your details.",
         );
-      confirmedConversion(
-        result.booking_id,
-        result.value_cents,
-        result.event_id,
-      );
-      if (!admin && result.deposit_cents > 0) {
-        const confirmation = new URL(result.confirmation_url, location.origin),
-          token = confirmation.searchParams.get("token"),
-          payment = await fetch("/api/payment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: result.booking_id,
-              token,
-              kind: "deposit",
-            }),
-          }),
-          checkout = await payment.json();
-        if (payment.ok && checkout.url) {
-          window.location.assign(checkout.url);
-          return;
-        }
-        confirmation.searchParams.set("payment", "unavailable");
-        window.location.assign(confirmation.toString());
-        return;
+      try {
+        confirmedConversion(result.booking_id, result.value_cents, result.event_id);
+      } catch {
+        // Analytics must never prevent a customer reaching their saved booking.
       }
-      window.location.assign(result.confirmation_url);
+      window.location.assign(await bookingDestination(result, location.origin));
     } catch (e) {
       setError(
         admin && e instanceof Error

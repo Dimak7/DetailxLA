@@ -5,9 +5,11 @@ import { BRAND_NAME } from "@/lib/brand";
 export function PageShell({
   business,
   children,
+  showBookingCTA = true,
 }: {
   business: BusinessSettings;
   children: React.ReactNode;
+  showBookingCTA?: boolean;
 }) {
   return (
     <div className="ceramics-site">
@@ -24,7 +26,7 @@ export function PageShell({
         }}
       />
       <main id="main">{children}</main>
-      <PublicFooter business={business} />
+      <PublicFooter business={business} showBookingCTA={showBookingCTA} />
     </div>
   );
 }

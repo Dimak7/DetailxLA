@@ -7,13 +7,13 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     assertOrigin(request);
+    let bookingSaved = false;
+    after(async () => {
+      if (bookingSaved) await processOutbox(10).catch(() => {});
+    });
     await rateLimit("booking:" + requestIP(request), 15, 900);
     const result = await createBooking(await readJson(request));
-    after(() =>
-      processOutbox(10)
-        .then(() => {})
-        .catch(() => {}),
-    );
+    bookingSaved = true;
     const b = result.booking;
     return NextResponse.json(
       {

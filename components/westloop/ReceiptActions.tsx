@@ -1,76 +1,67 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { confirmedConversion } from "./Tracking";
-export function ReceiptActions({
-  id,
-  token,
-  deposit,
-  canPay,
-  payments,
-  provider,
-}: {
+import styles from "./BookingConfirmation.module.css";
+
+export function ReceiptActions({ id, token, deposit, canPay, payments, resumeCheckoutUrl, onPaymentUncertain }: {
   id: string;
   token: string;
   deposit: boolean;
   canPay: boolean;
   payments: Array<{ id: string; amount_cents: number }>;
-  provider: "square" | "stripe" | null;
+  resumeCheckoutUrl: string | null;
+  onPaymentUncertain: () => void;
 }) {
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  const router = useRouter();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const activeRequest = useRef<AbortController | null>(null);
+
   useEffect(() => {
-    payments.forEach((p) =>
-      confirmedConversion(p.id, p.amount_cents, "payment:" + p.id, true),
-    );
+    setError("");
+    payments.forEach((payment) => {
+      try { confirmedConversion(payment.id, payment.amount_cents, "payment:" + payment.id, true); }
+      catch { /* Privacy or analytics failures must not interrupt a receipt. */ }
+    });
   }, [payments]);
-  async function pay(kind: string) {
+  useEffect(() => () => {
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+  }, []);
+
+  async function pay(kind: "deposit" | "balance") {
+    if (activeRequest.current || !canPay) return;
+    const request = new AbortController();
+    activeRequest.current = request;
     setBusy(true);
+    setError("");
+    const timer = setTimeout(() => request.abort(), 25_000);
     try {
-      const r = await fetch("/api/payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, token, kind }),
+      const response = await fetch("/api/payment", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, token, kind }), signal: request.signal,
       });
-      const d = await r.json();
-      if (!r.ok) throw Error(d.error);
-      location.assign(d.url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Payment is unavailable.");
+      const body = await response.json();
+      if (activeRequest.current !== request) return;
+      if (!response.ok || typeof body.url !== "string" || !body.url) throw new Error("Checkout unavailable");
+      window.location.assign(body.url);
+    } catch {
+      if (activeRequest.current !== request) return;
+      setError("We couldn’t open checkout. Please check your payment status before trying again, or contact us for help.");
       setBusy(false);
+      onPaymentUncertain();
+    } finally {
+      clearTimeout(timer);
+      if (activeRequest.current === request) activeRequest.current = null;
     }
   }
-  return (
-    <>
-      {canPay && (
-        <div className="button-row">
-          {deposit && (
-            <button
-              className="button"
-              disabled={busy}
-              onClick={() => pay("deposit")}
-            >
-              Pay deposit securely{provider === "square" ? " with Square" : ""}
-            </button>
-          )}
-          <button
-            className={deposit ? "button outline" : "button"}
-            disabled={busy}
-            onClick={() => pay("balance")}
-          >
-            Pay balance{provider === "square" ? " with Square" : ""}
-          </button>
-        </div>
-      )}
-      <button className="link-button" onClick={() => router.refresh()}>
-        Refresh payment status
-      </button>
-      {error && (
-        <p className="error-message" role="alert">
-          {error}
-        </p>
-      )}
-    </>
-  );
+
+  return <>
+    {(canPay || resumeCheckoutUrl) && <div className={styles.actions}>
+      {resumeCheckoutUrl ? <a className={styles.primaryButton} href={resumeCheckoutUrl}>Continue secure checkout</a> : <>
+        {deposit && <button className={styles.primaryButton} disabled={busy} onClick={() => pay("deposit")}>{busy ? "Opening secure checkout…" : "Pay deposit securely"}</button>}
+        <button className={deposit ? styles.secondaryButton : styles.primaryButton} disabled={busy} onClick={() => pay("balance")}>{busy ? "Opening secure checkout…" : deposit ? "Pay in full" : "Pay remaining balance"}</button>
+      </>}
+    </div>}
+    {error && canPay && <p className={styles.notice} role="alert">{error}</p>}
+  </>;
 }

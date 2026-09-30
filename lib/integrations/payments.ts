@@ -9,7 +9,7 @@ import { metaEvent } from "./providers";
 import type { Booking, BusinessSettings } from "../platform/types";
 import {
   SQUARE_API_VERSION, squareApiBase, squareEnvironment, retrieveSquarePayment,
-  upsertSquarePayment, type SquarePayment, type SquareMoney,
+  upsertSquarePayment, type SquarePayment, type SquareMoney, type SquareLedgerPayment, type SquareEnvironment,
 } from "./square-reporting";
 
 type PaymentKind = "deposit" | "balance";
@@ -188,6 +188,7 @@ async function createSquareCheckout(b: Booking, p: PaymentRow) {
       link.url,
       JSON.stringify({
         square_environment: squareEnvironment(),
+        square_location_id: locationId,
         square_order_id: link.order_id,
         square_payment_link_id: link.id || "",
       }),
@@ -460,31 +461,136 @@ export async function handleSquareEvent(event: SquareEvent) {
     )).rows;
     if (!inserted.length || !evidence) return;
     const payment = await upsertSquarePayment(q, evidence, environment, { reconcileInvoice: isRefund });
-    const matches = (await q<PaymentRow>(
-      `SELECT * FROM wl.payments WHERE provider='square' AND metadata->>'square_environment'=$3
-       AND (external_id=$1 OR (COALESCE(external_id,'')='' AND $2<>'' AND metadata->>'square_order_id'=$2)) FOR UPDATE`,
-      [payment.payment_id, payment.order_id, environment],
-    )).rows;
-    if (matches.length !== 1) return;
-    const p = matches[0];
-    if (payment.status === "COMPLETED") {
-      // Tips belong in the ledger gross; invoice confirmation compares principal.
-      // A split/foreign-currency payment still belongs in the ledger, but cannot
-      // on its own confirm this website invoice.
-      if (Number(payment.amount_cents) - Number(payment.tip_cents) !== p.amount_cents || payment.currency !== "USD") return;
-      await completePayment(q, p, business, {
-        provider: "square", externalId: payment.payment_id,
-        paymentMethod: payment.payment_method,
-        processorFeeCents: Math.max(0, Number(payment.processor_fee_cents)),
-      });
-      await q(`UPDATE wl.payments SET refunded_cents=LEAST(amount_cents,GREATEST(refunded_cents,$2::bigint)),
-        processor_fee_cents=GREATEST(0,$3::bigint),
-        paid_at=COALESCE($4::timestamptz,paid_at),
-        status=CASE WHEN $2::bigint>=amount_cents AND $2::bigint>0 THEN 'refunded' WHEN $2::bigint>0 THEN 'partially_refunded' ELSE status END
-        WHERE id=$1`, [p.id, payment.refunded_cents, payment.processor_fee_cents, payment.paid_at]);
-    } else if (["CANCELED", "FAILED"].includes(payment.status)) {
-      await q("UPDATE wl.payments SET status=$2,external_id=$3 WHERE id=$1 AND status='pending'",
-        [p.id, payment.status === "CANCELED" ? "expired" : "failed", payment.payment_id]);
-    }
+    await applySquareInvoiceEvidence(q, payment, business);
   });
+}
+
+async function applySquareInvoiceEvidence(
+  q: Query,
+  payment: SquareLedgerPayment,
+  business: BusinessSettings,
+  returnedInvoiceId?: string,
+) {
+  const matches = (await q<PaymentRow>(
+    `SELECT * FROM wl.payments WHERE provider='square' AND metadata->>'square_environment'=$3
+     AND (external_id=$1 OR (COALESCE(external_id,'')='' AND $2<>'' AND metadata->>'square_order_id'=$2)) FOR UPDATE`,
+    [payment.payment_id, payment.order_id, payment.environment],
+  )).rows;
+  if (matches.length !== 1 || (returnedInvoiceId && matches[0].id !== returnedInvoiceId)) return false;
+  const p = matches[0];
+  if (payment.status === "COMPLETED") {
+    // Tips belong in the ledger gross; invoice confirmation compares principal.
+    // Split/foreign-currency payments cannot alone confirm a website invoice.
+    if (Number(payment.amount_cents) - Number(payment.tip_cents) !== p.amount_cents || payment.currency !== "USD") return false;
+    const wasSettled = ["paid", "partially_refunded", "refunded"].includes(p.status);
+    if (returnedInvoiceId && Number(payment.refunded_cents) > 0 && !wasSettled) {
+      // A return may be opened long after a refund. Record the evidence without
+      // creating an appointment confirmation for money that was returned.
+      await q(`UPDATE wl.payments SET external_id=$2,paid_at=COALESCE($3::timestamptz,paid_at,now()),
+        refunded_cents=LEAST(amount_cents,GREATEST(refunded_cents,$4::bigint)),processor_fee_cents=GREATEST(0,$5::bigint),
+        payment_method=$6,status=CASE WHEN $4::bigint>=amount_cents THEN 'refunded' ELSE 'partially_refunded' END WHERE id=$1`,
+      [p.id, payment.payment_id, payment.paid_at, payment.refunded_cents, payment.processor_fee_cents, payment.payment_method]);
+      return true;
+    }
+    await completePayment(q, p, business, {
+      provider: "square", externalId: payment.payment_id,
+      paymentMethod: payment.payment_method,
+      processorFeeCents: Math.max(0, Number(payment.processor_fee_cents)),
+    });
+    await q(`UPDATE wl.payments SET refunded_cents=LEAST(amount_cents,GREATEST(refunded_cents,$2::bigint)),
+      processor_fee_cents=GREATEST(0,$3::bigint),
+      paid_at=COALESCE($4::timestamptz,paid_at),
+      status=CASE WHEN $2::bigint>=amount_cents AND $2::bigint>0 THEN 'refunded' WHEN $2::bigint>0 THEN 'partially_refunded' ELSE status END
+      WHERE id=$1`, [p.id, payment.refunded_cents, payment.processor_fee_cents, payment.paid_at]);
+    return !wasSettled;
+  }
+  if (["CANCELED", "FAILED"].includes(payment.status)) {
+    const changed = await q("UPDATE wl.payments SET status=$2,external_id=$3 WHERE id=$1 AND status='pending' RETURNING id",
+      [p.id, payment.status === "CANCELED" ? "expired" : "failed", payment.payment_id]);
+    return changed.rows.length > 0;
+  }
+  return false;
+}
+
+type SquareCheckoutInvoice = PaymentRow & {
+  metadata: { square_order_id?: string; square_location_id?: string };
+};
+type SquareCheckoutOrder = {
+  id?: string;
+  location_id?: string;
+  reference_id?: string;
+  tenders?: Array<{ payment_id?: string }>;
+};
+
+async function squareCheckoutGet<T>(path: string, token: string, environment: SquareEnvironment, deadline: number): Promise<T> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new AppError("Payment verification is taking longer than expected. Please check again shortly.", 502);
+  try {
+    const response = await fetch(squareApiBase(environment) + path, {
+      method: "GET", headers: { Authorization: "Bearer " + token, "Square-Version": SQUARE_API_VERSION },
+      signal: AbortSignal.timeout(Math.min(8000, remaining)), cache: "no-store",
+    });
+    if (!response.ok) throw new AppError("Payment verification is temporarily unavailable. Please check again shortly.", 502);
+    return await response.json() as T;
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError("Payment verification is temporarily unavailable. Please check again shortly.", 502);
+  }
+}
+
+/** Authenticated callers can refresh saved checkout attempts; every Square call is GET-only. */
+export async function reconcileSquareBookingPayment(bookingId: string): Promise<boolean> {
+  const environment = squareEnvironment();
+  const invoices = await query<SquareCheckoutInvoice>(
+    `SELECT * FROM wl.payments WHERE booking_id=$1 AND provider='square' AND status='pending'
+      AND metadata->>'square_environment'=$2 AND COALESCE(metadata->>'square_order_id','')<>''
+      ORDER BY created_at DESC,id DESC LIMIT 3`, [bookingId, environment],
+  );
+  if (!invoices.length) return false;
+  const token = await secret("square_access_token"), configuredLocation = await secret("square_location_id");
+  if (!token || !configuredLocation) throw new AppError("Payment verification is temporarily unavailable. Please contact the studio.", 503);
+  const business = await settings(), deadline = Date.now() + 20000;
+  let changed = false;
+  for (const invoice of invoices) {
+    try {
+      const orderId = invoice.metadata.square_order_id!;
+      const expectedLocation = invoice.metadata.square_location_id || configuredLocation;
+      const result = await squareCheckoutGet<{ order?: SquareCheckoutOrder }>(
+        "/v2/orders/" + encodeURIComponent(orderId), token, environment, deadline,
+      );
+      const order = result.order;
+      if (!order || order.id !== orderId || order.location_id !== expectedLocation ||
+          (order.reference_id && order.reference_id !== invoice.id)) {
+        throw new AppError("Payment details could not be matched to this appointment. Please contact the studio.", 502);
+      }
+      if (order.tenders !== undefined && !Array.isArray(order.tenders))
+        throw new AppError("Payment verification is temporarily unavailable. Please check again shortly.", 502);
+      const paymentIds = [...new Set((order.tenders || []).map((tender) => tender.payment_id).filter((id): id is string => Boolean(id)))];
+      if (paymentIds.length > 3) throw new AppError("Payment details need review. Please contact the studio.", 502);
+      for (const paymentId of paymentIds) {
+        const result = await squareCheckoutGet<{ payment?: SquarePayment }>(
+          "/v2/payments/" + encodeURIComponent(paymentId), token, environment, deadline,
+        );
+        const evidence = result.payment;
+        if (!evidence || evidence.id !== paymentId || evidence.order_id !== orderId || evidence.location_id !== expectedLocation)
+          throw new AppError("Payment details could not be matched to this appointment. Please contact the studio.", 502);
+        // Upsert before locking the invoice: this matches the webhook lock order.
+        // Re-read the invoice under that lock so a concurrent webhook cannot
+        // duplicate confirmation messages or timeline entries.
+        const applied = await transaction(async (q) => {
+          const payment = await upsertSquarePayment(q, evidence, environment);
+          if (payment.order_id !== orderId || payment.location_id !== expectedLocation ||
+              payment.currency !== "USD" || Number(payment.amount_cents) - Number(payment.tip_cents) !== invoice.amount_cents)
+            return false;
+          return applySquareInvoiceEvidence(q, payment, business, invoice.id);
+        });
+        changed = applied || changed;
+      }
+    } catch (error) {
+      // Preserve a completed newest attempt even when an older one cannot load.
+      if (changed) return true;
+      throw error;
+    }
+  }
+  return changed;
 }
