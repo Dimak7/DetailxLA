@@ -149,11 +149,23 @@ test("manager compensation actions honor custom defaults, mixed service rules, a
     assert.equal(Number((await summary(mixed)).commission_cents),18000);
     const audit = (await query<{after_data:{replaced_rule_ids:string[]}}>("SELECT after_data FROM wl.audit_logs WHERE entity_type='employee_pay_rule' AND entity_id=$1 ORDER BY created_at DESC LIMIT 1", [replacement.id]))[0];
     assert.deepEqual(audit.after_data.replaced_rule_ids,[exactRule.id]);
-    await adminAction("save_pay_rule",{ ...rule(services[0].id,"flat_job",5000),id:replacement.id,active:false },sessions.manager);
-    assert.equal(Number((await summary(mixed)).commission_cents),15500, "disabling a service rule falls back to the all-services rate");
-    await adminAction("save_pay_rule",{ ...rule(null,"commission_percent",1250),id:generalRule.id,active:false },sessions.manager);
+    assert.deepEqual(await adminAction("remove_pay_rule",{ id:replacement.id },sessions.manager),{ id:replacement.id,active:false });
+    assert.equal(Number((await summary(mixed)).commission_cents),15500, "removing a service rule falls back to the all-services rate");
+    assert.deepEqual(await query("SELECT employee_id,service_id,rule_type,value,active FROM wl.employee_pay_rules WHERE id=$1",[replacement.id]),[
+      { employee_id:mixed,service_id:services[0].id,rule_type:"flat_job",value:5000,active:false },
+    ],"removal retains the saved rule for restoration");
+    const removedAudit = (await query<{actor_id:string;before_data:{active:boolean};after_data:{active:boolean}}>("SELECT actor_id,before_data,after_data FROM wl.audit_logs WHERE entity_type='employee_pay_rule' AND entity_id=$1 AND action='removed'",[replacement.id]))[0];
+    assert.equal(removedAudit.actor_id,sessions.manager.user_id);
+    assert.equal(removedAudit.before_data.active,true);
+    assert.equal(removedAudit.after_data.active,false);
+    await adminAction("remove_pay_rule",{ id:replacement.id },sessions.manager);
+    assert.equal((await query<{count:number}>("SELECT count(*)::int count FROM wl.audit_logs WHERE entity_type='employee_pay_rule' AND entity_id=$1 AND action='removed'",[replacement.id]))[0].count,1,"repeated removal is idempotent");
+    await adminAction("save_pay_rule",{ ...rule(services[0].id,"flat_job",5000),id:replacement.id },sessions.manager);
+    assert.equal(Number((await summary(mixed)).commission_cents),18000,"an inactive rule can be restored with its saved rate");
+    await adminAction("remove_pay_rule",{ id:replacement.id },sessions.admin);
+    await adminAction("remove_pay_rule",{ id:generalRule.id },sessions.owner);
     assert.equal(Number((await summary(mixed)).commission_cents),27998, "no active rule falls back to the flat employee default");
-    t.diagnostic("service percent and flat rules override any default model; replacing a rule leaves only one active per scope");
+    t.diagnostic("service rules are removable, audited, idempotent and restorable; removing them restores the applicable fallback without changing other scopes");
 
     await adminAction("assign_job_employee", { booking_id:mixedFlatJob,employee_id:mixed,pool_share_bps:2500,commission_override_cents:4321 },sessions.manager);
     await adminAction("save_job_assignments", { booking_id:mixedFlatJob,assignments:[
@@ -172,10 +184,11 @@ test("manager compensation actions honor custom defaults, mixed service rules, a
     const paidSnapshot = await query("SELECT * FROM wl.payroll_records WHERE pay_period_id=$1 ORDER BY employee_id",[period.id]);
     assert.equal(Number(paidSnapshot.find((entry) => entry.employee_id === combined)!.estimated_gross_cents),10000);
     await save(plan(combined,"flat_job",0,0,1234));
-    await adminAction("save_pay_rule",{ employee_id:combined,service_id:services[0].id,rule_type:"commission_percent",value:5000,active:true },sessions.manager);
+    const paidRule = await adminAction("save_pay_rule",{ employee_id:combined,service_id:services[0].id,rule_type:"commission_percent",value:5000,active:true },sessions.manager) as {id:string};
+    await adminAction("remove_pay_rule",{ id:paidRule.id },sessions.manager);
     await assert.rejects(adminAction("lock_pay_period",{id:period.id},sessions.manager),/already paid/);
     assert.deepEqual(await query("SELECT * FROM wl.payroll_records WHERE pay_period_id=$1 ORDER BY employee_id",[period.id]),paidSnapshot);
-    t.diagnostic("changing default and service rates cannot rewrite a paid payroll snapshot");
+    t.diagnostic("changing defaults, service rates or removing a rule cannot rewrite a paid payroll snapshot");
 
     const beforeValidation = await query("SELECT * FROM wl.employees WHERE id=$1",[combined]);
     for (const invalid of [
@@ -187,6 +200,8 @@ test("manager compensation actions honor custom defaults, mixed service rules, a
     await assert.rejects(adminAction("save_pay_rule",rule(null,"commission_percent",10001),sessions.manager),/cannot exceed 100%/);
     await assert.rejects(adminAction("save_pay_rule",rule(null,"flat_job",100000001),sessions.manager));
     await assert.rejects(adminAction("save_pay_rule",rule(randomUUID(),"flat_job",1000),sessions.manager),/Service not found/);
+    await assert.rejects(adminAction("remove_pay_rule",{id:randomUUID()},sessions.manager),/Pay rule not found/);
+    await assert.rejects(adminAction("remove_pay_rule",{id:"invalid"},sessions.manager));
     await assert.rejects(save(plan(randomUUID(),"commission",0,2500)),/Employee not found/);
     assert.deepEqual(await query("SELECT * FROM wl.employees WHERE id=$1",[combined]),beforeValidation);
     await save(plan(combined,"commission",0,0));
@@ -194,7 +209,7 @@ test("manager compensation actions honor custom defaults, mixed service rules, a
     await save(plan(combined,"commission",0,10000));
     assert.equal(Number((await query("SELECT default_commission_bps FROM wl.employees WHERE id=$1",[combined]))[0].default_commission_bps),10000);
     const unauthorized = (error:unknown) => error instanceof Error && "status" in error && error.status === 403;
-    for (const action of ["save_employee_compensation","save_pay_rule","save_employee","assign_job_employee","save_job_assignments"])
+    for (const action of ["save_employee_compensation","save_pay_rule","remove_pay_rule","save_employee","assign_job_employee","save_job_assignments"])
       await assert.rejects(adminAction(action,{},sessions.staff),unauthorized);
     t.diagnostic("owner/admin/manager can save compensation; invalid rates reject atomically and staff cannot edit pay");
 

@@ -428,6 +428,7 @@ const actionSections: Record<string, string> = {
   save_inventory_item: "inventory",
   record_inventory_movement: "inventory",
   save_pay_rule: "payroll",
+  remove_pay_rule: "payroll",
   save_employee_compensation: "payroll",
   assign_job_employee: "payroll",
   save_job_assignments: "payroll",
@@ -520,6 +521,19 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       await q("INSERT INTO wl.employee_pay_rules(id,employee_id,service_id,rule_type,value,active) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO UPDATE SET employee_id=$2,service_id=$3,rule_type=$4,value=$5,active=$6,updated_at=now()", [id,rule.employee_id,rule.service_id,rule.rule_type,rule.value,rule.active]);
       await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'employee_pay_rule',$3,'saved',$4::jsonb,$5::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify(previous || {}),JSON.stringify({ ...rule, replaced_rule_ids: replaced.map((row) => row.id) })]);
       return { id };
+    });
+  }
+  if (action === "remove_pay_rule") {
+    const input = z.object({ id: uuid }).parse(data);
+    return transaction(async (q) => {
+      const previous = (await q<Row>("SELECT * FROM wl.employee_pay_rules WHERE id=$1 FOR UPDATE", [input.id])).rows[0];
+      if (!previous) throw new AppError("Pay rule not found.", 404);
+      if (!previous.active) return { id: input.id, active: false };
+      // Keep the rule and its audit history so it can be restored. Paid payroll
+      // snapshots are separate records and must not be changed by rate edits.
+      const removed = (await q<Row>("UPDATE wl.employee_pay_rules SET active=false,updated_at=now() WHERE id=$1 RETURNING *", [input.id])).rows[0];
+      await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'employee_pay_rule',$3,'removed',$4::jsonb,$5::jsonb)", [randomUUID(),user.user_id,input.id,JSON.stringify(previous),JSON.stringify(removed)]);
+      return { id: input.id, active: false };
     });
   }
   if (action === "save_employee_compensation") {

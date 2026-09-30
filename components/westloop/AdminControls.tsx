@@ -31,6 +31,7 @@ export type EditorSpec = {
   selectChanges?: (key: string, value: string) => RecordData | undefined;
   description?: React.ReactNode;
   preview?: (values: RecordData) => React.ReactNode;
+  removeAction?: { action: string; data: RecordData; description: string };
 };
 export async function action(name: string, data: RecordData) {
   const r = await fetch("/api/manage", {
@@ -112,8 +113,23 @@ export function Editor({
 }) {
   const [v, setV] = useState<RecordData>(spec.initial),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [confirmRemoval, setConfirmRemoval] = useState(false);
   const router = useRouter();
+  async function remove() {
+    if (!spec.removeAction || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await action(spec.removeAction.action, spec.removeAction.data);
+      router.refresh();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The rule could not be removed.");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function upload(file: File | undefined, key: string) {
     if (!file) return;
     setBusy(true);
@@ -136,6 +152,7 @@ export function Editor({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
+          if (busy || confirmRemoval) return;
           setBusy(true);
           setError("");
           try {
@@ -264,9 +281,21 @@ export function Editor({
             {error}
           </p>
         )}
-        <button className="button" disabled={busy}>
-          {busy ? "Saving..." : "Save changes"}
-        </button>
+        {confirmRemoval && spec.removeAction ? (
+          <div className="editor-remove-confirmation" role="group" aria-label="Confirm rule removal">
+            <strong>Remove this saved rule?</strong>
+            <p className="small-note">{spec.removeAction.description}</p>
+            <div className="editor-actions">
+              <button type="button" className="button button-danger" disabled={busy} onClick={remove}>{busy ? "Removing..." : "Remove rule"}</button>
+              <button type="button" className="button outline" disabled={busy} onClick={() => { setConfirmRemoval(false); setError(""); }}>Keep rule</button>
+            </div>
+          </div>
+        ) : (
+          <div className="editor-actions">
+            <button className="button" disabled={busy}>{busy ? "Saving..." : "Save changes"}</button>
+            {spec.removeAction && <button type="button" className="button button-danger" disabled={busy} onClick={() => { setConfirmRemoval(true); setError(""); }}>Remove rule</button>}
+          </div>
+        )}
       </form>
     </Modal>
   );

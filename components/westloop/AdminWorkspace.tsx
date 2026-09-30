@@ -504,6 +504,11 @@ export function AdminWorkspace({
       action: "save_pay_rule",
       initial: { employee_id: rows(data.employees)[0]?.id || "", service_id: "", rule_type: "commission_percent", active: true, ...r, percentage: r.rule_type === "flat_job" ? 0 : n(r.value) / 100, flat_amount: r.rule_type === "flat_job" ? n(r.value) / 100 : 0 },
       description: <p className="small-note">Replace this employee’s default job pay with a percentage or flat amount for the selected service. Hourly pay still applies when their plan includes it. A specific service rule takes priority over an all-services rule. Saving an active rule replaces the other active rule for the same employee and service.</p>,
+      removeAction: r.id && (r.active === true || r.active === "true") ? {
+        action: "remove_pay_rule",
+        data: { id: r.id },
+        description: "This stops the saved override and recalculates payroll estimates using the employee’s default plan or an active all-services rule. Paid payroll records stay unchanged. The inactive rule can be restored later.",
+      } : undefined,
       fields: [
         f("employee_id", "Employee", "select", { required: true, options: rows(data.employees).map((employee) => ({ value: s(employee.id), label: s(employee.name) })) }),
         f("service_id", "Service", "nullable-select", { options: [{ value: "", label: "All services" }, ...rows(data.services).map((service) => ({ value: s(service.id), label: s(service.name) }))] }),
