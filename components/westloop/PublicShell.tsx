@@ -31,7 +31,7 @@ export function CallLink({ phone, className = "" }: { phone: string; className?:
 const navigation = [
   { href: "/services", label: "Services & prices", feature: true },
   { href: "/#detailing", label: "Detailing" },
-  { href: "/#process", label: "Our process" },
+  { href: "/services/ceramic-coating", label: "Ceramic coating" },
   { href: "/gallery", label: "Our work" },
   { href: "/contact", label: "Contact" },
 ];

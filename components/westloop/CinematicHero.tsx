@@ -183,23 +183,23 @@ export function CinematicHero() {
     <section
       ref={section}
       className={styles.hero}
-      aria-label="West Loop Ceramics — premium car detailing in Chicago"
+      aria-label="West Loop Ceramics — premium detailing and ceramic coating in Chicago"
       data-status={status}
       data-playback={playback}
       data-media-mode={mediaMode}
       data-frame-ready={frameReady}
     >
       <div className={styles.heading}>
-        <p className={styles.eyebrow}>CAR DETAILING IN CHICAGO’S WEST LOOP</p>
+        <p className={styles.eyebrow}>WEST LOOP · CHICAGO</p>
         <h1>
-          Premium detailing.<br /><em>Inside &amp; out.</em>
+          Premium detailing.<br /><em>Ceramic coating.</em>
         </h1>
         <p className={styles.description}>
-          Interior and exterior detailing, paint correction and ceramic coating.
+          Paint correction and complete interior and exterior care in Chicago’s West Loop.
         </p>
         <div className={styles.actions}>
           <Link href="/services" className={styles.primary}>See services &amp; prices</Link>
-          <Link href="/booking" className={styles.secondary}>Book a detail</Link>
+          <Link href="/booking" className={styles.secondary}>Book your service</Link>
         </div>
       </div>
 
