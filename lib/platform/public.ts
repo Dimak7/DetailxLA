@@ -1,5 +1,5 @@
 import { query } from "./db";
-import { settings } from "./settings";
+import { settings, publicSettings } from "./settings";
 import type { Service, GalleryItem, Review } from "./types";
 export async function publicData() {
   const [business, services, gallery, reviews] = await Promise.all([
@@ -14,5 +14,5 @@ export async function publicData() {
       "SELECT id,name,rating,text,created_at FROM wl.reviews WHERE status='published' ORDER BY created_at DESC LIMIT 12",
     ),
   ]);
-  return { business, services, gallery, reviews };
+  return { business: publicSettings(business), services, gallery, reviews };
 }

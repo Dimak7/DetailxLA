@@ -2868,3 +2868,10 @@ td small {
 @media (max-width: 360px) {
   .admin-shell .admin-payroll-table :is(th, td):first-child { width: 160px; min-width: 160px; max-width: 160px; }
 }
+.admin-shell .role-permissions-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.admin-shell .role-permissions-grid > div { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #f6f8f3; }
+.admin-shell .role-permissions-grid strong { font-size: 13px; }
+.admin-shell .role-permissions-grid p { margin: 6px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+@media (max-width: 760px) {
+  .admin-shell .role-permissions-grid { grid-template-columns: minmax(0, 1fr); }
+}

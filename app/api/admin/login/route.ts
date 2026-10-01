@@ -8,6 +8,7 @@ import {
 } from "@/lib/platform/auth";
 import { apiError, readJson } from "@/lib/platform/http";
 import { z } from "zod";
+import { adminLandingPage } from "@/lib/platform/admin-navigation";
 export async function POST(request: Request) {
   try {
     assertOrigin(request);
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
       s = await sessionFromToken(token);
     const r = NextResponse.json({
       ok: true,
-      redirectTo: s?.role === "staff" ? "/admin/bookings" : "/admin/dashboard",
+      redirectTo: s ? adminLandingPage(s.role) : "/admin/login",
     });
     r.cookies.set(sessionCookie, token, {
       httpOnly: true,

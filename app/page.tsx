@@ -5,6 +5,7 @@ import { heroVideoMedia, mobileHeroMediaQuery } from "@/components/westloop/hero
 import { publicData } from "@/lib/platform/public";
 import { servicePrice } from "@/lib/service-content";
 import { siteUrl } from "@/lib/platform/settings";
+import { openingHoursSpecification } from "@/lib/platform/business-hours";
 import { PageShell } from "@/components/westloop/PageShell";
 import { CinematicHero } from "@/components/westloop/CinematicHero";
 import { CeramicFilm } from "@/components/westloop/CeramicFilm";
@@ -43,6 +44,7 @@ export default async function Home() {
   const schema = {
     "@context": "https://schema.org", "@type": "AutomotiveBusiness",
     name: business.name, url: siteUrl(), areaServed: "Chicago, Illinois",
+    openingHoursSpecification: openingHoursSpecification(business),
     ...(business.phone ? { telephone: business.phone } : {}),
     ...(business.address ? { address: { "@type": "PostalAddress", streetAddress: business.address, addressLocality: "Chicago", addressRegion: "IL", addressCountry: "US" } } : {}),
   };

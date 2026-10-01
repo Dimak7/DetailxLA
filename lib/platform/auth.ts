@@ -101,7 +101,7 @@ export const access: Record<string, Role[]> = {
   gallery: ["owner", "admin", "manager"],
   analytics: ["owner", "admin"],
   settings: ["owner", "admin"],
-  team: ["owner"],
+  team: ["owner", "admin"],
   payments: ["owner", "admin", "manager"],
   employees: ["owner", "admin", "manager"],
   schedule: ["owner", "admin", "manager"],

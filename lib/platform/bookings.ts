@@ -12,6 +12,7 @@ import { saveAttribution, attributionSchema } from "./attribution";
 import { enqueue, enqueueBooking } from "./outbox";
 import { metaEvent } from "../integrations/providers";
 import { squareEnvironment } from "../integrations/square-reporting";
+import { businessHoursForDay } from "./business-hours";
 import {
   dateToday,
   priceFor,
@@ -123,10 +124,11 @@ async function validateSlot(
   exclude?: string,
 ) {
   if (!validDate(date)) throw new AppError("Choose a valid date.");
+  const hours = businessHoursForDay(s, new Date(date + "T12:00:00Z").getUTCDay());
   if (
-    !s.days.includes(new Date(date + "T12:00:00Z").getUTCDay()) ||
-    start < minute(s.open_time) ||
-    start + service.duration_minutes > minute(s.close_time) ||
+    !hours ||
+    start < minute(hours.open_time) ||
+    start + service.duration_minutes > minute(hours.close_time) ||
     start % 30
   )
     throw new AppError("Choose an available appointment time.");
@@ -168,11 +170,12 @@ export async function availability(
     )[0];
   if (!service) throw new AppError("This service is unavailable.", 404);
   const slots: Array<{ minute: number; available: boolean }> = [];
-  if (!s.days.includes(new Date(date + "T12:00:00Z").getUTCDay())) return slots;
+  const hours = businessHoursForDay(s, new Date(date + "T12:00:00Z").getUTCDay());
+  if (!hours) return slots;
   const q: Query = async (sql, p) => ({ rows: await query(sql, p) });
   for (
-    let start = Math.ceil(minute(s.open_time) / 30) * 30;
-    start + service.duration_minutes <= minute(s.close_time);
+    let start = Math.ceil(minute(hours.open_time) / 30) * 30;
+    start + service.duration_minutes <= minute(hours.close_time);
     start += 30
   ) {
     try {
@@ -436,6 +439,17 @@ export async function updateBooking(
         "You can update only your assigned appointments.",
         403,
       );
+    if (staff && (
+      data.price_cents !== undefined || data.assigned_to !== undefined ||
+      data.date !== undefined || data.start_minute !== undefined || data.assignment_override ||
+      data.internal_notes !== undefined
+    ))
+      throw new AppError("A manager must change pricing, assignment, schedule or internal notes.", 403);
+    if (staff && data.status && data.status !== b.status && (
+      ["completed", "cancelled", "no_show"].includes(b.status) ||
+      !["in_progress", "completed"].includes(data.status)
+    ))
+      throw new AppError("Staff can only start or complete their assigned appointments.", 403);
     const status = data.status || b.status,
       date = data.date || b.booking_date,
       start = data.start_minute ?? b.start_minute;

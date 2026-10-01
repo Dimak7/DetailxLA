@@ -54,7 +54,7 @@ export function AdminShell({
   const path = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const workspaces = adminNavigation(sections);
+  const workspaces = adminNavigation(sections).map((workspace) => ({ ...workspace, label: user.role === "staff" && workspace.target === "bookings" ? "My jobs" : workspace.label }));
   const home = sections.includes("dashboard") ? "dashboard" : sections.includes("my_schedule") ? "my_schedule" : workspaces[0]?.target || "bookings";
   const quickLinks = [
     { section: "bookings", label: "New booking", href: "/admin/bookings?new=booking" },
@@ -67,7 +67,7 @@ export function AdminShell({
   const activeWorkspace = workspaces.find((workspace) => workspace.sections.includes(currentSection));
   const mobileLinks = [
     { target: home, label: home === "my_schedule" ? "My day" : "Overview", icon: "home", active: currentSection === home },
-    ...(home !== "bookings" && sections.includes("bookings") ? [{ target: "bookings", label: "Bookings", icon: "bookings", active: ["bookings", "calendar", "services"].includes(currentSection) }] : []),
+    ...(home !== "bookings" && sections.includes("bookings") ? [{ target: "bookings", label: user.role === "staff" ? "My jobs" : "Bookings", icon: "bookings", active: ["bookings", "calendar", "services"].includes(currentSection) }] : []),
     ...(sections.includes("schedule") ? [{ target: "schedule", label: "Schedule", icon: "schedule", active: ["schedule", "employees", "hours", "payroll", "performance"].includes(currentSection) }] : []),
   ];
   const menuActive = !mobileLinks.some((link) => link.active);
@@ -78,7 +78,7 @@ export function AdminShell({
         <span className="app-business-name">{BRAND_NAME.toUpperCase()} <small>Business workspace</small></span>
         <div className="app-global-actions">
           <button className="admin-mobile-search-toggle" aria-label={searchOpen ? "Close search" : "Search bookings"} aria-expanded={searchOpen} aria-controls="admin-mobile-search" onClick={() => setSearchOpen(!searchOpen)}><NavIcon name="search" /></button>
-          <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label="Search bookings" placeholder="Search" /><button>Search</button></form>
+          <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label={user.role === "staff" ? "Search my jobs" : "Search bookings"} placeholder={user.role === "staff" ? "Search my jobs" : "Search"} /><button>Search</button></form>
           {quickLinks.length > 0 && <details className="admin-quick-menu"><summary aria-label="Quick actions">+</summary><div>{quickLinks.map((item) => <Link key={item.section} href={item.href}>{item.label}</Link>)}</div></details>}
           <details className="app-profile"><summary aria-label="Your account">{user.name.slice(0, 1).toUpperCase()}</summary><div><strong>{user.name}</strong><small>{user.role} · {user.email}</small>{sections.includes("settings") && <Link href="/admin/settings">Settings</Link>}<button onClick={async () => { await fetch("/api/admin/logout", { method: "POST" }); location.assign("/admin/login"); }}>Sign out</button></div></details>
         </div>
