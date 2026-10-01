@@ -1,3 +1,9 @@
+import type { Role } from "./types";
+
+export function adminLandingPage(role: Role) {
+  return role === "staff" ? "/admin/my_schedule" : "/admin/dashboard";
+}
+
 const workspaces = [
   { label: "Dashboard", target: "dashboard", sections: ["dashboard"] },
   { label: "Bookings", target: "bookings", sections: ["bookings", "calendar", "services"] },

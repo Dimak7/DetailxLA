@@ -63,6 +63,7 @@ test("dashboard data and pay-rule actions preserve their visible contracts", asy
       await addBooking(relativeDay(1), "cancelled");
       await addBooking(relativeDay(1), "no_show");
       const data = await adminData("dashboard", new URLSearchParams({ from: today, to: today }), owner);
+      assert.ok("operations" in data && "unassigned" in data);
       assert.ok(data.operations && !Array.isArray(data.operations));
       assert.deepEqual(data.operations, { active_detailers: 2, today_jobs: 3, unassigned_jobs: 3 });
       assert.deepEqual(data.unassigned?.map((row) => row.id), expected);

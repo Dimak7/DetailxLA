@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { query, transaction, type Query } from "./db";
-import { access, AppError, addUser, passwordHash, receiptToken } from "./auth";
+import { access, AppError, passwordHash, receiptToken } from "./auth";
 import {
   settings,
   saveSettings,
@@ -85,6 +85,18 @@ async function syncBookingFinancialTotal(q: Query, bookingId: string) {
   await q("UPDATE wl.bookings SET price_cents=$2,updated_at=now() WHERE id=$1", [bookingId, netCents]);
   return { grossCents, discountCents, netCents };
 }
+function operationalReport(full: Awaited<ReturnType<typeof report>>) {
+  // Dashboard access does not grant access to marketing or business cost reports.
+  const {
+    expenses: _expenses, expense_summary: _expenseSummary,
+    net_operating_profit: _profit, operating_margin: _margin,
+    financial_series: _financialSeries, spend: _spend,
+    conversion_rate: _conversionRate, events: _events,
+    channels: _channels, google_ads: _googleAds, campaigns: _campaigns,
+    ...operations
+  } = full;
+  return operations;
+}
 export async function adminData(
   section: string,
   p: URLSearchParams,
@@ -111,22 +123,23 @@ export async function adminData(
     limit = 100,
     offset = (page - 1) * limit,
     search = p.get("search") || "";
-  const team = await query(
+  const team = staff ? [] : await query(
     "SELECT id,name,role,active FROM wl.users ORDER BY name",
   );
   if (
     section === "dashboard" ||
     section === "marketing" ||
     section === "analytics"
-  )
+  ) {
+    const dashboardReport = await report(p);
     return {
-      report: await report(p),
+      report: user.role === "manager" ? operationalReport(dashboardReport) : dashboardReport,
       square: await squareRevenueStatus(),
       integrations: await integrationStatus(),
-      spend: await query(
+      spend: user.role === "manager" ? [] : await query(
         "SELECT * FROM wl.ad_spend ORDER BY spend_date DESC LIMIT 100",
       ),
-      campaigns: await query(
+      campaigns: user.role === "manager" ? [] : await query(
         "SELECT c.*,(SELECT count(*)::int FROM wl.messages m WHERE m.campaign_id=c.id AND m.status='sent') sent,(SELECT count(*)::int FROM wl.messages m WHERE m.campaign_id=c.id AND m.status IN ('failed','uncertain')) failed FROM wl.campaigns c ORDER BY created_at DESC LIMIT 100",
       ),
       today: await query(
@@ -146,8 +159,9 @@ export async function adminData(
            AND b.assigned_to IS NULL AND b.status IN ('new','confirmed','in_progress')
          ORDER BY b.booking_date,b.start_minute LIMIT 12`,
       ),
-      inventory: await inventorySummary(),
+      ...(user.role === "manager" ? {} : { inventory: await inventorySummary() }),
     };
+  }
   if (section === "reports") return { report: await report(p), square: await squareRevenueStatus(), inventory: await inventorySummary() };
   if (section === "expenses") {
     const { start, end } = reportRange(p);
@@ -174,9 +188,9 @@ export async function adminData(
     const week = p.get("week") || (await import("./types")).dateToday();
     return {
       rows: await query(
-        `SELECT e.*,COALESCE((SELECT SUM(s.end_minute-s.start_minute-s.break_minutes) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text AND s.status='scheduled'),0)::int scheduled_minutes,
+        `SELECT e.*,COALESCE(u.role,'staff') login_role,COALESCE((SELECT SUM(s.end_minute-s.start_minute-s.break_minutes) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text AND s.status='scheduled'),0)::int scheduled_minutes,
          (SELECT min(s.shift_date) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND s.status='scheduled') next_shift
-         FROM wl.employees e ORDER BY e.active DESC,e.name`, [week]),
+         FROM wl.employees e LEFT JOIN wl.users u ON u.id=e.user_id ORDER BY e.active DESC,e.name`, [week]),
       availability: await query("SELECT * FROM wl.employee_availability ORDER BY employee_id,weekday"),
     };
   }
@@ -208,7 +222,7 @@ export async function adminData(
       employee,
       shifts: await query("SELECT * FROM wl.employee_shifts WHERE employee_id=$1 AND published=true AND shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') ORDER BY shift_date,start_minute", [employee.id]),
       appointments: await query(
-        `SELECT b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.price_cents,b.location,b.notes,
+        `SELECT b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,${staff ? "" : "b.price_cents,"}b.location,b.notes,
           c.first_name||' '||c.last_name customer_name,c.phone,
           concat_ws(' ',v.year,v.make,v.model) vehicle
          FROM wl.bookings b
@@ -349,7 +363,7 @@ export async function adminData(
       await query<{ total: number }>("SELECT count(*)::int total " + base, args)
     )[0].total;
     const fields = staff
-      ? "b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.customer_id,b.notes,b.internal_notes,b.location,b.assigned_to"
+      ? "b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.customer_id,b.notes,b.location,b.assigned_to"
       : "b.*";
     args.push(
       section === "calendar" ? 2000 : limit,
@@ -370,10 +384,10 @@ export async function adminData(
         ),
       } : {}),
       team,
-      employees: await query(
+      employees: staff ? [] : await query(
         "SELECT e.id employee_id,e.user_id,e.name,e.position,e.phone FROM wl.employees e JOIN wl.users u ON u.id=e.user_id WHERE e.active=true AND u.active=true ORDER BY e.name",
       ),
-      blocks: await query(
+      blocks: staff ? [] : await query(
         "SELECT * FROM wl.blocks ORDER BY booking_date DESC LIMIT 200",
       ),
       services: await query(
@@ -648,7 +662,11 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     return requirement;
   }
   if (action === "save_employee") {
-    const e = z.object({ id: uuid.optional(), name: z.string().trim().min(2).max(100), phone: z.string().min(7).max(30), email: z.email(), password: z.string().max(128).optional(), position: z.string().min(2).max(80), hourly_rate_cents: z.number().int().min(0).max(100000000).optional(), max_weekly_minutes: z.number().int().min(60).max(10080).default(2400), hire_date: z.string().max(10).nullable(), notes: txt, active: z.boolean(), availability: z.array(z.object({ weekday: z.number().int().min(0).max(6), available: z.boolean(), start_minute: z.number().int().min(0).max(1439), end_minute: z.number().int().min(1).max(1440) })).length(7) }).parse(data);
+    const e = z.object({ id: uuid.optional(), name: z.string().trim().min(2).max(100), phone: z.string().min(7).max(30), email: z.email(), password: z.string().max(128).optional(), login_role: z.enum(["staff", "manager"]).optional(), position: z.string().min(2).max(80), hourly_rate_cents: z.number().int().min(0).max(100000000).optional(), max_weekly_minutes: z.number().int().min(60).max(10080).default(2400), hire_date: z.string().max(10).nullable(), notes: txt, active: z.boolean(), availability: z.array(z.object({ weekday: z.number().int().min(0).max(6), available: z.boolean(), start_minute: z.number().int().min(0).max(1439), end_minute: z.number().int().min(1).max(1440) })).length(7) }).parse(data);
+    if (user.role === "manager" && e.login_role && e.login_role !== "staff")
+      throw new AppError("Only an administrator can grant manager access.", 403);
+    if (e.password && e.password.length < 12)
+      throw new AppError("Use an employee login password of at least 12 characters.");
     if (!e.id && e.hourly_rate_cents === undefined) throw new AppError("Set a starting hourly rate for the new employee.");
     const id = e.id || randomUUID();
     await transaction(async (q) => {
@@ -658,9 +676,21 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       if (!userId) {
         if (!e.password || e.password.length < 12) throw new AppError("Set an employee login password of at least 12 characters.");
         userId = randomUUID();
-        await q("INSERT INTO wl.users(id,name,email,password_hash,role,active) VALUES($1,$2,$3,$4,'staff',$5)", [userId,e.name,e.email.toLowerCase(),passwordHash(e.password),e.active]);
+        await q("INSERT INTO wl.users(id,name,email,password_hash,role,active) VALUES($1,$2,$3,$4,$5,$6)", [userId,e.name,e.email.toLowerCase(),passwordHash(e.password),e.login_role || "staff",e.active]);
       } else {
-        await q("UPDATE wl.users SET name=$1,email=$2,active=$3,password_hash=CASE WHEN $4<>'' THEN $5 ELSE password_hash END,updated_at=now() WHERE id=$6", [e.name,e.email.toLowerCase(),e.active,e.password || "",e.password ? passwordHash(e.password) : "",userId]);
+        const account = (await q<{ role: Session["role"]; email: string; active: boolean }>(
+          "SELECT role,email,active FROM wl.users WHERE id=$1 FOR UPDATE", [userId],
+        )).rows[0];
+        if (!account) throw new AppError("Employee account not found.", 404);
+        if ((user.role === "manager" && account.role !== "staff") || (user.role === "admin" && account.role === "owner"))
+          throw new AppError("Your role cannot change this employee account.", 403);
+        const nextRole = e.login_role || account.role;
+        if (userId === user.user_id && (!e.active || nextRole !== user.role))
+          throw new AppError("Your current account must remain active with its current access.", 403);
+        await q("UPDATE wl.users SET name=$1,email=$2,active=$3,password_hash=CASE WHEN $4<>'' THEN $5 ELSE password_hash END,role=$7,updated_at=now() WHERE id=$6", [e.name,e.email.toLowerCase(),e.active,e.password || "",e.password ? passwordHash(e.password) : "",userId,nextRole]);
+        // Replaced credentials and revoked access must also invalidate existing sessions.
+        if (e.password || account.email !== e.email.toLowerCase() || account.active !== e.active || account.role !== nextRole)
+          await q("DELETE FROM wl.sessions WHERE user_id=$1", [userId]);
       }
       // New Detailers start on the previous default plan. Editing an existing
       // employee, including their position, never resets their chosen pay settings.
@@ -760,7 +790,13 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         "A manager must change pricing, assignment or schedule.",
         403,
       );
-    return updateBooking(b.id, b, user.user_id, user.role === "staff");
+    const booking = await updateBooking(b.id, b, user.user_id, user.role === "staff");
+    if (user.role !== "staff") return booking;
+    // Staff action responses follow the same data boundary as their job list.
+    return Object.fromEntries([
+      "id", "reference", "booking_date", "start_minute", "duration_minutes", "status",
+      "service_name", "customer_id", "notes", "location", "assigned_to",
+    ].map((key) => [key, booking[key as keyof typeof booking]]));
   }
   if (action === "block_time") {
     const b = z
@@ -945,25 +981,34 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         active: z.boolean().default(true),
       })
       .parse(data);
-    if (u.id === user.user_id && (!u.active || u.role !== "owner"))
-      throw new AppError("Your current owner account must remain active.");
-    if (!u.id) await addUser(u);
-    else
-      await transaction(async (q) => {
+    if (user.role === "admin" && u.role === "owner")
+      throw new AppError("Only an owner can grant owner access.", 403);
+    if (u.id === user.user_id && (!u.active || u.role !== user.role))
+      throw new AppError("Your current account must remain active with its current access.", 403);
+    if (u.password && u.password.length < 12)
+      throw new AppError("Use at least 12 characters.");
+    await transaction(async (q) => {
+      if (!u.id) {
+        if (!u.password) throw new AppError("Use a password of at least 12 characters.");
+        await q("INSERT INTO wl.users(id,name,email,password_hash,role,active) VALUES($1,$2,$3,$4,$5,$6)", [randomUUID(),u.name,u.email.toLowerCase(),passwordHash(u.password),u.role,u.active]);
+      } else {
+        const account = (await q<{ role: Session["role"] }>("SELECT role FROM wl.users WHERE id=$1 FOR UPDATE", [u.id])).rows[0];
+        if (!account) throw new AppError("Team member not found.", 404);
+        if (user.role === "admin" && account.role === "owner")
+          throw new AppError("Only an owner can change an owner account.", 403);
         await q(
           "UPDATE wl.users SET name=$2,email=$3,role=$4,active=$5,updated_at=now() WHERE id=$1",
           [u.id, u.name, u.email.toLowerCase(), u.role, u.active],
         );
         if (u.password) {
-          if (u.password.length < 12)
-            throw new AppError("Use at least 12 characters.");
           await q("UPDATE wl.users SET password_hash=$2 WHERE id=$1", [
             u.id,
             passwordHash(u.password),
           ]);
         }
         await q("DELETE FROM wl.sessions WHERE user_id=$1", [u.id]);
-      });
+      }
+    });
   }
   if (action === "save_template")
     await query(

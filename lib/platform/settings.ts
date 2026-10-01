@@ -14,6 +14,17 @@ const optionalUrl = z.union([
   z.literal(""),
   z.url().refine((v) => /^https:\/\//.test(v), "Use an HTTPS URL."),
 ]);
+const businessTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+const dayHoursSchema = z
+  .object({
+    weekday: z.number().int().min(0).max(6),
+    open_time: businessTime,
+    close_time: businessTime,
+  })
+  .refine((hours) => hours.open_time < hours.close_time, {
+    message: "Closing time must follow opening time.",
+    path: ["close_time"],
+  });
 export const settingsSchema = z
   .object({
     name: z.string().trim().min(2).max(100),
@@ -24,8 +35,9 @@ export const settingsSchema = z
     service_area: z.string().max(500),
     appointment_mode: z.enum(["shop", "mobile", "both"]),
     days: z.array(z.number().int().min(0).max(6)).min(1),
-    open_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-    close_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    open_time: businessTime,
+    close_time: businessTime,
+    day_hours: z.array(dayHoursSchema).max(7).default([]),
     buffer_minutes: z.number().int().min(0).max(180),
     deposit_percent: z.number().min(0).max(100),
     cancellation_policy: z.string().max(2000),
@@ -54,6 +66,10 @@ export const settingsSchema = z
   .refine(
     (s) => s.open_time < s.close_time,
     "Closing time must follow opening time.",
+  )
+  .refine(
+    (s) => new Set(s.day_hours.map((hours) => hours.weekday)).size === s.day_hours.length,
+    { message: "Choose one hours override per weekday.", path: ["day_hours"] },
   );
 const envKeys: Record<string, string[]> = {
   email_key: ["EMAIL_PROVIDER_API_KEY", "RESEND_API_KEY"],
@@ -98,9 +114,14 @@ export async function settings(): Promise<BusinessSettings> {
     ...Object.fromEntries(
       Object.entries(rows[0]?.value || {}).filter(([, v]) => v !== ""),
     ),
+    // Older custom schedules keep their shared hours until an override is saved.
+    day_hours: rows[0]?.value.day_hours ?? [],
   } as BusinessSettings;
   // Resolve the former default without modifying custom contact or integration fields.
   return { ...business, name: resolveBusinessName(business.name) };
+}
+export function publicSettings(business: BusinessSettings): BusinessSettings {
+  return { ...business, email_from: "", telegram_chat_id: "", sms_from: "" };
 }
 export function effectiveDepositPercent(s: BusinessSettings) {
   const configured = Number(process.env.BOOKING_DEPOSIT_PERCENT);

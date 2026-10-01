@@ -290,4 +290,20 @@ WITH migration AS (
 UPDATE wl.employees
 SET hourly_rate_cents=1000,compensation_model='hourly_commission',default_commission_bps=3000,updated_at=now()
 WHERE lower(position)='detailer' AND EXISTS (SELECT 1 FROM migration);
+-- Add Sunday only to the former default schedule; preserve custom business hours.
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (4)
+  ON CONFLICT DO NOTHING
+  RETURNING version
+)
+UPDATE wl.settings
+SET value = value || '{"days":[0,1,2,3,4,5,6],"day_hours":[{"weekday":0,"open_time":"08:00","close_time":"17:00"}],"hours_label":"Monday-Saturday, 8:00 AM-8:00 PM; Sunday, 8:00 AM-5:00 PM"}'::jsonb,
+    updated_at = now()
+WHERE key='business'
+  AND EXISTS (SELECT 1 FROM migration)
+  AND value->'days'='[1,2,3,4,5,6]'::jsonb
+  AND value->>'open_time'='08:00'
+  AND value->>'close_time'='20:00'
+  AND value->>'hours_label'='Monday-Saturday, 8:00 AM-8:00 PM'
+  AND (NOT value ? 'day_hours' OR value->'day_hours'='[]'::jsonb);
 `;

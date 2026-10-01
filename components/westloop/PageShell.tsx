@@ -1,6 +1,7 @@
 import { PublicHeader, PublicFooter } from "./PublicShell";
 import { Tracking } from "./Tracking";
 import type { BusinessSettings } from "@/lib/platform/types";
+import { publicSettings } from "@/lib/platform/settings";
 import { BRAND_NAME } from "@/lib/brand";
 export function PageShell({
   business,
@@ -13,10 +14,11 @@ export function PageShell({
   showBookingCTA?: boolean;
   mobileBookingCTA?: boolean;
 }) {
+  const publicBusiness = publicSettings(business);
   return (
     <div className="ceramics-site">
       <link rel="icon" href={business.name === BRAND_NAME ? "/icon.svg" : business.favicon_url || "/icon.svg"} />
-      <PublicHeader business={business} />
+      <PublicHeader business={publicBusiness} />
       <Tracking
         config={{
           google_tag_id: business.google_tag_id,
@@ -28,7 +30,7 @@ export function PageShell({
         }}
       />
       <main id="main">{children}</main>
-      <PublicFooter business={business} showBookingCTA={showBookingCTA} mobileBookingCTA={mobileBookingCTA} />
+      <PublicFooter business={publicBusiness} showBookingCTA={showBookingCTA} mobileBookingCTA={mobileBookingCTA} />
     </div>
   );
 }

@@ -235,6 +235,11 @@ export function AdminWorkspace({
     );
   }
   function bookingEdit(r: R) {
+    const editableStatuses = staff
+      ? ["completed", "cancelled", "no_show"].includes(s(r.status))
+        ? [s(r.status)]
+        : Array.from(new Set([s(r.status), "in_progress", "completed"]))
+      : [...bookingStatuses];
     edit(
       "Manage " + s(r.reference),
       "update_booking",
@@ -242,9 +247,9 @@ export function AdminWorkspace({
         id: r.id,
         status: r.status,
         notes: r.notes,
-        internal_notes: r.internal_notes,
         ...(!staff
           ? {
+              internal_notes: r.internal_notes,
               date: r.booking_date,
               start_minute: r.start_minute,
               assigned_to: r.assigned_to || "",
@@ -253,7 +258,7 @@ export function AdminWorkspace({
           : {}),
       },
       [
-        f("status", "Status", "select", { options: [...bookingStatuses] }),
+        f("status", "Status", "select", { options: editableStatuses }),
         ...(!staff
           ? [
               f("date", "Appointment date", "date"),
@@ -429,6 +434,7 @@ export function AdminWorkspace({
     );
   }
   function teamEdit(r: R = {}) {
+    if (!allowedSections.includes("team") || (user.role !== "owner" && r.role === "owner")) return;
     edit(
       "Team member",
       "save_user",
@@ -437,7 +443,8 @@ export function AdminWorkspace({
         f("name", "Name", "text", { required: true }),
         f("email", "Email", "email", { required: true }),
         f("role", "Role", "select", {
-          options: ["owner", "admin", "manager", "staff"],
+          options: user.role === "owner" ? ["owner", "admin", "manager", "staff"] : ["admin", "manager", "staff"],
+          hint: "Admins manage the business. Managers run daily operations, employees and payroll. Staff see their own assigned work.",
         }),
         f(
           "password",
@@ -452,8 +459,11 @@ export function AdminWorkspace({
     );
   }
   function employeeEdit(r: R = {}) {
+    if (user.role === "manager" && r.user_id && s(r.login_role) !== "staff") return;
+    if (user.role !== "owner" && r.login_role === "owner") return;
     const availability = Array.isArray(r.availability) ? r.availability : Array.from({ length: 7 }, (_, weekday) => ({ weekday, available: weekday > 0 && weekday < 6, start_minute: 480, end_minute: 1020 }));
-    edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", hourly_rate_cents: 10, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : "Login password (12+ characters)", "password", { required: !r.user_id }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"] }), f("hourly_rate_cents", "Starting hourly rate ($)", "money", { hint: "New Detailers start on an hourly + 30% plan. Use Pay settings after saving to customize the plan.", visibleWhen: (values) => !values.id }), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => { const { hourly_rate_cents, ...profile } = d; return { ...profile, ...(!profile.id ? { hourly_rate_cents } : {}), hire_date: d.hire_date || null }; });
+    const canSetRole = allowedSections.includes("team") && !["owner", "admin"].includes(s(r.login_role));
+    edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", login_role: "staff", hourly_rate_cents: 10, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : "Login password (12+ characters)", "password", { required: !r.user_id }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"], hint: "Job title. Dashboard permissions are set by the login access role." }), ...(canSetRole ? [f("login_role", "Login access role", "select", { options: [{ value: "staff", label: "Staff — own work and time clock" }, { value: "manager", label: "Manager — operations, employees and payroll" }], hint: "Admin accounts and other access changes are managed in Settings → Team & permissions." })] : []), f("hourly_rate_cents", "Starting hourly rate ($)", "money", { hint: "New Detailers start on an hourly + 30% plan. Use Pay settings after saving to customize the plan.", visibleWhen: (values) => !values.id }), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => { const { hourly_rate_cents, login_role, ...profile } = d; return { ...profile, ...(canSetRole ? { login_role } : {}), ...(!profile.id ? { hourly_rate_cents } : {}), hire_date: d.hire_date || null }; });
   }
   function expenseEdit(r: R = {}) {
     edit(r.id ? "Edit expense" : "Add expense", "save_expense", { expense_date: dateToday(), amount_cents: 0, category: "Supplies", vendor: "", description: "", payment_method: "Card", recurrence: "one_time", recurring_start: "", recurring_end: "", receipt_url: "", notes: "", ...r, ...(r.amount_cents != null ? { amount_cents: n(r.amount_cents) / 100 } : {}) }, [f("expense_date", "Date", "date", { required: true }), f("amount_cents", "Amount ($)", "money", { required: true }), f("category", "Category", "select", { options: ["Rent", "Utilities", "Payroll", "Chemicals", "Equipment", "Supplies", "Insurance", "Advertising", "Software", "Vehicle", "Repairs", "Taxes / Fees", "Other"] }), f("vendor", "Vendor"), f("payment_method", "Payment method", "select", { options: ["Card", "Cash", "ACH", "Check", "Other"] }), f("recurrence", "Frequency", "select", { options: [{ value: "one_time", label: "One-time" }, { value: "weekly", label: "Weekly" }, { value: "monthly", label: "Monthly" }, { value: "yearly", label: "Yearly" }] }), f("recurring_start", "Recurring start", "date"), f("recurring_end", "Recurring end (optional)", "date"), f("receipt_url", "Receipt", "upload"), f("description", "Description", "textarea", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, recurring_start: d.recurring_start || null, recurring_end: d.recurring_end || null }));
@@ -567,6 +577,7 @@ export function AdminWorkspace({
   }
   function settingsEdit(group: string) {
     const b = data.settings as R;
+    const sunday = rows(b.day_hours).find((day) => n(day.weekday) === 0);
     const groups: Record<string, Field[]> = {
       Business: [
         f("name", "Business name"),
@@ -583,8 +594,10 @@ export function AdminWorkspace({
         f("days", "Available weekdays (0=Sun, 6=Sat)", "text", {
           hint: "Comma separated, e.g. 1,2,3,4,5,6",
         }),
-        f("open_time", "Open", "time"),
-        f("close_time", "Close", "time"),
+        f("open_time", "Monday–Saturday open", "time"),
+        f("close_time", "Monday–Saturday close", "time"),
+        f("sunday_open_time", "Sunday open", "time"),
+        f("sunday_close_time", "Sunday close", "time", { hint: "Sunday appointments must finish by this time. Include 0 in available weekdays to accept Sunday bookings." }),
         f("buffer_minutes", "Buffer (minutes)", "number"),
         f("deposit_percent", "Standard detail deposit (%)", "number", {
           max: 100,
@@ -665,7 +678,7 @@ export function AdminWorkspace({
     edit(
       group + " settings",
       "save_settings",
-      { ...b, days: (b.days as number[]).join(",") },
+      { ...b, days: (b.days as number[]).join(","), sunday_open_time: s(sunday?.open_time) || s(b.open_time), sunday_close_time: s(sunday?.close_time) || s(b.close_time) },
       groups[group],
       (d) => {
         const cfg = { ...b, ...d };
@@ -678,6 +691,12 @@ export function AdminWorkspace({
           typeof d.days === "string"
             ? s(d.days).split(",").map(Number)
             : b.days;
+        if (group === "Booking") cfg.day_hours = [
+          ...rows(b.day_hours).filter((day) => n(day.weekday) !== 0),
+          { weekday: 0, open_time: s(d.sunday_open_time), close_time: s(d.sunday_close_time) },
+        ];
+        delete cfg.sunday_open_time;
+        delete cfg.sunday_close_time;
         return { settings: cfg, credentials: secrets };
       },
     );
@@ -810,6 +829,8 @@ export function AdminWorkspace({
     consents: R[];
   } | null;
   const reportMode = !!rep;
+  const canViewExpenses = allowedSections.includes("expenses");
+  const canViewGrowthReports = allowedSections.includes("analytics") || allowedSections.includes("marketing");
   const workspace = workspaceSections.find((group) => group.items.includes(section));
   return (
     <>
@@ -872,12 +893,12 @@ export function AdminWorkspace({
       {section === "employees" && (
         <section className="paper">
           <div className="section-heading"><div><p className="eyebrow">TEAM</p><h2>{list.filter((r) => r.active).length} active employees</h2></div><button className="button" onClick={() => employeeEdit()}>Add employee +</button></div>
-          <p className="small-note">Each employee gets a separate staff login and can only view their own schedule and time clock. Scheduled hours are separate from actual paid clocked hours.</p>
-          {table(["Employee", "Role", "Phone", "Status", "Default pay plan", "Scheduled this week", "Actions"], list.map((r) => [
+          <p className="small-note">Each employee gets a separate login. Staff see their own assigned jobs, schedule and time clock. Managers can add staff and manage payroll; admins set login access roles. Scheduled hours are separate from actual clocked hours.</p>
+          {table(["Employee", "Position & access", "Phone", "Status", "Default pay plan", "Scheduled this week", "Actions"], list.map((r) => [
             <><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>,
-            s(r.position), s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
+            <>{s(r.position)}<small>{title(s(r.login_role) || "staff")} access</small></>, s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
             compensationPlanLabel(r), (n(r.scheduled_minutes) / 60).toFixed(1) + "h",
-            <><button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit profile</button>
+            <>{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit profile</button>}
               {allowedSections.includes("payroll") && !staff && <button className="button" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button>}</>,
           ]))}
         </section>
@@ -1014,18 +1035,20 @@ export function AdminWorkspace({
               ["Outstanding", money(rep.outstanding), "Completed work not yet fully collected"],
               ["Refunds", money(rep.refunds), "Refunds on payments in selected period"],
               ["Appointment tips", money(rep.tips), "Tips recorded on completed website appointments"],
-              ["Operating expenses", money(rep.expenses), "Recorded expenses in period"],
-              ["Net operating profit", money(rep.net_operating_profit), "Revenue less operating expenses"],
-              ["Operating margin", rep.operating_margin == null ? "No paid revenue" : rep.operating_margin.toFixed(1) + "%", "Not tax or full accounting profit"],
+              ...(canViewExpenses ? [
+                ["Operating expenses", money(rep.expenses), "Recorded expenses in period"],
+                ["Net operating profit", money(rep.net_operating_profit), "Revenue less operating expenses"],
+                ["Operating margin", rep.operating_margin == null ? "No paid revenue" : rep.operating_margin.toFixed(1) + "%", "Not tax or full accounting profit"],
+              ] : []),
               ["Bookings", s(rep.bookings.total), "Created in period"],
               ["New leads", s(rep.leads), "Recorded enquiries & bookings"],
-              [
+              ...(canViewGrowthReports ? [[
                 "Booking conversion",
                 rep.conversion_rate == null
                   ? "No visits"
                   : rep.conversion_rate.toFixed(1) + "%",
                 "Booked sessions / tracked visitors",
-              ],
+              ]] : []),
               [
                 "Average paid appointment",
                 money(rep.average_order),
@@ -1082,10 +1105,10 @@ export function AdminWorkspace({
                 ].map(([k, v, h]) => <div className="stat" key={k}><p>{k}</p><strong>{v}</strong><small>{h}</small></div>)}
               </div>
               <div className="admin-grid">
-                <section className="paper">
+                {canViewExpenses && <section className="paper">
                   <h2>Financial trend</h2>
                   {rep.financial_series.length ? <>{table(["Date", "Revenue", "Expenses", "Net operating profit"], rep.financial_series.map((row) => [s(row.day), money(n(row.revenue)), money(n(row.expenses)), money(n(row.net_operating_profit))]))}<p className="small-note">Revenue is verified payments less refunds. Operating expenses include recorded expenses only; labor is shown separately when time entries exist.</p></> : <div className="empty-state"><p>No financial activity in this period.</p></div>}
-                </section>
+                </section>}
                 <section className="paper">
                   <h2>Today's schedule</h2>
                   {table(
@@ -1134,7 +1157,7 @@ export function AdminWorkspace({
                     </strong>
                   </div>
                   <div className="summary-row"><span>Recorded labor cost</span><strong>{money(rep.labor_cost)}</strong></div>
-                  <div className="summary-row"><span>Inventory alerts</span><strong>{s((data.inventory as R | undefined)?.low_stock)} low · {s((data.inventory as R | undefined)?.out_of_stock)} out</strong></div>
+                  {allowedSections.includes("inventory") && <div className="summary-row"><span>Inventory alerts</span><strong>{s((data.inventory as R | undefined)?.low_stock)} low · {s((data.inventory as R | undefined)?.out_of_stock)} out</strong></div>}
                 </section>
               </div>
             </>
@@ -1186,7 +1209,7 @@ export function AdminWorkspace({
                 </div>
               )}
             </section>
-            <section className="paper">
+            {canViewGrowthReports && <section className="paper">
               <h2>Customer journey</h2>
               {rep.events.length ? (
                 rep.events.map((r) => (
@@ -1202,9 +1225,9 @@ export function AdminWorkspace({
                 Phone clicks measure intent, not answered calls. Manually record
                 actual phone leads in Leads.
               </p>
-            </section>
+            </section>}
           </div>
-          <section className="paper">
+          {canViewGrowthReports && <section className="paper">
             <h2>Channel performance</h2>
             {table(
               [
@@ -1234,7 +1257,7 @@ export function AdminWorkspace({
               added. Missing spend is not zero spend. Source is linked to the
               actual booking and payment record.
             </p>
-          </section>
+          </section>}
           {section !== "dashboard" && (
             <>
               <section className="paper">
@@ -2020,7 +2043,7 @@ export function AdminWorkspace({
           <section className="paper">
             <div className="section-heading">
               <h2>Team & permissions</h2>
-              {user.role === "owner" && (
+              {allowedSections.includes("team") && (
                 <button className="button" onClick={() => teamEdit()}>
                   Add team member +
                 </button>
@@ -2033,16 +2056,21 @@ export function AdminWorkspace({
                 s(r.email),
                 s(r.role),
                 status(r.active ? "active" : "disabled"),
-                user.role === "owner" && (
+                allowedSections.includes("team") && (user.role === "owner" || r.role !== "owner") && (
                   <button onClick={() => teamEdit(r)}>Edit access</button>
                 ),
               ]),
             )}
             <p className="small-note">
               Staff see only their assigned appointments and cannot access
-              financial, customer database or marketing reports. Owners manage
-              team access. Password changes invalidate existing sessions.
+              financial, customer database or marketing reports. Admins and owners manage
+              team access; only owners can change owner accounts. Password changes invalidate existing sessions.
             </p>
+            <div className="role-permissions-grid">
+              <div><strong>Admin</strong><p>All business pages, settings, integrations and account access.</p></div>
+              <div><strong>Manager</strong><p>Daily operations, customers, bookings, payments, employees, schedules and payroll.</p></div>
+              <div><strong>Staff</strong><p>Assigned jobs, their own schedule and time clock. No business finances or team management.</p></div>
+            </div>
           </section>
         </>
       )}

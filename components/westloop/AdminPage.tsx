@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { sessionFromToken, sessionCookie, access, AppError } from "@/lib/platform/auth";
 import { adminData } from "@/lib/platform/admin";
-import { settings } from "@/lib/platform/settings";
+import { settings, publicSettings } from "@/lib/platform/settings";
 import { AdminWorkspace } from "./AdminWorkspace";
 export async function AdminPage({
   section,
@@ -33,7 +33,7 @@ export async function AdminPage({
       data={JSON.parse(JSON.stringify(data))}
       user={user}
       allowedSections={Object.keys(access).filter((key) => access[key].includes(user.role))}
-      business={await settings()}
+      business={section === "settings" ? await settings() : publicSettings(await settings())}
     />
   );
 }
