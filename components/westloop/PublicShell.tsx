@@ -32,6 +32,7 @@ const navigation = [
   { href: "/services", label: "Services & prices", feature: true },
   { href: "/#detailing", label: "Detailing" },
   { href: "/services/ceramic-coating", label: "Ceramic coating" },
+  { href: "/services/paint-correction", label: "Paint correction" },
   { href: "/gallery", label: "Our work" },
   { href: "/contact", label: "Contact" },
 ];

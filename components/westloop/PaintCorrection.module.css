@@ -1,6 +1,7 @@
 .shell { --ink:#f4f2ed; --paper:#101010; --muted:#a7a5a1; --line:#373634; background:#101010; color:#f4f2ed; }
 .shell :global(.ceramics-header) { background:#101010f5; border-color:#ffffff1c; }
 .shell :global(.ceramics-wordmark),.shell :global(.ceramics-nav > a),.shell :global(.ceramics-menu-toggle) { color:#f4f2ed; }
+.shell :global(.ceramics-nav > a:hover),.shell :global(.ceramics-nav > a[aria-current]) { color:#c69768; }
 .shell :global(.ceramics-mark) { color:#c69768; }
 .shell :global(.ceramics-header-book) { background:#f4f2ed; border-color:#f4f2ed; color:#101010; border-radius:2px; }
 .shell :global(.ceramics-nav.is-open) { background:#171717; border-color:#393939; }
