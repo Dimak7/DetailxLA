@@ -31,3 +31,16 @@ This is a detailing illustration. No affiliation with or endorsement by Ferrari.
 
 Three.js: MIT license, see THREE-LICENSE.txt.
 Draco decoder: Google Draco, Apache License 2.0, see DRACO-LICENSE.txt.
+
+Paint correction service page: Porsche studio and machine-polishing films
+generated through Higgsfield with GPT Image 2.5 reference images and Kling 3.0
+video. These are service illustrations, not footage of the business's studio,
+employees or customer results. No affiliation with or endorsement by Porsche.
+The current paint-correction hero is one polished Porsche animation, generated
+with Higgsfield Genjutsu (hf_mult_motion_control) using the original Kling motion
+and a color-matched GPT Image 2.5 polished-finish reference, with a 1080p source.
+Its poster comes from the first generated polished video frame. The original
+and refined references from earlier comparison development are retained as
+provenance; the page no longer offers a Before / After comparison switch.
+These media are service illustrations, not a record of an actual treatment,
+customer vehicle or guaranteed outcome.

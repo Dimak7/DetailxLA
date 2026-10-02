@@ -8,15 +8,17 @@ export function PageShell({
   children,
   showBookingCTA = true,
   mobileBookingCTA = showBookingCTA,
+  className = "",
 }: {
   business: BusinessSettings;
   children: React.ReactNode;
   showBookingCTA?: boolean;
   mobileBookingCTA?: boolean;
+  className?: string;
 }) {
   const publicBusiness = publicSettings(business);
   return (
-    <div className="ceramics-site">
+    <div className={`ceramics-site ${className}`}>
       <link rel="icon" href={business.name === BRAND_NAME ? "/icon.svg" : business.favicon_url || "/icon.svg"} />
       <PublicHeader business={publicBusiness} />
       <Tracking
