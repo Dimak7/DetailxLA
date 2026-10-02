@@ -7,6 +7,8 @@ import { publicData } from "@/lib/platform/public";
 import { PageShell } from "@/components/westloop/PageShell";
 import { ServiceCards } from "@/components/westloop/ServiceCards";
 import { CeramicFilm } from "@/components/westloop/CeramicFilm";
+import { PaintCorrection } from "@/components/westloop/PaintCorrection";
+import paintStyles from "@/components/westloop/PaintCorrection.module.css";
 import { money } from "@/lib/platform/types";
 import { siteUrl } from "@/lib/platform/settings";
 import { BRAND_NAME } from "@/lib/brand";
@@ -26,7 +28,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${service.name} in Chicago`, description: content.metadata,
     alternates: { canonical: `/services/${service.slug}` },
-    openGraph: { title: `${service.name} in Chicago | ${BRAND_NAME}`, siteName: BRAND_NAME, type: "website", description: content.metadata, url: `/services/${service.slug}`, images: [{ url: content.image, alt: content.imageAlt }] },
+    openGraph: { title: `${service.name} in Chicago | ${BRAND_NAME}`, siteName: BRAND_NAME, type: "website", description: content.metadata, url: `/services/${service.slug}`, images: [service.slug === "paint-correction" ? { url: "/paint-correction/hero-after-matched.webp", alt: "Graphite Porsche 911 in a detailing studio — concept imagery" } : { url: content.image, alt: content.imageAlt }] },
   };
 }
 
@@ -48,6 +50,12 @@ export default async function Page({ params }: PageProps) {
       { "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Services", item: `${siteUrl()}/services` }, { "@type": "ListItem", position: 2, name: service.name, item: `${siteUrl()}/services/${service.slug}` }] },
     ],
   };
+  if (service.slug === "paint-correction") return (
+    <PageShell business={d.business} className={paintStyles.shell} showBookingCTA={false} mobileBookingCTA={false}>
+      <PaintCorrection service={service} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
+    </PageShell>
+  );
   return (
     <PageShell business={d.business}>
       <div className={styles.page}>

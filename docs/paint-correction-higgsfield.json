@@ -1,0 +1,126 @@
+{
+  "project": {
+    "project_id": "a0e2b00f-1e5a-42df-ba45-59816345cba7",
+    "default_folder_id": "a0e2b00f-1e5a-42df-ba45-59816345cba7",
+    "workspace_id": "df98359f-308e-4891-8bd4-de0977a71075",
+    "name": "West Loop \u2014 Paint Correction Film"
+  },
+  "models": {
+    "images": "GPT Image 2.5, high quality, 4K",
+    "videos": "Kling 3.0, 4K, silent, 8 seconds; Higgsfield Genjutsu motion control, 1080p, for the matched After"
+  },
+  "creditsUsed": 201,
+  "generatedImages": [
+    "85e3765b-c74b-4380-9b93-69350dd6b3d6",
+    "6b6f39de-8f8b-48a6-86f7-e2714923db4e",
+    "fbd956ed-b17a-4ef4-8760-f8e6c0288237",
+    "33d55146-cc3c-4d4f-9dd7-b38add099533"
+  ],
+  "generatedVideos": [
+    "d3000617-a975-4225-82c8-70e3095d39bf",
+    "7c8cd7c6-f059-4678-848b-39110bd6dbb7",
+    "780e7428-1a2d-4a6f-8567-edaf26f1d10e"
+  ],
+  "params": [
+    {
+      "model": "gpt_image_2_5",
+      "variant": "flare",
+      "quality": "high",
+      "resolution": "4k",
+      "aspect_ratio": "16:9",
+      "count": 1,
+      "folder_id": "a0e2b00f-1e5a-42df-ba45-59816345cba7",
+      "prompt": "Create one extraordinarily realistic luxury automotive campaign photograph, a physical camera photograph not a 3D render. A Porsche 911 GT3 in deep graphite metallic paint, satin silver forged wheels, black brake calipers, parked in an immaculate high-end automotive detailing atelier. Entire car visible from a low front three-quarter view, pointing slightly toward camera left, car positioned in right two-thirds of a wide 16:9 composition, left quarter dark restrained negative space. Car is large, hero subject. Architecture: enormous dark charcoal cyclorama-like concrete wall, a few broad tall rectangular softbox reflections and one warm bronze side strip, clean polished dark floor with subtle physically natural reflections. Paint has extraordinary true-to-life depth with straight precise white light reflections that describe the fender curvature; crisp realistic headlight optics, correct clean tire sidewalls, stable recognizable Porsche body geometry, real believable clear coat texture. Cinematic but properly exposed, dramatic white overhead key and a subtle warm edge; no crushed shadows on the car. 50mm full-frame automotive lens, deep enough focus to keep vehicle crisp, photographed like a high budget magazine cover. No text, no lettering, no graphic overlays, no drawn scratches, no smoke, no particles, no rain, no water, no people, no logo floating in space, no exaggerated flares."
+    },
+    {
+      "model": "gpt_image_2_5",
+      "variant": "flare",
+      "quality": "high",
+      "resolution": "4k",
+      "aspect_ratio": "16:9",
+      "count": 1,
+      "folder_id": "a0e2b00f-1e5a-42df-ba45-59816345cba7",
+      "prompt": "An extremely realistic professional automotive detailing photograph, wide 16:9, close editorial crop in an immaculate dark detailing studio. A trained detailer's two anatomically correct hands wearing fitted matte black nitrile gloves firmly hold a professional black dual-action orbital polisher in a realistic working grip. The small round orange foam pad is perfectly flat, flush and in full contact with the gently curved graphite metallic hood of a Porsche 911. One hand on the front handle, one hand on the rear grip, wrists anatomically plausible and forearms emerging naturally from the upper-right edge. Only hands and short forearms visible, no face. Body of polisher and circular pad clearly separate solid mechanically plausible objects. Machine at upper right third, paint fills lower and left frame; a fine realistic trace of polishing compound immediately at pad's edge, otherwise deep black glossy paint, a crisp white inspection strip reflection crossing the hood naturally. Shot over the hood at 35 degree oblique angle with an 85mm lens, slight shallow depth of field but pad-to-paint contact and adjacent finish critically sharp. Natural neutral studio light with small warm copper accent, sophisticated automotive commercial photography, accurate material texture and contact shadows. No magic transformation, no drawing, no computer-generated appearance, no giant scratches, no artificial circles, no text, no diagrams, no haze effects, no mist, no smoke, no water, no extra hands or fingers, no floating tool."
+    },
+    {
+      "model": "kling3_0",
+      "mode": "4k",
+      "sound": "off",
+      "duration": 8,
+      "aspect_ratio": "16:9",
+      "count": 1,
+      "folder_id": "a0e2b00f-1e5a-42df-ba45-59816345cba7",
+      "medias": [
+        {
+          "role": "start_image",
+          "value": "85e3765b-c74b-4380-9b93-69350dd6b3d6"
+        }
+      ],
+      "prompt": "A flawless high-budget automotive commercial single continuous shot of this exact graphite metallic Porsche 911 GT3 in this exact architectural detailing studio. The car stays absolutely stationary, all wheels motionless, body geometry and trim perfectly stable. A real stabilized cinema camera glides smoothly on a short lateral dolly arc around the front corner from this low three-quarter angle toward a slightly more frontal view, a clear but elegant physical camera move throughout the entire eight seconds. Simultaneously a subtle push-in of only ten percent, always keeping the entire vehicle and wheels inside frame and spacious dark area at left. Broad studio softbox reflections travel naturally across the hood and curved fenders as viewpoint changes, revealing pristine detailed clear coat, crisp headlight glass, authentic metallic depth. Gentle cinematic parallax in the architectural background, realistic fixed lighting, beautifully controlled glossy highlights, deep blacks with visible detail. Precise luxury automotive cinematography, absolutely photorealistic, smooth 24fps commercial motion. Do not rotate or move the car itself. No magical transformation, no morphing, no wheel rotation, no new objects, no people, no smoke, no particles, no text, no water, no artificial scratches. No cuts, no zoom jump, no sudden acceleration, no exaggerated lens distortion. Consistent Porsche body, reflections and wheels frame to frame. Silent."
+    },
+    {
+      "model": "kling3_0",
+      "mode": "4k",
+      "sound": "off",
+      "duration": 8,
+      "aspect_ratio": "16:9",
+      "count": 1,
+      "folder_id": "a0e2b00f-1e5a-42df-ba45-59816345cba7",
+      "medias": [
+        {
+          "role": "start_image",
+          "value": "6b6f39de-8f8b-48a6-86f7-e2714923db4e"
+        }
+      ],
+      "prompt": "Photorealistic automotive detailing commercial. Continue this exact close-up. The skilled detailer's two black-gloved hands keep their natural grip on this professional dual-action polisher. The orange foam pad remains completely flat and in continuous full contact with the graphite Porsche hood throughout. The powered foam pad spins and has tiny orbital vibration while the operator slowly guides the entire tool only ten centimeters leftward in one steady, controlled polishing pass. The black machine body stays rigid and stable, only pad rotating; realistic minute vibration in wrists. Slight physically accurate compound residue next to the moving pad, natural contact shadow. A subtle slow camera slider move a few centimeters follows the tool, maintaining sharp focus at the pad and clear paint reflections. No tool lifting, no wiping, no disappearing scratches or magic surface transformation. Preserve the exact hood shape, car emblem and headlight geometry, natural studio reflections, two correct gloved hands, accurate scale, one mechanically plausible polisher. Genuine luxury workshop documentary close-up, crisp realistic paint, fine clear coat texture, beautifully exposed cinematic lighting, not a 3D render. No extra fingers, no detached foam pad, no floating machinery, no text, no water, no smoke, no cuts. Silent."
+    },
+    {
+      "model": "gpt_image_2_5",
+      "variant": "flare",
+      "quality": "high",
+      "resolution": "4k",
+      "aspect_ratio": "16:9",
+      "count": 1,
+      "folder_id": "a0e2b00f-1e5a-42df-ba45-59816345cba7",
+      "medias": [
+        {
+          "role": "image",
+          "value": "85e3765b-c74b-4380-9b93-69350dd6b3d6"
+        }
+      ],
+      "prompt": "Precise localized photo retouch of this exact reference image. Make an AFTER paint correction reference for a matched before/after. Preserve the exact medium graphite GRAY paint color and brightness of the reference Porsche. Do NOT turn the car black, darken the car, enrich its color, increase contrast, adjust exposure, alter saturation, white balance or lighting. The hood and door must retain exactly the same gray luminance. Keep the original background, floor, car silhouette, framing, camera, wheel spokes, mirrors, headlight positions, Porsche emblem, glass and all panel seams completely unchanged. Remove ONLY the very fine pale circular scratch-like surface marring and localized cloudy clearcoat texture on the hood and painted panels. Smooth those tiny defects while keeping broad light reflections at their exact positions, intensities and shapes. The result should look like the same gray car photographed in the same moment and same light, with subtle local clearcoat refinement, NOT a new paint job or darker car. Do not perform a glamour grade. No enhanced deep blacks, no color change. Extreme pixel-registered fidelity to original. One 16:9 full-frame photograph. No labels, overlays, text, graphics or split-screen."
+    },
+    {
+      "model": "hf_mult_motion_control",
+      "resolution": "1080p",
+      "count": 1,
+      "folder_id": "a0e2b00f-1e5a-42df-ba45-59816345cba7",
+      "medias": [
+        {
+          "role": "image",
+          "value": "33d55146-cc3c-4d4f-9dd7-b38add099533"
+        },
+        {
+          "role": "video",
+          "value": "d3000617-a975-4225-82c8-70e3095d39bf"
+        }
+      ],
+      "prompt": "Transfer the exact original video's camera motion to this reference image of the same Porsche. Create the polished AFTER counterpart for synchronized Before/After playback. Preserve the reference image's medium graphite GRAY paint color and luminance throughout, identical exposure and white balance to the driving video; do not darken the car or make it black. Camera trajectory, speed, starting pose and duration must match the driving video exactly: the same subtle smooth front three-quarter dolly arc. Wheels and car remain stationary, Porsche geometry and all parts stay unchanged. Only the fine clearcoat surface marring is removed: clean smooth paint with natural unchanged studio softbox reflections. No color grading, no brighter headlights, no new shine effect, no new objects, no changes to the wall or floor, no cuts or scene transitions, no text. Physically natural identical lighting and a stable realistic vehicle. Silent."
+    }
+  ],
+  "delivery": "Production release approved by the owner on October 2, 2026. Native originals retained in ignored artifacts/paint-correction. The current page presents one polished animated Porsche hero using hero-after-film.mp4 (1080p desktop), hero-after-film-mobile.mp4 (720p mobile), and hero-after-matched.webp as its first-frame poster. The polished animation is shown on every fresh load; the Before / After comparison switch has been removed. The process film is presented at full 16:9 without cropping. The beforeAfter block records archived comparison development and generation provenance, not the current interface. Generated service illustrations, not customer results; provenance in visual credits.",
+  "beforeAfter": {
+    "beforeImageJob": "85e3765b-c74b-4380-9b93-69350dd6b3d6",
+    "beforeVideoJob": "d3000617-a975-4225-82c8-70e3095d39bf",
+    "afterImageJob": "33d55146-cc3c-4d4f-9dd7-b38add099533",
+    "afterVideoJob": "780e7428-1a2d-4a6f-8567-edaf26f1d10e",
+    "supersededAfterImageJob": "fbd956ed-b17a-4ef4-8760-f8e6c0288237",
+    "beforePoster": "/paint-correction/hero-poster.webp",
+    "afterPoster": "/paint-correction/hero-after-matched.webp",
+    "beforeVideo": "/paint-correction/hero-film.mp4",
+    "afterVideo": "/paint-correction/hero-after-film.mp4",
+    "afterMobileVideo": "/paint-correction/hero-after-film-mobile.mp4",
+    "revisionCreditsUsed": 92.25,
+    "description": "Color-matched graphite reference edit and motion transfer from the original hero film. Both finish modes animate, retain their selected poster while loading, and transfer playback position when switched. Default After on fresh load. After poster extracted from its finished film. Illustrative comparison, not actual customer results."
+  }
+}

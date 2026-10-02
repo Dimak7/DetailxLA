@@ -1,0 +1,58 @@
+PAINT CORRECTION — HIGGSFIELD RELEASE
+
+Preview: http://localhost:3100/services/paint-correction
+Production: https://detailxla-production.up.railway.app/services/paint-correction
+Status: production release approved by the owner on October 2, 2026.
+
+The previous drawn swirl demonstration has been removed.
+Hero and polishing films generated through Higgsfield:
+- GPT Image 2.5: high quality 4K reference photographs.
+- Kling 3.0: two silent eight-second 4K films.
+- Initial references and films: 104.5 credits.
+- Polished reference edit for the earlier hero comparison: 4.25 credits.
+- Color-matched GPT Image 2.5 reference edit: 4.25 credits.
+- Higgsfield Genjutsu (hf_mult_motion_control): polished animated hero, driven by
+  the original Kling hero motion and the color-matched reference; 1080p source,
+  88 credits.
+- Total generation spend: 201.0 credits.
+- Generation parameters and job IDs: paint-correction-higgsfield.json.
+
+Current page assets: public/paint-correction/
+- process-poster.webp
+- process-film.mp4 (1080p, H.264, faststart)
+- process-film-mobile.mp4 (720p)
+- hero-after-film.mp4 (animated polished finish, 1080p, approximately 3.9 MB)
+- hero-after-film-mobile.mp4 (animated polished finish, 720p, approximately 1 MB)
+- hero-after-matched.webp (1920px poster from the first polished hero video frame)
+
+Retained development assets in the same directory:
+- hero-poster.webp (original hero reference)
+- hero-after.webp (intermediate polished reference edit, 2000px)
+- hero-film.mp4 and hero-film-mobile.mp4 (original Kling hero and motion guide)
+
+Original 4K Kling files retained under ignored artifacts/paint-correction.
+Films are conceptual service illustrations and do not show customer results.
+The custom in-page AI badge was removed at the owner's request. Generation
+provenance remains documented here, in the job manifest and in visual credits.
+No provider watermark or embedded provenance was deliberately removed.
+
+The revised page explains outcomes, suitability and limits, compares single-step
+and multi-step approaches, and includes expandable process details and FAQs.
+In-page navigation makes those topics easy to find. Price, duration, inclusions
+and booking service ID still come from the existing service catalogue.
+Preview data stays in isolated local PGlite.
+
+Poster images remain behind each film and return if playback is paused,
+buffering or unavailable. Posters load directly as pre-optimized WebP files.
+
+The current hero presents one polished Porsche animation on every fresh load.
+The Before / After comparison switch has been removed. The polished film retains
+its matching poster while loading or paused. Earlier comparison references,
+generation records and credit usage remain archived as development provenance.
+The film is illustrative and does not represent an actual customer's treatment
+or results.
+
+The second, machine-polishing film has a large 16:9 presentation with contain
+framing to preserve the whole video. On mobile the film spans the viewport,
+with its caption and playback control below the footage. The explanation and
+benefits follow beneath it.
