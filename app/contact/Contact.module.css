@@ -1,0 +1,33 @@
+.layout { max-width: 1440px; margin-inline: auto; padding: 64px 6% 88px; display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); grid-template-areas: "intro form" "studio form"; align-items: start; gap: 36px 7%; }
+.intro { grid-area: intro; }
+.eyebrow { margin: 0 0 17px; color: #825b38; font-size: 10px; font-weight: 650; letter-spacing: .13em; line-height: 1.6; }
+.intro h1 { margin: 0; font-size: clamp(48px, 6.5vw, 84px); line-height: 1.06; }
+.lead { max-width: 530px; margin: 24px 0 0; font-size: 15px; line-height: 1.8; color: #65625d; }
+.studio { grid-area: studio; min-width: 0; }
+.studio h2 { margin: 0 0 25px; font-size: clamp(29px, 3vw, 40px); line-height: 1.2; }
+.details { margin: 0; }
+.details > div { padding: 17px 0; border-bottom: 1px solid #d9d4ca; }
+.details > div:first-child { padding-top: 0; }
+.details dt { margin-bottom: 7px; color: #825b38; font-size: 10px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase; }
+.details dd { margin: 0; color: #59564f; font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
+.details dd > span, .details dd > a { display: block; }
+.details a { color: #151719; text-decoration: underline; text-decoration-color: #bdb2a1; text-underline-offset: 4px; }
+.details a:hover { color: #825b38; text-decoration-color: currentColor; }
+.booking { margin-top: 29px; }
+.booking h3 { margin: 0; font-family: var(--font-body), sans-serif; font-size: 15px; }
+.booking p { max-width: 310px; margin: 9px 0 17px; font-size: 13px; line-height: 1.8; }
+.panel { grid-area: form; min-width: 0; padding: 36px; background: #fbf9f4; border: 1px solid #d9d4ca; border-top: 3px solid #b78559; box-shadow: 0 14px 40px #342d1e06; }
+.panel h2 { margin: 0; font-size: clamp(31px, 3.3vw, 43px); line-height: 1.18; }
+.panelIntro { margin: 16px 0 0; color: #65625d; font-size: 14px; line-height: 1.8; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "intro" "form" "studio"; gap: 32px; }
+}
+@media (max-width: 600px) {
+  .intro h1 { font-size: 52px; }
+  .lead { margin-top: 20px; font-size: 14px; }
+  .layout { padding-top: 40px; padding-bottom: 56px; }
+  .panel { padding: 26px 20px; }
+  .panel h2 { font-size: 33px; }
+  .panel .eyebrow { font-size: 9px; margin-bottom: 14px; }
+  .details dd { font-size: 14px; }
+}
