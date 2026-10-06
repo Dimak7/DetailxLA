@@ -268,7 +268,7 @@ export function PaintFilm({ kind, paused, allowReducedMotion = false, onPlayback
         priority={kind === "hero"}
       />
       {blocked && !paused && !showStaticPoster && (
-        <button className={styles.play} type="button" onClick={() => retryPlayback.current()} aria-label={`Play ${kind === "hero" ? "Porsche" : "paint correction"} film`}>
+        <button className={`button small outline on-dark ${styles.play}`} type="button" onClick={() => retryPlayback.current()} aria-label={`Play ${kind === "hero" ? "Porsche" : "paint correction"} film`}>
           <span aria-hidden="true" className={styles.playIcon} />
           Play film
         </button>

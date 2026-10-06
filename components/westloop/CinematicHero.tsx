@@ -198,8 +198,8 @@ export function CinematicHero() {
           Paint correction and complete interior and exterior care in Chicago’s West Loop.
         </p>
         <div className={styles.actions}>
-          <Link href="/services" className={styles.primary}>See services &amp; prices</Link>
-          <Link href="/booking" className={styles.secondary}>Book your service</Link>
+          <Link href="/services" className="button gold">See services &amp; prices</Link>
+          <Link href="/booking" className="button outline on-dark">Book your service</Link>
         </div>
       </div>
 
@@ -230,7 +230,7 @@ export function CinematicHero() {
           {status === "ready" && (
             <button
               type="button"
-              className={styles.playback}
+              className="button small outline on-dark"
               onClick={() => {
                 pausedByVisitor.current = playback === "playing";
                 if (pausedByVisitor.current) player.current?.pause();
@@ -251,7 +251,7 @@ export function CinematicHero() {
             </button>
           )}
           {status === "error" && (
-            <button type="button" className={styles.playback} onClick={() => setAttempt((value) => value + 1)}>
+            <button type="button" className="button small outline on-dark" onClick={() => setAttempt((value) => value + 1)}>
               Retry film
             </button>
           )}

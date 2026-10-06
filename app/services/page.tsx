@@ -28,7 +28,7 @@ export default async function Page() {
         )}
         <aside className={styles.help} aria-label="Help choosing a service">
           <div><h2>Not sure what to choose?</h2><p>Tell us about your car. We’ll help you find the right service.</p></div>
-          <Link href="/contact">Ask us for help</Link>
+          <Link className="button small outline" href="/contact">Ask us for help</Link>
         </aside>
       </div>
     </PageShell>

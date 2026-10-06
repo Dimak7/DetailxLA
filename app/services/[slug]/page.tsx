@@ -63,7 +63,7 @@ export default async function Page({ params }: PageProps) {
         <section className={styles.detailHero}>
           <div className={styles.detailHeroCopy}>
             <p className={styles.eyebrow}>{content.eyebrow}</p><p className={styles.serviceName}>{service.name}</p><h1>{content.headline.split("\n").map((line, index) => <span key={line}>{index ? <em>{line}</em> : line}</span>)}</h1><p className={styles.lead}>{content.introduction}</p>
-            <div className={styles.actions}><Link className={styles.primaryLink} href={bookingHref}>{service.pricing_mode === "quote" ? "Start your booking" : "Book this service"}</Link><a className={styles.textLink} href="#the-treatment">What’s included</a></div>
+            <div className={styles.actions}><Link className="button" href={bookingHref}>{service.pricing_mode === "quote" ? "Start your booking" : "Book this service"}</Link><a className={styles.textLink} href="#the-treatment">What’s included</a></div>
           </div>
           <figure className={styles.detailHeroImage}><Image src={content.image} alt={content.imageAlt} fill priority sizes="(max-width: 800px) 100vw, 45vw" style={{ objectPosition: content.imagePosition }} /><figcaption>FINISH & FORM <span>Editorial imagery</span></figcaption></figure>
         </section>
@@ -83,7 +83,7 @@ export default async function Page({ params }: PageProps) {
           </article>)}</div>
           <p className={styles.guideNote}>{content.guide.note}</p>
           <div className={styles.guideBoundaries}>{content.guide.boundaries.map((boundary) => <article key={boundary.title}><h3>{boundary.title}</h3><p>{boundary.body}</p></article>)}</div>
-          <div className={styles.actions}><Link className={styles.primaryLink} href={bookingHref}>Book {service.name.toLowerCase()}</Link><Link className={styles.textLink} href="/contact">Discuss your vehicle first</Link></div>
+          <div className={styles.actions}><Link className="button" href={bookingHref}>Book {service.name.toLowerCase()}</Link><Link className={styles.textLink} href="/contact">Discuss your vehicle first</Link></div>
         </section>}
 
         <section className={styles.processSection} aria-labelledby="process-heading"><div className={styles.sectionHeading}><div><p className={styles.eyebrow}>A CONSIDERED PROCESS</p><h2 id="process-heading">Care, from start to finish.</h2></div><p>Every vehicle has a different starting point. The agreed scope guides the work.</p></div><ol className={styles.processGrid}>{content.process.map((step, index) => <li key={step.title}><span className={styles.stepNumber}>{String(index + 1).padStart(2, "0")}</span><h3>{step.title}</h3><p>{step.body}</p></li>)}</ol></section>
@@ -97,7 +97,7 @@ export default async function Page({ params }: PageProps) {
 
         <section className={`${styles.section} ${styles.faqSection}`} aria-labelledby="faq-heading"><div className={styles.faqLayout}><div><p className={styles.eyebrow}>GOOD QUESTIONS</p><h2 id="faq-heading">Know what<br /><em>to expect.</em></h2><p className={styles.bodyCopy}>A clear understanding of the service is part of a good result.</p></div><div className={styles.faqs}>{content.faqs.map((faq) => <details key={faq.question}><summary>{faq.question}<span aria-hidden="true">+</span></summary><p>{faq.answer}</p></details>)}</div></div></section>
 
-        <section className={styles.consultation}><p className={styles.eyebrow}>{service.name.toUpperCase()}</p><h2>Ready to get started?</h2><p>Choose a time and tell us about your car. We will confirm the details that matter before the work begins.</p><div className={styles.actions}><Link className={styles.primaryLink} href={bookingHref}>Book {service.name.toLowerCase()}</Link><Link className={styles.lightTextLink} href="/contact">Ask a question</Link></div></section>
+        <section className={styles.consultation}><p className={styles.eyebrow}>{service.name.toUpperCase()}</p><h2>Ready to get started?</h2><p>Choose a time and tell us about your car. We will confirm the details that matter before the work begins.</p><div className={styles.actions}><Link className="button gold" href={bookingHref}>Book {service.name.toLowerCase()}</Link><Link className={styles.lightTextLink} href="/contact">Ask a question</Link></div></section>
 
         {related.length > 0 && <section className={styles.section} aria-labelledby="related-heading"><div className={styles.sectionHeading}><div><p className={styles.eyebrow}>MORE SERVICES</p><h2 id="related-heading">Other ways to care for your car.</h2></div><Link className={styles.textLink} href="/services">View all services</Link></div><ServiceCards services={related} compact /></section>}
       </div>

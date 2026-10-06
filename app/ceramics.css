@@ -27,15 +27,37 @@
 .ceramics-site .eyebrow { color: #825b38; font-size: 11px; font-weight: 650; letter-spacing: .14em; }
 .ceramics-site a, .ceramics-site button { -webkit-tap-highlight-color: transparent; }
 :where(.ceramics-site) :focus-visible { outline: 2px solid #875a32; outline-offset: 5px; }
-.ceramics-site .button {
-  border-radius: 2px; background: #151719; border: 1px solid #151719; color: #f7f3eb;
-  font-size: 13px; font-weight: 650; letter-spacing: .01em; min-height: 52px;
-  padding: 15px 25px; gap: 0; box-shadow: none;
+.ceramics-site .button, .ceramics-site .button:is(.outline, .light, .gold) {
+  --button-bg: #151719; --button-border: #151719; --button-text: #f7f3eb;
+  --button-hover-bg: #775436; --button-hover-border: #775436; --button-hover-text: #fff;
+  --button-focus: #875a32;
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  border-radius: 2px; background: var(--button-bg); border: 1px solid var(--button-border); color: var(--button-text);
+  font-family: var(--font-body), sans-serif; font-size: 13px; font-weight: 650; line-height: 1.4;
+  letter-spacing: .01em; text-align: center; text-decoration: none; min-height: 52px;
+  padding: 14px 24px; box-shadow: none; cursor: pointer;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
 }
-.ceramics-site .button:hover { background: #775436; border-color: #775436; color: #fff; transform: translateY(-2px); }
-.ceramics-site .button.outline { color: #151719; background: transparent; border-color: #b4aca0; }
-.ceramics-site .button.outline:hover { color: #fff; background: #151719; border-color: #151719; }
-.ceramics-site .button.light { background: #f2efe8; border-color: #f2efe8; color: #151719; }
+.ceramics-site .button:hover, .ceramics-site .button:is(.outline, .light, .gold):hover { background: var(--button-hover-bg); border-color: var(--button-hover-border); color: var(--button-hover-text); transform: translateY(-2px); }
+.ceramics-site .button:focus-visible { outline: 2px solid var(--button-focus); outline-offset: 5px; }
+.ceramics-site .button.outline {
+  --button-bg: transparent; --button-border: #b4aca0; --button-text: #151719;
+  --button-hover-bg: #151719; --button-hover-border: #151719; --button-hover-text: #fff;
+}
+.ceramics-site .button.light { --button-bg: #f2efe8; --button-border: #f2efe8; --button-text: #151719; }
+.ceramics-site .button.gold {
+  --button-bg: #d8ba90; --button-border: #d8ba90; --button-text: #151719;
+  --button-hover-bg: #e7cba4; --button-hover-border: #e7cba4; --button-hover-text: #151719;
+  --button-focus: #e4c397;
+}
+.ceramics-site .button.outline.on-dark {
+  --button-bg: #151719b8; --button-border: #ffffff4a; --button-text: #f2efe8;
+  --button-hover-bg: #292724; --button-hover-border: #d8ba90; --button-hover-text: #fff;
+  --button-focus: #e4c397;
+}
+.ceramics-site .button.small { min-height: 44px; padding: 10px 16px; font-size: 12px; }
+.ceramics-site .button:is(:disabled, [aria-disabled="true"]) { opacity: .5; cursor: not-allowed; }
+.ceramics-site .button:is(:disabled, [aria-disabled="true"]):hover { background: var(--button-bg); border-color: var(--button-border); color: var(--button-text); transform: none; }
 .ceramics-site .text-link { color: var(--ink); border: 0; font-size: 13px; font-weight: 650; text-decoration: none; }
 .ceramics-site .text-link:hover { color: #825b38; text-decoration: underline; text-underline-offset: 5px; }
 .ceramics-site .button-row { flex-wrap: wrap; }
@@ -46,10 +68,10 @@
 .ceramics-site .ceramics-mark { flex: 0 0 auto; color: #a57447; width: 53px; height: 53px; }
 .ceramics-site .ceramics-wordmark small { margin-top: 8px; color: inherit; font-size: 9px; letter-spacing: .47em; }
 .ceramics-site .ceramics-nav { margin-left: auto; display: flex; align-items: center; gap: 27px; }
-.ceramics-site .ceramics-nav > a { position: relative; font-size: 12px; font-weight: 600; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; transition: color .2s ease; }
-.ceramics-site .ceramics-nav > a:hover, .ceramics-site .ceramics-nav > a[aria-current] { color: #81562f; }
+.ceramics-site .ceramics-nav > a:not(.button) { position: relative; font-size: 12px; font-weight: 600; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; transition: color .2s ease; }
+.ceramics-site .ceramics-nav > a:not(.button):hover, .ceramics-site .ceramics-nav > a[aria-current] { color: #81562f; }
 .ceramics-site .ceramics-nav-feature { color: #81562f; }
-.ceramics-site .ceramics-header-book { min-height: 46px; padding: 12px 21px; font-size: 12px; flex-shrink: 0; }
+.ceramics-site .ceramics-header-book { flex-shrink: 0; }
 .ceramics-site .ceramics-menu-toggle, .ceramics-site .ceramics-menu-caption, .ceramics-site .ceramics-nav .ceramics-menu-book, .ceramics-site .ceramics-menu-note { display: none; }
 
 /* Interior pages retain their working layouts with the new paper and copper palette. */
@@ -93,8 +115,6 @@
 .ceramics-site .booking-main > p, .ceramics-site .booking-main .small-note { color: #635f58; }
 .ceramics-site .booking-main .field input, .ceramics-site .booking-main .field select, .ceramics-site .booking-main .field textarea { background: #fffdf8; color: #151719; border-color: #bdb7ad; border-radius: 0; caret-color: #151719; }
 .ceramics-site .booking-main .field input::placeholder, .ceramics-site .booking-main .field textarea::placeholder { color: #78736b; }
-.ceramics-site .booking-main .button { background: #151719; border-color: #151719; color: #fffaf0; letter-spacing: .04em; }
-.ceramics-site .booking-main .button.outline { background: transparent; border-color: #a89c8b; color: #151719; }
 .ceramics-site .booking-main .booking-progress span { color: #726b62; border-color: #c7beb0; }
 .ceramics-site .booking-main .booking-progress .active { color: #151719; border-color: #96663d; }
 .ceramics-site .booking-main .service-option { background: #fffdf8; color: #151719; border-color: #cfc6b8; }
@@ -125,7 +145,6 @@
 .ceramics-site .ceramics-final-inner p:not(.eyebrow) { max-width: 560px; margin: 0; color: #5f584f; font-size: 15px; line-height: 1.7; }
 .ceramics-site .ceramics-final-inner .eyebrow { margin-bottom: 23px; color: #775436; }
 .ceramics-site .ceramics-final-actions { display: grid; flex: 0 0 auto; gap: 21px; justify-items: start; }
-.ceramics-site .ceramics-final-actions .button { min-height: 58px; padding-inline: 26px; }
 .ceramics-site .ceramics-final-actions .text-link { font-size: 13px; }
 .ceramics-site .ceramics-footer { background: #151719; color: #f2efe8; }
 .ceramics-site .ceramics-footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.25fr; gap: 34px; padding-top: 79px; padding-bottom: 30px; }
@@ -153,7 +172,6 @@
   .ceramics-site .ceramics-header { gap: 20px; padding-inline: 4%; }
   .ceramics-site .ceramics-nav { gap: 18px; }
   .ceramics-site .ceramics-wordmark { font-size: 16px; }
-  .ceramics-site .ceramics-header-book { padding-inline: 15px; gap: 17px; }
 }
 @media (max-width: 1080px) {
   .ceramics-site .ceramics-header { padding: 17px 6%; gap: 24px; }
@@ -166,9 +184,9 @@
   .ceramics-site .ceramics-nav { display: none; position: absolute; top: 100%; left: 0; right: 0; margin: 0; padding: 24px 6% 29px; background: #f2efe8; border-top: 1px solid #d9d4ca; border-bottom: 1px solid #c6bcab; box-shadow: 0 20px 40px #1517191c; max-height: calc(100svh - 100px); overflow-y: auto; }
   .ceramics-site .ceramics-nav.is-open { display: flex; align-items: stretch; flex-direction: column; gap: 0; }
   .ceramics-site .ceramics-menu-caption { display: block; font-size: 8px; letter-spacing: .2em; color: #8b623d; padding-bottom: 12px; }
-  .ceramics-site .ceramics-nav > a { font-family: var(--font-display), serif; font-weight: 500; font-size: 28px; min-height: 53px; border-bottom: 1px solid #dfd8cb; justify-content: flex-start; }
+  .ceramics-site .ceramics-nav > a:not(.button) { font-family: var(--font-display), serif; font-weight: 500; font-size: 28px; min-height: 53px; border-bottom: 1px solid #dfd8cb; justify-content: flex-start; }
   .ceramics-site .ceramics-nav > a::after { display: none; }
-  .ceramics-site .ceramics-nav .ceramics-menu-book { display: flex; background: #151719; color: #fffaf0; padding: 12px 19px; font-family: var(--font-body), sans-serif; font-size: 11px; margin-top: 20px; border: 0; }
+  .ceramics-site .ceramics-nav .ceramics-menu-book { display: flex; margin-top: 20px; }
   .ceramics-site .ceramics-menu-note { display: block; color: #777065; font-size: 10px; margin: 19px 0 0; }
   .ceramics-site .ceramics-footer-grid { grid-template-columns: 1.4fr 1fr 1fr; gap: 40px 28px; }
   .ceramics-site .ceramics-footer-contact { grid-column: 1/-1; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 0 30px; }
@@ -184,7 +202,6 @@
   .ceramics-site .ceramics-wordmark { font-size: 13px; gap: 7px; }
   .ceramics-site .ceramics-wordmark small { font-size: 7px; margin-top: 6px; letter-spacing: .4em; }
   .ceramics-site .ceramics-mark { width: 40px; height: 40px; }
-  .ceramics-site .ceramics-header-book { min-height: 42px; font-size: 11px; padding: 10px 15px; }
   .ceramics-site .ceramics-menu-toggle { min-width: 20px; }
   .ceramics-site .ceramics-menu-toggle > span:first-child { display: none; }
   .ceramics-site .ceramics-header .ceramics-nav.is-open { gap: 0; }
@@ -192,7 +209,7 @@
   .ceramics-site .page-intro h1 { font-size: clamp(46px, 11vw, 70px); }
   .ceramics-site .page-intro p:not(.eyebrow) { font-size: 13px; }
   .ceramics-site .eyebrow { font-size: 10px; margin-bottom: 19px; }
-  .ceramics-site .button { font-size: 12px; padding: 14px 20px; gap: 0; }
+  .ceramics-site .button:not(.small) { font-size: 12px; padding: 14px 20px; }
   .ceramics-site .contact-grid .paper { padding: 27px; }
   .ceramics-site .contact-grid .paper h2 { font-size: 36px; }
   .ceramics-site .paper { padding: 25px; }
@@ -207,7 +224,6 @@
   .ceramics-site .ceramics-final-inner h2 { font-size: clamp(42px, 10vw, 61px); }
   .ceramics-site .ceramics-final-inner p:not(.eyebrow) { font-size: 12px; }
   .ceramics-site .ceramics-final-actions { gap: 20px; width: 100%; }
-  .ceramics-site .ceramics-final-actions .button { min-height: 51px; }
   .ceramics-site .ceramics-footer-grid { grid-template-columns: 1fr 1fr; gap: 35px 25px; padding-top: 54px; }
   .ceramics-site .ceramics-footer-brand { grid-column: 1/-1; }
   .ceramics-site .ceramics-footer .ceramics-wordmark { font-size: 17px; }
@@ -224,7 +240,7 @@
   .ceramics-site .ceramics-footer-bottom > div { gap: 22px; }
   .ceramics-site .ceramics-footer-bottom > span:last-child { margin-top: 4px; }
   .ceramics-site .ceramics-mobile-bar { display: grid; grid-template-columns: 1.45fr 1fr; gap: 9px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #f2efe8f5; border-top: 1px solid #c6bcab; padding: 9px 5% calc(9px + env(safe-area-inset-bottom)); backdrop-filter: blur(12px); }
-  .ceramics-site .ceramics-mobile-bar .button { min-height: 47px; padding: 12px 10px; font-size: 11px; gap: 0; white-space: nowrap; }
+  .ceramics-site .ceramics-mobile-bar .button { white-space: nowrap; }
 }
 @media (max-width: 360px) {
   .ceramics-site .ceramics-header { gap: 11px; }
@@ -232,7 +248,6 @@
   .ceramics-site .ceramics-header .ceramics-mark { width: 34px; height: 34px; }
   .ceramics-site .ceramics-header-book { display: none; }
   .ceramics-site .ceramics-menu-toggle { margin-left: auto; }
-  .ceramics-site .ceramics-mobile-bar .button { font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ceramics-site *, .ceramics-site *::before, .ceramics-site *::after { scroll-behavior: auto !important; }

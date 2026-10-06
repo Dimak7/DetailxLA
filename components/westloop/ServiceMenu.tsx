@@ -74,7 +74,7 @@ export function ServiceMenu({ services }: { services: Service[] }) {
                 <span className={styles.duration}>{serviceDuration(service.duration_minutes)}{service.duration_minutes > 0 ? " estimated" : ""}</span>
                 <div className={styles.actions}>
                   <Link className={styles.details} href={`/services/${service.slug}`}>Details<span className={styles.srOnly}> for {service.name}</span></Link>
-                  <Link className={styles.book} href={`/booking?service=${encodeURIComponent(service.id)}`} onClick={() => trackSelection(service.id)}>{consultation ? "Get quote" : "Book"}<span className={styles.srOnly}> {service.name}</span></Link>
+                  <Link className="button small" href={`/booking?service=${encodeURIComponent(service.id)}`} onClick={() => trackSelection(service.id)}>{consultation ? "Get quote" : "Book"}<span className={styles.srOnly}> {service.name}</span></Link>
                 </div>
               </div>
             </article>

@@ -60,7 +60,7 @@ export default async function Home() {
         <div className={styles.quickGrid}>{featured.map(({ purpose, copy, service }) => <article className={styles.quickCard} key={service.id}>
           <p className={styles.purpose}>{purpose}</p><h3>{service.name}</h3><p>{copy}</p>
           <div className={styles.quickPrice}><strong>{servicePrice(service)}</strong><Link href={`/services/${service.slug}`}>See details</Link></div>
-          <Link className={styles.quickBook} href={`/booking?service=${encodeURIComponent(service.id)}`}>{service.slug === "ceramic-coating" || service.pricing_mode === "quote" ? "Request a consultation" : `Book ${service.name.toLowerCase()}`}</Link>
+          <Link className={`button small ${styles.quickBook}`} href={`/booking?service=${encodeURIComponent(service.id)}`}>{service.slug === "ceramic-coating" || service.pricing_mode === "quote" ? "Request a consultation" : `Book ${service.name.toLowerCase()}`}</Link>
         </article>)}</div>
       </div></section>
       {fullDetail && <section className={`${styles.detailingFeature} wrap`} id="full-detail" aria-labelledby="detailing-heading">
