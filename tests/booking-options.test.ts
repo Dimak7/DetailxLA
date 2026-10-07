@@ -7,7 +7,7 @@ import {
   servicePackages,
   vehicleSizeLabel,
 } from "../lib/booking-options";
-import type { Service } from "../lib/platform/types";
+import { money, type Service } from "../lib/platform/types";
 
 function service(slug: string, price = 25000): Service {
   return {
@@ -49,4 +49,9 @@ test("package selection can remain quote-based without inventing a total", () =>
   assert.equal(bookingSelection(correction, "Sedan", "correction-level-3").totalCents, null);
   assert.equal(vehicleSizeLabel("interior-detail", "SUV"), "Mid Size");
   assert.equal(vehicleSizeLabel("full-detail", "Truck"), "XL");
+});
+
+test("currency formatting preserves real cents without adding unnecessary zeros", () => {
+  assert.equal(money(56500), "$565");
+  assert.equal(money(28250), "$282.50");
 });

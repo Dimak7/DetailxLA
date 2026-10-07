@@ -177,12 +177,12 @@ export const channels = [
 export function money(cents: number | null | undefined) {
   return cents == null
     ? "By consultation"
-    : new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      }).format(cents / 100);
+      : new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+          minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+          maximumFractionDigits: 2,
+        }).format(cents / 100);
 }
 export function timeLabel(minute: number) {
   const h = Math.floor(minute / 60);
