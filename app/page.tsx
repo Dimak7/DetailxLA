@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { heroVideoMedia, mobileHeroMediaQuery } from "@/components/westloop/hero-media";
 import { publicData } from "@/lib/platform/public";
 import { servicePrice } from "@/lib/service-content";
 import { siteUrl } from "@/lib/platform/settings";
@@ -25,12 +27,13 @@ const questions = [
 ];
 
 export default async function Home() {
-  const { business, services, reviews } = await publicData();
+  const [{ business, services, reviews }, requestHeaders] = await Promise.all([publicData(), headers()]);
+  const mobileAnimation = heroVideoMedia?.mobileAnimation ?? heroVideoMedia?.animation;
   const coating = services.find((s) => s.slug === "ceramic-coating");
   const fullDetail = services.find((s) => s.slug === "full-detail");
   const detailing = ["interior-detail", "exterior-detail"].flatMap((slug) => services.filter((s) => s.slug === slug));
   const featured = [
-    { slug: "full-detail", purpose: "Choose your detail", copy: "Interior, exterior or full detailing. Choose the care your car needs.", image: "/brand/photos/green-car-foam.webp", imageAlt: "Green sports car covered in wash foam", displayPrice: "Detail from $250" },
+    { slug: "full-detail", purpose: "Choose your detail", copy: "Interior, exterior or full detailing. Choose the care your car needs.", image: "/brand/photos/green-car-foam.webp", imageAlt: "Green sports car covered in wash foam", displayPrice: "From $250" },
     { slug: "paint-correction", purpose: "Improve the paint", copy: "Polishing to reduce light swirls, haze and fine marks.", image: "/brand/photos/paint-beading.webp", imageAlt: "Water beading on black paint beside a microfiber towel" },
     { slug: "ceramic-coating", purpose: "Protect the finish", copy: "Prepared paint, lasting gloss and easier upkeep.", image: "/brand/photos/paint-beading.webp", imageAlt: "Water droplets on a black vehicle’s protected finish" },
   ].flatMap((item) => {
@@ -47,6 +50,9 @@ export default async function Home() {
   };
   return (
     <PageShell business={business}>
+      {mobileAnimation && requestHeaders.get("save-data") !== "on" && (
+        <link rel="preload" as="image" href={mobileAnimation.src} media={mobileHeroMediaQuery} fetchPriority="high" />
+      )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
       <CinematicHero />
       <section className={styles.quickServices} id="detailing" aria-labelledby="choose-care-heading"><div className="wrap" id="services">
@@ -64,7 +70,7 @@ export default async function Home() {
         <div className={styles.detailingImage}><Image src="/brand/photos/hand-wash.webp" alt="Detailer hand washing a black car with a sponge" fill sizes="(max-width: 760px) 100vw, 48vw" /></div>
         <div className={styles.detailingCopy}><p className="eyebrow">DETAILING, YOUR WAY</p><h2 id="detailing-heading">A clean cabin.<br /><em>A fresh exterior.</em></h2>
           <p>Everyday dust, road grime and the places a quick wash misses. Choose interior care, an exterior detail or both together, so your car gets the attention it needs.</p>
-          <div className={styles.detailingPrice}><strong>Detail from $250</strong><span>Interior · Exterior · Full detail</span></div>
+          <div className={styles.detailingPrice}><strong>From $250</strong><span>Interior · Exterior · Full detail</span></div>
           <div className={styles.links}><Link className="button" href="/booking">Choose your detail</Link><Link className="text-link" href="/services#all-services">Compare details</Link></div>
           {detailing.length > 0 && <div className={styles.focusedDetails}><p>Only need one area?</p>{detailing.map((service) => <Link key={service.id} href={`/services/${service.slug}`}><span>{service.name}</span><strong>{servicePrice(service)}</strong></Link>)}</div>}
         </div>
