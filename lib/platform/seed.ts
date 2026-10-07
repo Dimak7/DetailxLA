@@ -88,7 +88,7 @@ const catalog = [
     "full-detail-studio.webp",
   ],
   [
-    "Deep Interior Cleaning",
+    "Extensive Interior Detail",
     "deep-interior-cleaning",
     "Restorative care",
     "Extra attention for interiors that need more.",

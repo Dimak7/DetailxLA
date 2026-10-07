@@ -199,7 +199,7 @@ export function CinematicHero() {
         </p>
         <div className={styles.actions}>
           <Link href="/services" className="button light">See services &amp; prices</Link>
-          <Link href="/booking" className="button outline on-dark">Book your service</Link>
+          <Link href="/booking" className="button outline on-dark">Detailing from $250</Link>
         </div>
       </div>
 

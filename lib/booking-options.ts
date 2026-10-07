@@ -98,6 +98,7 @@ export function bookingSelection(
 }
 
 export function vehicleSizeLabel(slug: string | undefined, value: string): string {
+  if (!value) return "Choose a size";
   if (slug === "interior-detail") return value === "SUV" ? "Mid Size" : value === "Truck" ? "Full Size" : "Sedan";
   if (["exterior-detail", "full-detail"].includes(slug || "")) return value === "Truck" ? "XL" : value;
   return value;

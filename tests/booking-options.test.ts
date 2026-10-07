@@ -49,6 +49,7 @@ test("package selection can remain quote-based without inventing a total", () =>
   assert.equal(bookingSelection(correction, "Sedan", "correction-level-3").totalCents, null);
   assert.equal(vehicleSizeLabel("interior-detail", "SUV"), "Mid Size");
   assert.equal(vehicleSizeLabel("full-detail", "Truck"), "XL");
+  assert.equal(vehicleSizeLabel("full-detail", ""), "Choose a size");
 });
 
 test("currency formatting preserves real cents without adding unnecessary zeros", () => {

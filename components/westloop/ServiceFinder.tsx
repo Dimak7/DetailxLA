@@ -7,7 +7,7 @@ type Option = Pick<Service, "id" | "slug" | "name" | "price_cents" | "pricing_mo
 const goals = [
   { label: "Protect my paint", slug: "ceramic-coating", copy: "Start with ceramic coating. We’ll assess your paint and discuss the preparation and aftercare that fit your car." },
   { label: "Restore the shine", slug: "paint-correction", copy: "Start with paint correction. An inspection helps us choose the right polishing approach for visible swirls and reduced clarity." },
-  { label: "Refresh the interior", slug: "interior-detail", copy: "Start with an interior detail. For heavy staining or pet hair, ask us about deep interior cleaning." },
+  { label: "Refresh the interior", slug: "interior-detail", copy: "Start with an interior detail. For heavy staining or pet hair, ask us about Extensive Interior Detail." },
   { label: "Reset the whole car", slug: "full-detail", copy: "Start with a full detail: a considered interior and exterior reset, with the scope confirmed around your vehicle." },
 ];
 export function ServiceFinder({ services }: { services: Option[] }) {

@@ -71,7 +71,7 @@ export function BookingWizard({
       make: "",
       model: "",
       year: new Date().getFullYear(),
-      vehicle_type: "Sedan",
+      vehicle_type: "",
       condition: "",
       date: "",
       start_minute: -1,
@@ -96,7 +96,7 @@ export function BookingWizard({
   const service = services.find((s) => s.id === draft.service_id),
     packages = servicePackages(service?.slug),
     availableAddOns = bookingAddOns(service?.slug),
-    selection = service
+    selection = service && draft.vehicle_type
       ? bookingSelection(
           service,
           draft.vehicle_type,
@@ -105,8 +105,10 @@ export function BookingWizard({
         )
       : null,
     price = selection?.totalCents ?? null,
-    quoteBased =
-      price === null || service?.pricing_mode === "quote" || service?.slug === "ceramic-coating",
+    quoteBased = Boolean(
+      draft.vehicle_type &&
+        (price === null || service?.pricing_mode === "quote" || service?.slug === "ceramic-coating"),
+    ),
     deposit =
       !quoteBased && paymentsEnabled && price !== null
         ? Math.round((price * business.deposit_percent) / 100)
@@ -152,6 +154,10 @@ export function BookingWizard({
     if (step < 3) {
       if (step === 0 && !service) {
         setError("Choose a service to continue.");
+        return;
+      }
+      if (step === 1 && !draft.vehicle_type) {
+        setError("Choose your vehicle size to continue.");
         return;
       }
       if (step === 2 && draft.start_minute < 0) {
@@ -287,6 +293,7 @@ export function BookingWizard({
                       service_id: s.id,
                       service_package: defaultServicePackage(s.slug),
                       addons: [],
+                      vehicle_type: "",
                       start_minute: -1,
                     }));
                     setError("");
@@ -322,9 +329,11 @@ export function BookingWizard({
               <label className="field">
                 <span>Vehicle size</span>
                 <select
+                  required
                   value={draft.vehicle_type}
                   onChange={(e) => set("vehicle_type", e.target.value)}
                 >
+                  <option value="" disabled>Select vehicle size</option>
                   {["Sedan", "SUV", "Truck"].map((x) => (
                     <option key={x} value={x}>
                       {vehicleSizeLabel(service?.slug, x)}
@@ -574,7 +583,7 @@ export function BookingWizard({
           <span>
             {service?.pricing_mode === "starting" ? "From" : "Estimate"}
           </span>
-          <strong>{service ? money(price) : "—"}</strong>
+          <strong>{service && !draft.vehicle_type ? "Choose size" : service ? money(price) : "—"}</strong>
         </div>
         {deposit > 0 && (
           <div className="summary-row">

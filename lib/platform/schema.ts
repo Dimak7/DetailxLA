@@ -330,4 +330,13 @@ FROM (VALUES
   ('headlight-restoration',7500,0,0,'starting','/brand/photography/headlight-restoration.webp')
 ) AS menu(slug,price_cents,suv_extra_cents,truck_extra_cents,pricing_mode,image_url)
 WHERE service.slug=menu.slug AND EXISTS (SELECT 1 FROM migration);
+-- Keep the established slug while updating the customer-facing service name.
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (6)
+  ON CONFLICT DO NOTHING
+  RETURNING version
+)
+UPDATE wl.services
+SET name='Extensive Interior Detail', updated_at=now()
+WHERE slug='deep-interior-cleaning' AND EXISTS (SELECT 1 FROM migration);
 `;

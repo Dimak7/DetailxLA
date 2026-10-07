@@ -19,7 +19,7 @@ export const metadata = {
 };
 
 const questions = [
-  ["Which detail should I choose?", "Choose Full Detail for interior and exterior care together. Interior Detail focuses on the cabin; Exterior Detail focuses on the body, wheels and glass. For heavier interior cleaning, explore Deep Interior Cleaning."],
+  ["Which detail should I choose?", "Choose Full Detail for interior and exterior care together. Interior Detail focuses on the cabin; Exterior Detail focuses on the body, wheels and glass. For heavier interior cleaning, explore Extensive Interior Detail."],
   ["Will detailing remove scratches?", "Cleaning removes dirt; paint correction uses machine polishing to improve suitable swirls, fine marks and haze. We inspect the paint and agree the scope first. Deep scratches may need a different repair."],
   ["What does ceramic coating do?", "It adds protection, gloss and water repellency to prepared paint, making routine cleaning easier. It does not remove scratches or prevent stone chips. We discuss preparation and aftercare with you."],
   ["Is the listed price the final price?", "Prices are based on a sedan. Vehicle size, condition and the work needed can affect the final price. Any additional work is discussed before we begin."],
