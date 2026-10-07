@@ -12,6 +12,7 @@ import paintStyles from "@/components/westloop/PaintCorrection.module.css";
 import { money } from "@/lib/platform/types";
 import { siteUrl } from "@/lib/platform/settings";
 import { BRAND_NAME } from "@/lib/brand";
+import { servicePackages } from "@/lib/booking-options";
 import { careStages, getServiceContent, serviceDuration, servicePrice } from "@/lib/service-content";
 import styles from "@/components/westloop/ServiceDetails.module.css";
 
@@ -28,7 +29,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${service.name} in Chicago`, description: content.metadata,
     alternates: { canonical: `/services/${service.slug}` },
-    openGraph: { title: `${service.name} in Chicago | ${BRAND_NAME}`, siteName: BRAND_NAME, type: "website", description: content.metadata, url: `/services/${service.slug}`, images: [service.slug === "paint-correction" ? { url: "/paint-correction/hero-after-matched.webp", alt: "Graphite Porsche 911 in a detailing studio — concept imagery" } : { url: content.image, alt: content.imageAlt }] },
+    openGraph: { title: `${service.name} in Chicago | ${BRAND_NAME}`, siteName: BRAND_NAME, type: "website", description: content.metadata, url: `/services/${service.slug}`, images: [{ url: content.image, width: 1920, height: 1080, alt: content.imageAlt }] },
+    twitter: { card: "summary_large_image", title: `${service.name} in Chicago | ${BRAND_NAME}`, description: content.metadata, images: [content.image] },
   };
 }
 
@@ -41,6 +43,7 @@ export default async function Page({ params }: PageProps) {
   const bookingHref = `/booking?service=${encodeURIComponent(service.id)}`;
   const related = content.related.flatMap((relatedSlug) => d.services.filter((item) => item.slug === relatedSlug && item.id !== service.id)).slice(0, 3);
   const isCoating = service.slug === "ceramic-coating";
+  const packages = servicePackages(service.slug);
   const schema = {
     "@context": "https://schema.org",
     "@graph": [
@@ -70,6 +73,11 @@ export default async function Page({ params }: PageProps) {
         <div className={styles.appointmentStrip}>
           <div><span>YOUR INVESTMENT</span><strong>{servicePrice(service)}</strong></div><div><span>APPOINTMENT ESTIMATE</span><strong>{serviceDuration(service.duration_minutes)}</strong></div><p>Scope confirmed for your vehicle.<br />{isCoating ? "Cure and collection timing discussed before application." : "Additional work discussed before we begin."}</p>
         </div>
+
+        {packages.length > 0 && <section className={`${styles.section} ${styles.guideSection}`} aria-labelledby="package-heading">
+          <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>PACKAGES &amp; PRICING</p><h2 id="package-heading">Choose your level of care.</h2></div><p>Starting prices are shown clearly. We inspect the vehicle and confirm the final scope before work begins.</p></div>
+          <div className={styles.guideChoices}>{packages.map((item) => <article className={styles.guideChoice} key={item.id}><p className={styles.eyebrow}>{item.name}</p><h3>{money(item.priceCents)}</h3><p>{item.description}</p><Link className={styles.textLink} href={`${bookingHref}&package=${item.id}`}>Choose {item.name.toLowerCase()}</Link></article>)}</div>
+        </section>}
 
         <section className={`${styles.section} ${styles.treatmentLayout}`} id="the-treatment" aria-labelledby="treatment-heading">
           <div><p className={styles.eyebrow}>WHAT’S INCLUDED</p><h2 id="treatment-heading">Care that earns a closer look.</h2><p className={styles.bodyCopy}>{content.overview}</p><h3 className={styles.smallHeading}>Included in this service</h3><ul className={styles.inclusions}>{service.includes.map((item) => <li key={item}>{item}</li>)}</ul></div>

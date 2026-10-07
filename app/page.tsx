@@ -64,7 +64,7 @@ export default async function Home() {
         </article>)}</div>
       </div></section>
       {fullDetail && <section className={`${styles.detailingFeature} wrap`} id="full-detail" aria-labelledby="detailing-heading">
-        <div className={styles.detailingImage}><Image src="/portfolio/tan-interior-detail.jpg" alt="Clean leather seating and carefully finished interior details" fill sizes="(max-width: 760px) 100vw, 48vw" /></div>
+        <div className={styles.detailingImage}><Image src="/brand/photography/full-detail-studio.webp" alt="Graphite luxury sedan receiving a meticulous finishing pass in a professional Chicago studio" fill sizes="(max-width: 760px) 100vw, 48vw" /></div>
         <div className={styles.detailingCopy}><p className="eyebrow">FULL SERVICE DETAILING</p><h2 id="detailing-heading">A clean cabin.<br /><em>A fresh exterior.</em></h2>
           <p>Everyday dust, road grime and the places a quick wash misses. Our full detail brings interior and exterior care together, so your whole car feels cared for.</p>
           <div className={styles.detailingPrice}><strong>{servicePrice(fullDetail)}</strong><span>Interior + exterior · {fullDetail.name}</span></div>
@@ -82,15 +82,15 @@ export default async function Home() {
         <div className={styles.featureVisual}><CeramicFilm /></div>
       </section>}
       <section className={`${styles.process} wrap`} id="process">
-        <div className={styles.processImage}><Image src="/portfolio/black-porsche-studio.jpg" alt="Light tracing the contours of a polished black Porsche" fill sizes="(max-width: 760px) 100vw, 44vw" /></div>
+        <div className={styles.processImage}><Image src="/brand/photography/paint-correction.webp" alt="Professional paint correction under precise vertical inspection lights" fill sizes="(max-width: 760px) 100vw, 44vw" /></div>
         <div className={styles.processCopy}><p className="eyebrow">OUR PROCESS</p><h2>The finish matters.<br /><em>So does the process.</em></h2><p>Premium care should feel clear from the first conversation to the first drive home.</p>
           {[["01", "Understand your vehicle", "Tell us what you want cleaned or improved. We help you choose the right service."], ["02", "Agree the details", "We confirm the price and what is included before work begins."], ["03", "Finish. Inspect. Advise.", "We check the completed work, then share simple aftercare advice."]].map(([n, title, body]) => <div className={styles.processStep} key={n}><span>{n}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}
           <Link className="text-link" href="/contact">Ask about your vehicle</Link>
         </div>
       </section>
       <section className={styles.detailStrip} aria-label="Attention to every surface">
-        <figure><Image src="/portfolio/red-audi-light-detail.jpg" alt="Close-up of red paint and precise automotive lighting" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>PAINTWORK</span><h3>Depth in every reflection.</h3></figcaption></figure>
-        <figure><Image src="/portfolio/tan-interior-detail.jpg" alt="Fine leather texture and detailed interior stitching" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>INTERIOR CARE</span><h3>Care you feel, every day.</h3></figcaption></figure>
+        <figure><Image src="/brand/photography/ceramic-coating.webp" alt="Ceramic coating applied across deep graphite automotive paint" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>PAINTWORK</span><h3>Depth in every reflection.</h3></figcaption></figure>
+        <figure><Image src="/brand/photography/interior-detail.webp" alt="Immaculate saddle leather cabin after professional interior detailing" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>INTERIOR CARE</span><h3>Care you feel, every day.</h3></figcaption></figure>
       </section>
       {reviews.length > 0 && <section className={`${styles.reviews} wrap`}><p className="eyebrow">FROM THE DRIVER’S SEAT</p><h2>Good care gets remembered.</h2><div>{reviews.slice(0, 3).map((r) => <blockquote key={r.id}><span aria-label={`${r.rating} out of 5 stars`}>{"★".repeat(r.rating)}</span><p>“{r.text}”</p><cite>{r.name}</cite><small>Verified appointment</small></blockquote>)}</div></section>}
       <section className={`${styles.faq} wrap`}><div><p className="eyebrow">BEFORE YOU BOOK</p><h2>Answers before your appointment.</h2><p>Not sure where to start? Tell us about your vehicle and we’ll help you choose.</p><Link className="text-link" href="/contact">Ask the studio</Link></div><div className={styles.questions}>{questions.map(([question, answer]) => <details key={question}><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div></section>

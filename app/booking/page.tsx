@@ -13,7 +13,7 @@ export const metadata = {
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ service?: string }>;
+  searchParams: Promise<{ service?: string; package?: string }>;
 }) {
   const d = await publicData();
   const provider = await paymentProvider();
@@ -27,7 +27,8 @@ export default async function Page({
   const paymentsEnabled =
     provider === "square" ||
     (provider === "stripe" && bookingBusiness.deposit_percent > 0);
-  const requestedService = (await searchParams).service;
+  const requested = await searchParams;
+  const requestedService = requested.service;
   const selectedService = d.services.find((service) => service.id === requestedService || service.slug === requestedService);
   return (
     <PageShell business={d.business}>
@@ -43,6 +44,7 @@ export default async function Page({
         business={bookingBusiness}
         paymentsEnabled={paymentsEnabled}
         initialService={selectedService?.id}
+        initialPackage={requested.package}
       />
     </PageShell>
   );

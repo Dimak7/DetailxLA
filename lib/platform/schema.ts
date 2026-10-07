@@ -306,4 +306,28 @@ WHERE key='business'
   AND value->>'close_time'='20:00'
   AND value->>'hours_label'='Monday-Saturday, 8:00 AM-8:00 PM'
   AND (NOT value ? 'day_hours' OR value->'day_hours'='[]'::jsonb);
+-- Apply the approved public service menu and service-specific photography once.
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (5)
+  ON CONFLICT DO NOTHING
+  RETURNING version
+)
+UPDATE wl.services AS service
+SET price_cents=menu.price_cents,
+    suv_extra_cents=menu.suv_extra_cents,
+    truck_extra_cents=menu.truck_extra_cents,
+    pricing_mode=menu.pricing_mode,
+    image_url=menu.image_url,
+    updated_at=now()
+FROM (VALUES
+  ('interior-detail',30000,2500,5000,'fixed','/brand/photography/interior-detail.webp'),
+  ('exterior-detail',25000,2500,5000,'fixed','/brand/photography/exterior-detail.webp'),
+  ('full-detail',50000,5000,10000,'fixed','/brand/photography/full-detail-studio.webp'),
+  ('deep-interior-cleaning',35000,0,0,'starting','/brand/photography/deep-interior.webp'),
+  ('paint-correction',52500,0,0,'starting','/brand/photography/paint-correction.webp'),
+  ('ceramic-coating',55000,0,0,'starting','/brand/photography/ceramic-coating.webp'),
+  ('maintenance-detail',0,0,0,'quote','/brand/photography/exterior-detail.webp'),
+  ('headlight-restoration',7500,0,0,'starting','/brand/photography/headlight-restoration.webp')
+) AS menu(slug,price_cents,suv_extra_cents,truck_extra_cents,pricing_mode,image_url)
+WHERE service.slug=menu.slug AND EXISTS (SELECT 1 FROM migration);
 `;

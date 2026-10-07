@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { PaintFilm } from "./PaintFilm";
 import { serviceDuration, servicePrice } from "@/lib/service-content";
-import type { Service } from "@/lib/platform/types";
+import { servicePackages } from "@/lib/booking-options";
+import { money, type Service } from "@/lib/platform/types";
 import styles from "./PaintCorrection.module.css";
 
 const benefits = [
@@ -32,6 +33,7 @@ export function PaintCorrection({ service }: { service: Service }) {
   const [allowReducedMotion, setAllowReducedMotion] = useState(false);
   const [dock, setDock] = useState(false);
   const booking = `/booking?service=${encodeURIComponent(service.id)}`;
+  const correctionPackages = servicePackages("paint-correction");
   const questions = [
     { title: "How long will you need my car?", answer: `The current appointment estimate is ${serviceDuration(service.duration_minutes)}. Vehicle size, paint condition and the agreed correction can change that timing. We confirm drop-off and collection arrangements for your visit.` },
     { title: "Will every scratch disappear?", answer: "No. Deep scratches, stone chips and failing paint may need repair instead. Removing too much material to chase a mark can be the wrong choice. We explain the realistic improvement after inspecting your paint." },
@@ -84,7 +86,22 @@ export function PaintCorrection({ service }: { service: Service }) {
     </section>
 
     <section className={styles.service} id="your-correction" aria-labelledby="service-title">
-      <div className={styles.serviceIntro}><p className={styles.eyebrow}>02 / OPTIONS & PRICING</p><h2 id="service-title">Your paint.<br /><span>The right correction.</span></h2><p>You don’t need to choose a technical package. Tell us what bothers you; we assess the finish and recommend an approach.</p><div className={styles.approaches}><article><span>SINGLE-STEP POLISHING</span><h3>Refresh & refine.</h3><dl><div><dt>Best for</dt><dd>Lighter swirls, mild haze and an overall improvement in gloss.</dd></div><div><dt>The approach</dt><dd>One polishing stage balances correction and finish quality.</dd></div><div><dt>What to expect</dt><dd>A considered refresh. Deeper isolated marks may remain.</dd></div></dl></article><article><span>MULTI-STEP CORRECTION</span><h3>A deeper refinement.</h3><dl><div><dt>Best for</dt><dd>More noticeable defects, where the paint can support additional work.</dd></div><div><dt>The approach</dt><dd>A correction stage followed by finer polishing to refine the result.</dd></div><div><dt>What to expect</dt><dd>More involved work, with scope and timing agreed after inspection.</dd></div></dl></article></div><p className={styles.approachNote}>More stages aren’t automatically better. The condition and response of your paint guide the recommendation.</p></div>
+      <div className={styles.serviceIntro}>
+        <p className={styles.eyebrow}>02 / OPTIONS & PRICING</p>
+        <h2 id="service-title">Your paint.<br /><span>The right correction.</span></h2>
+        <p>Choose the level that best matches what you see. We inspect the paint before work and confirm the safe, realistic scope.</p>
+        <div className={styles.approaches}>
+          {correctionPackages.map((item) => (
+            <article key={item.id}>
+              <span>{item.name.toUpperCase()}</span>
+              <h3>{item.priceCents === null ? "Custom assessment" : money(item.priceCents)}</h3>
+              <p>{item.description}</p>
+              <Link href={`${booking}&package=${item.id}`}>Choose this level</Link>
+            </article>
+          ))}
+        </div>
+        <p className={styles.approachNote}>Correction percentages are targets, not promises. Paint thickness, previous repairs and defect depth determine the safe result.</p>
+      </div>
       <aside className={styles.bookingCard} aria-label="Paint correction service details"><span className={styles.cardTag}>PAINT CORRECTION</span><div className={styles.price}>{servicePrice(service)}</div><p className={styles.duration}>Estimated appointment <strong>{serviceDuration(service.duration_minutes)}</strong></p><ul>{service.includes.map(item => <li key={item}>{bookingInclusionLabels.get(item.trim().toLowerCase()) ?? item}</li>)}</ul><Link href={booking} className="button gold">Book your correction</Link><p className={styles.cardNote}>{service.pricing_mode === "quote" ? "Your vehicle and paint condition guide your final quote." : "Sedan pricing shown. Vehicle size and paint condition guide your final quote."} Scope agreed before work begins.</p></aside>
     </section>
 

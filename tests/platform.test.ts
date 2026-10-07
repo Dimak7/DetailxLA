@@ -79,6 +79,7 @@ test("Relational platform integration", async (t) => {
       model: "Vehicle",
       year: 2025,
       vehicle_type: "SUV",
+      addons: ["engine-bay", "ceramic-sealant"],
       date: day,
       start_minute: 480,
       terms: true,
@@ -95,7 +96,29 @@ test("Relational platform integration", async (t) => {
       "booking creates connected customer, vehicle, lead, attribution, events and outbox",
       async () => {
         booking = await createBooking(input);
-        assert.equal(booking.booking.price_cents, 12000);
+        assert.equal(booking.booking.price_cents, 37500);
+        const lineItems = await query<{
+          kind: string;
+          name: string;
+          quantity: number;
+          unit_price_cents: number;
+        }>(
+          "SELECT kind,name,quantity,unit_price_cents FROM wl.booking_line_items WHERE booking_id=$1 ORDER BY created_at",
+          [booking.booking.id],
+        );
+        assert.equal(lineItems.length, 3);
+        assert.deepEqual(
+          lineItems.map(({ kind, name, quantity, unit_price_cents }) => ({
+            kind,
+            name,
+            total_cents: quantity * unit_price_cents,
+          })),
+          [
+            { kind: "base_service", name: "Exterior Detail", total_cents: 27500 },
+            { kind: "upsell", name: "Engine Bay", total_cents: 6500 },
+            { kind: "upsell", name: "Ceramic Sealant", total_cents: 3500 },
+          ],
+        );
         assert.equal((await query("SELECT * FROM wl.customers")).length, 1);
         assert.equal((await query("SELECT * FROM wl.vehicles")).length, 1);
         assert.equal((await query("SELECT * FROM wl.leads")).length, 1);
@@ -124,14 +147,14 @@ test("Relational platform integration", async (t) => {
       async () => {
         const business = await settings();
         assert.equal(
-          bookingDepositCents(services[0], 12000, business, "square"),
-          6000,
+          bookingDepositCents(services[0], 27500, business, "square"),
+          13750,
         );
         const ceramic = services.find(
           (service) => service.slug === "ceramic-coating",
         )!;
         assert.equal(
-          bookingDepositCents(ceramic, 50000, business, "square"),
+          bookingDepositCents(ceramic, 55000, business, "square"),
           0,
         );
       },
@@ -187,7 +210,7 @@ test("Relational platform integration", async (t) => {
               }>;
             }
           ).line_items[0].base_price_money.amount,
-          12000,
+          37500,
         );
         const payment = (
           await query<{ provider: string; metadata: Record<string, string> }>(
@@ -226,14 +249,14 @@ test("Relational platform integration", async (t) => {
         reason: "Returning customer",
         code: "WELCOME25",
       }, owner!) as unknown as { amount_cents: number; netCents: number };
-      assert.equal(result.amount_cents, 4125);
-      assert.equal(result.netCents, 12375);
-      const financials = await jobFinancials(booking.booking.id);
-      assert.equal(financials?.base_service_cents, 12000);
-      assert.equal(financials?.upsell_cents, 4500);
-      assert.equal(financials?.discount_cents, 4125);
-      assert.equal(financials?.net_service_cents, 12375);
-      assert.equal((await query<{ price_cents: number }>("SELECT price_cents FROM wl.bookings WHERE id=$1", [booking.booking.id]))[0].price_cents, 12375);
+        assert.equal(result.amount_cents, 10500);
+        assert.equal(result.netCents, 31500);
+        const financials = await jobFinancials(booking.booking.id);
+        assert.equal(financials?.base_service_cents, 27500);
+        assert.equal(financials?.upsell_cents, 14500);
+        assert.equal(financials?.discount_cents, 10500);
+        assert.equal(financials?.net_service_cents, 31500);
+        assert.equal((await query<{ price_cents: number }>("SELECT price_cents FROM wl.bookings WHERE id=$1", [booking.booking.id]))[0].price_cents, 31500);
     });
     await t.test(
       "idempotent retries and concurrent overlap protection",

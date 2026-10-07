@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   money,
-  priceFor,
   dateToday,
   timeLabel,
   type Service,
@@ -10,8 +9,17 @@ import {
 } from "@/lib/platform/types";
 import { visitor, track, confirmedConversion } from "./Tracking";
 import { bookingDestination } from "@/lib/booking-handoff";
+import {
+  bookingAddOns,
+  bookingSelection,
+  defaultServicePackage,
+  servicePackages,
+  vehicleSizeLabel,
+} from "@/lib/booking-options";
 type Draft = {
   service_id: string;
+  service_package: string;
+  addons: string[];
   make: string;
   model: string;
   year: number;
@@ -33,6 +41,7 @@ export function BookingWizard({
   services,
   business,
   initialService,
+  initialPackage,
   admin = false,
   paymentsEnabled = false,
   lead,
@@ -41,17 +50,24 @@ export function BookingWizard({
   services: Service[];
   business: BusinessSettings;
   initialService?: string;
+  initialPackage?: string;
   admin?: boolean;
   paymentsEnabled?: boolean;
   lead?: { id: string; name: string; email: string; phone: string };
   onComplete?: () => void;
 }) {
+  const initialServiceRecord = services.find((s) => s.id === initialService);
   const [step, setStep] = useState(0),
     [draft, setDraft] = useState<Draft>({
       service_id:
         initialService && services.some((s) => s.id === initialService)
           ? initialService
           : "",
+      service_package:
+        servicePackages(initialServiceRecord?.slug).some((item) => item.id === initialPackage)
+          ? initialPackage || ""
+          : defaultServicePackage(initialServiceRecord?.slug),
+      addons: [],
       make: "",
       model: "",
       year: new Date().getFullYear(),
@@ -78,9 +94,19 @@ export function BookingWizard({
   const key = useRef({ body: "", id: "" }),
     started = useRef(false);
   const service = services.find((s) => s.id === draft.service_id),
-    price = service ? priceFor(service, draft.vehicle_type) : null,
+    packages = servicePackages(service?.slug),
+    availableAddOns = bookingAddOns(service?.slug),
+    selection = service
+      ? bookingSelection(
+          service,
+          draft.vehicle_type,
+          draft.service_package,
+          draft.addons,
+        )
+      : null,
+    price = selection?.totalCents ?? null,
     quoteBased =
-      service?.pricing_mode === "quote" || service?.slug === "ceramic-coating",
+      price === null || service?.pricing_mode === "quote" || service?.slug === "ceramic-coating",
     deposit =
       !quoteBased && paymentsEnabled && price !== null
         ? Math.round((price * business.deposit_percent) / 100)
@@ -256,8 +282,14 @@ export function BookingWizard({
                   value={s.id}
                   checked={draft.service_id === s.id}
                   onChange={() => {
-                    set("service_id", s.id);
-                    set("start_minute", -1);
+                    setDraft((current) => ({
+                      ...current,
+                      service_id: s.id,
+                      service_package: defaultServicePackage(s.slug),
+                      addons: [],
+                      start_minute: -1,
+                    }));
+                    setError("");
                     if (!admin) track("service_selected", { service_id: s.id });
                   }}
                 />
@@ -294,7 +326,9 @@ export function BookingWizard({
                   onChange={(e) => set("vehicle_type", e.target.value)}
                 >
                   {["Sedan", "SUV", "Truck"].map((x) => (
-                    <option key={x}>{x}</option>
+                    <option key={x} value={x}>
+                      {vehicleSizeLabel(service?.slug, x)}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -312,6 +346,48 @@ export function BookingWizard({
               Vehicle condition may change the scope. We discuss additional work
               before it begins.
             </p>
+            {packages.length > 0 && (
+              <section className="booking-upgrades" aria-labelledby="booking-package-heading">
+                <div className="booking-upgrades-heading">
+                  <div>
+                    <p className="eyebrow">CHOOSE YOUR PACKAGE</p>
+                    <h3 id="booking-package-heading">Match the service to your finish.</h3>
+                  </div>
+                </div>
+                <div className="booking-package-grid">
+                  {packages.map((item) => (
+                    <label className="booking-package" key={item.id}>
+                      <input type="radio" name="service-package" value={item.id} checked={draft.service_package === item.id} onChange={() => set("service_package", item.id)} />
+                      <span><strong>{item.name}</strong><small>{item.description}</small></span>
+                      <b>{item.priceCents === null ? "By quote" : `${service?.pricing_mode === "starting" ? "From " : ""}${money(item.priceCents)}`}</b>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            )}
+            {availableAddOns.length > 0 && (
+              <section className="booking-upgrades" aria-labelledby="booking-addons-heading">
+                <div className="booking-upgrades-heading">
+                  <div>
+                    <p className="eyebrow">RECOMMENDED UPGRADES</p>
+                    <h3 id="booking-addons-heading">Add only what your vehicle needs.</h3>
+                  </div>
+                  <span>{draft.addons.length ? `${draft.addons.length} selected` : "Optional"}</span>
+                </div>
+                <div className="booking-addon-grid">
+                  {availableAddOns.map((item) => {
+                    const selected = draft.addons.includes(item.id);
+                    return (
+                      <label className="booking-addon" data-selected={selected} key={item.id}>
+                        <input type="checkbox" checked={selected} onChange={() => set("addons", selected ? draft.addons.filter((id) => id !== item.id) : [...draft.addons, item.id])} />
+                        <span><strong>{item.name} · {money(item.priceCents)}</strong><small>{item.description}</small></span>
+                        <b>{selected ? "Added" : "+ Add"}</b>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
           </>
         )}
         {step === 2 && (
@@ -376,9 +452,9 @@ export function BookingWizard({
             <section className="booking-review" aria-label="Your appointment">
               <p className="eyebrow">YOUR APPOINTMENT</p>
               <div className="booking-review-grid">
-                <div><span>Care</span><strong>{service?.name}</strong><small>{draft.vehicle_type}</small></div>
+                <div><span>Care</span><strong>{service?.name}</strong><small>{selection?.selectedPackage?.name || vehicleSizeLabel(service?.slug, draft.vehicle_type)}</small></div>
                 <div><span>When</span><strong>{draft.date}</strong><small>{timeLabel(draft.start_minute)} CT</small></div>
-                <div className="booking-review-price"><span>{service?.pricing_mode === "starting" ? "Starting at" : "Your estimate"}</span><strong>{money(price)}</strong>{deposit > 0 && <small>{money(deposit)} due now</small>}</div>
+                <div className="booking-review-price"><span>{service?.pricing_mode === "starting" ? "Starting at" : "Your estimate"}</span><strong>{money(price)}</strong>{selection?.selectedAddOns.length ? <small>Includes {selection.selectedAddOns.length} upgrade{selection.selectedAddOns.length === 1 ? "" : "s"}</small> : null}{deposit > 0 && <small>{money(deposit)} due now</small>}</div>
               </div>
             </section>
             <h3 className="booking-details-heading">YOUR DETAILS</h3>
@@ -445,7 +521,7 @@ export function BookingWizard({
         </div>
         <p className="small-note">
           {quoteBased
-            ? "No payment is collected now. We will inspect the vehicle and confirm the ceramic coating scope and final quote with you."
+            ? "No payment is collected now. We will inspect the vehicle and confirm the service scope and final quote with you."
             : deposit > 0
               ? `A ${business.deposit_percent}% deposit of ${money(deposit)} is required to confirm this appointment. Card details are entered securely on Square.`
               : "No card details are required right now. Payment details are confirmed with your appointment."}
@@ -462,10 +538,24 @@ export function BookingWizard({
           <span>Service</span>
           <strong>{service?.name || "Choose your care"}</strong>
         </div>
+        {selection?.selectedPackage && (
+          <div className="summary-row">
+            <span>Package</span>
+            <strong>{selection.selectedPackage.name}</strong>
+          </div>
+        )}
+        {selection?.selectedAddOns.map((item) => (
+          <div className="summary-row summary-addon" key={item.id}>
+            <span>{item.name}</span>
+            <strong>{money(item.priceCents)}</strong>
+          </div>
+        ))}
         <div className="summary-row">
           <span>Vehicle</span>
           <strong>
-            {draft.make ? draft.make + " " + draft.model : draft.vehicle_type}
+            {draft.make
+              ? draft.make + " " + draft.model
+              : vehicleSizeLabel(service?.slug, draft.vehicle_type)}
           </strong>
         </div>
         <div className="summary-row">

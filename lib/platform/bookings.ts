@@ -13,9 +13,9 @@ import { enqueue, enqueueBooking } from "./outbox";
 import { metaEvent } from "../integrations/providers";
 import { squareEnvironment } from "../integrations/square-reporting";
 import { businessHoursForDay } from "./business-hours";
+import { bookingSelection } from "../booking-options";
 import {
   dateToday,
-  priceFor,
   type Booking,
   type Service,
   type BusinessSettings,
@@ -24,6 +24,8 @@ import {
 export const bookingInput = z.object({
   request_key: z.uuid(),
   service_id: z.uuid(),
+  service_package: z.string().max(80).default(""),
+  addons: z.array(z.string().max(80)).max(12).default([]),
   first_name: z.string().trim().min(1).max(80),
   last_name: z.string().trim().min(1).max(80),
   email: z
@@ -297,8 +299,27 @@ export async function createBooking(value: unknown, admin = false) {
         ],
       )
     ).rows[0];
-    const price = priceFor(service, input.vehicle_type),
+    let selection: ReturnType<typeof bookingSelection>;
+    try {
+      selection = bookingSelection(
+        service,
+        input.vehicle_type,
+        input.service_package,
+        input.addons,
+      );
+    } catch (error) {
+      throw new AppError(error instanceof Error ? error.message : "Choose valid booking options.");
+    }
+    const price = selection.totalCents,
       deposit = bookingDepositCents(service, price, s, provider);
+    const serviceName = selection.selectedPackage
+      ? `${service.name} · ${selection.selectedPackage.name}`
+      : service.name;
+    const serviceSnapshot = {
+      ...service,
+      selected_package: selection.selectedPackage || null,
+      selected_addons: selection.selectedAddOns,
+    };
     const booking = (
       await q<Booking>(
         `INSERT INTO wl.bookings(id,request_key,request_hash,reference,customer_id,vehicle_id,service_id,service_name,service_snapshot,booking_date,start_minute,duration_minutes,buffer_minutes,price_cents,deposit_cents,notes,location,attribution_id,lead_id)
@@ -311,8 +332,8 @@ export async function createBooking(value: unknown, admin = false) {
           customerId,
           vehicle.id,
           service.id,
-          service.name,
-          JSON.stringify(service),
+          serviceName,
+          JSON.stringify(serviceSnapshot),
           input.date,
           input.start_minute,
           service.duration_minutes,
@@ -326,6 +347,16 @@ export async function createBooking(value: unknown, admin = false) {
         ],
       )
     ).rows[0];
+    if (selection.baseCents !== null)
+      await q(
+        "INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,'base_service',$3,1,$4)",
+        [randomUUID(), id, serviceName, selection.baseCents],
+      );
+    for (const addOn of selection.selectedAddOns)
+      await q(
+        "INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,'upsell',$3,1,$4)",
+        [randomUUID(), id, addOn.name, addOn.priceCents],
+      );
     const leadId = input.lead_id || randomUUID();
     if (input.lead_id)
       await q(
@@ -353,7 +384,7 @@ export async function createBooking(value: unknown, admin = false) {
         customerId,
         id,
         leadId,
-        service.name + " reserved for " + input.date,
+        serviceName + " reserved for " + input.date,
       ],
     );
     if (!old)
