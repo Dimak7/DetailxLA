@@ -49,19 +49,21 @@ export function PaintCorrection({ service }: { service: Service }) {
   }, []);
 
   return <div className={`${serviceStyles.page} ${styles.page}`}>
-    <nav className={serviceStyles.breadcrumbs} aria-label="Breadcrumb"><Link href="/services">Services</Link><span aria-hidden="true">/</span><span aria-current="page">Paint Correction</span></nav>
-    <section className={serviceStyles.detailHero} aria-labelledby="paint-title">
-      <div className={serviceStyles.detailHeroCopy}>
-        <p className={serviceStyles.eyebrow}>PRECISION PAINT REFINEMENT</p>
-        <p className={serviceStyles.serviceName}>Paint Correction</p>
-        <h1 id="paint-title"><span>Bring back the finish</span><span><em>you fell for.</em></span></h1>
-        <p className={serviceStyles.lead}>Still swirled or hazy after a wash? Precision polishing brings back clarity and gloss.</p>
-        <div className={serviceStyles.actions}><Link className="button" href={booking}>Book paint correction</Link><a className={serviceStyles.textLink} href="#the-craft">Discover the difference</a></div>
+    <section className={styles.hero} aria-labelledby="paint-title">
+      <div className={styles.heroFilm}><PaintFilm kind="hero" paused={paused} allowReducedMotion={allowReducedMotion} /></div>
+      <div className={styles.heroShade} aria-hidden="true" />
+      <div className={styles.heroHeading}>
+        <p className={styles.heroEyebrow}>WEST LOOP CERAMICS / CHICAGO</p>
+        <h1 id="paint-title">Paint correction.</h1>
       </div>
-      <figure className={styles.heroMedia}>
-        <div className={styles.heroFilm}><PaintFilm kind="hero" paused={paused} allowReducedMotion={allowReducedMotion} /></div>
-        <figcaption className={styles.mediaCaption}><span>YOUR FINISH, REFINED</span><button type="button" onClick={() => { setAllowReducedMotion(true); setPaused(value => !value); }} className="button small outline"><span aria-hidden="true">{paused ? "▷" : "Ⅱ"}</span>{paused ? "Play films" : "Pause films"}</button></figcaption>
-      </figure>
+      <div className={styles.heroBottom}>
+        <div className={styles.heroCopy}>
+          <p className={styles.heroLead}>Bring back the finish<br /><em>you fell for.</em></p>
+          <p className={styles.heroDescription}>Still swirled or hazy after a wash?<br />Precision polishing brings back clarity and gloss.</p>
+          <div className={styles.heroActions}><Link className="button light" href={booking}>Book paint correction</Link><a className="button outline on-dark" href="#the-craft">Discover the difference</a></div>
+        </div>
+        <div className={styles.heroControls}><span>YOUR FINISH, REFINED</span><button type="button" onClick={() => { setAllowReducedMotion(true); setPaused(value => !value); }} className="button small outline on-dark"><span aria-hidden="true">{paused ? "▷" : "Ⅱ"}</span>{paused ? "Play films" : "Pause films"}</button></div>
+      </div>
     </section>
     <div className={serviceStyles.appointmentStrip}>
       <div><span>YOUR INVESTMENT</span><strong>{servicePrice(service)}</strong></div><div><span>APPOINTMENT ESTIMATE</span><strong>{serviceDuration(service.duration_minutes)}</strong></div><p>Scope confirmed for your vehicle.<br />Additional work discussed before we begin.</p>
