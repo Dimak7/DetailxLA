@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { PaintFilm } from "./PaintFilm";
 import { serviceDuration, servicePrice } from "@/lib/service-content";
 import { servicePackages } from "@/lib/booking-options";
 import { money, type Service } from "@/lib/platform/types";
 import styles from "./PaintCorrection.module.css";
+import serviceStyles from "./ServiceDetails.module.css";
 
 const benefits = [
   { title: "Less visible swirling", text: "Refine the fine wash marks that catch the light, even when your car is clean." },
@@ -28,10 +29,8 @@ const bookingInclusionLabels = new Map([
 ]);
 
 export function PaintCorrection({ service }: { service: Service }) {
-  const hero = useRef<HTMLElement>(null);
   const [paused, setPaused] = useState(false);
   const [allowReducedMotion, setAllowReducedMotion] = useState(false);
-  const [dock, setDock] = useState(false);
   const booking = `/booking?service=${encodeURIComponent(service.id)}`;
   const correctionPackages = servicePackages("paint-correction");
   const questions = [
@@ -49,26 +48,24 @@ export function PaintCorrection({ service }: { service: Service }) {
     return () => preference.removeEventListener("change", update);
   }, []);
 
-  useEffect(() => {
-    if (!hero.current || !("IntersectionObserver" in window)) return;
-    const observer = new IntersectionObserver(([entry]) => setDock(!entry.isIntersecting));
-    observer.observe(hero.current);
-    return () => observer.disconnect();
-  }, []);
-
-  return <div className={styles.page}>
-    <section className={styles.hero} ref={hero} aria-labelledby="paint-title">
-      <div className={styles.heroFilm}>
-        <PaintFilm kind="hero" paused={paused} allowReducedMotion={allowReducedMotion} />
+  return <div className={`${serviceStyles.page} ${styles.page}`}>
+    <nav className={serviceStyles.breadcrumbs} aria-label="Breadcrumb"><Link href="/services">Services</Link><span aria-hidden="true">/</span><span aria-current="page">Paint Correction</span></nav>
+    <section className={serviceStyles.detailHero} aria-labelledby="paint-title">
+      <div className={serviceStyles.detailHeroCopy}>
+        <p className={serviceStyles.eyebrow}>PRECISION PAINT REFINEMENT</p>
+        <p className={serviceStyles.serviceName}>Paint Correction</p>
+        <h1 id="paint-title"><span>Bring back the finish</span><span><em>you fell for.</em></span></h1>
+        <p className={serviceStyles.lead}>Still swirled or hazy after a wash? Precision polishing brings back clarity and gloss.</p>
+        <div className={serviceStyles.actions}><Link className="button" href={booking}>Book paint correction</Link><a className={serviceStyles.textLink} href="#the-craft">Discover the difference</a></div>
       </div>
-      <div className={styles.heroShade} aria-hidden="true" />
-      <div className={styles.heroTop}><Link href="/services">All services</Link><span>WEST LOOP CERAMICS / CHICAGO</span></div>
-      <h1 id="paint-title"><span>PAINT</span><span>CORRECTION<span className={styles.period}>.</span></span></h1>
-      <div className={styles.heroBottom}>
-        <div className={styles.heroCopy}><p>Bring back the finish<br />you fell for.</p><span>Still swirled or hazy after a wash?<br />Precision polishing brings back clarity and gloss.</span><div className={styles.heroActions}><Link className="button gold" href={booking}>Book paint correction</Link><a className="button outline on-dark" href="#the-craft">Discover the difference</a></div></div>
-        <div className={styles.heroMeta}><div><span>YOUR FINISH, REFINED</span><strong>{servicePrice(service)}</strong></div><button type="button" onClick={() => { setAllowReducedMotion(true); setPaused(value => !value); }} className={`button small outline on-dark ${styles.filmToggle}`}><span aria-hidden="true">{paused ? "▷" : "Ⅱ"}</span>{paused ? "Play films" : "Pause films"}</button></div>
-      </div>
+      <figure className={styles.heroMedia}>
+        <div className={styles.heroFilm}><PaintFilm kind="hero" paused={paused} allowReducedMotion={allowReducedMotion} /></div>
+        <figcaption className={styles.mediaCaption}><span>YOUR FINISH, REFINED</span><button type="button" onClick={() => { setAllowReducedMotion(true); setPaused(value => !value); }} className="button small outline"><span aria-hidden="true">{paused ? "▷" : "Ⅱ"}</span>{paused ? "Play films" : "Pause films"}</button></figcaption>
+      </figure>
     </section>
+    <div className={serviceStyles.appointmentStrip}>
+      <div><span>YOUR INVESTMENT</span><strong>{servicePrice(service)}</strong></div><div><span>APPOINTMENT ESTIMATE</span><strong>{serviceDuration(service.duration_minutes)}</strong></div><p>Scope confirmed for your vehicle.<br />Additional work discussed before we begin.</p>
+    </div>
 
     <nav className={styles.sectionNav} aria-label="Paint correction guide"><span>YOUR GUIDE TO A BETTER FINISH</span><a href="#the-craft">The difference</a><a href="#your-correction">Options & pricing</a><a href="#your-visit">The process</a><a href="#paint-questions">Questions</a></nav>
 
@@ -77,7 +74,7 @@ export function PaintCorrection({ service }: { service: Service }) {
       <div className={styles.craftGrid}>
         <figure className={styles.processShowcase}>
           <div className={styles.processFilm}><PaintFilm kind="process" paused={paused} allowReducedMotion={allowReducedMotion} /></div>
-          <figcaption className={styles.processCaption}><span className={styles.processLabel}>THE ART OF PAINT REFINEMENT</span><button type="button" className={`button small outline on-dark ${styles.processToggle}`} onClick={() => { setAllowReducedMotion(true); setPaused(value => !value); }}><span aria-hidden="true">{paused ? "▷" : "Ⅱ"}</span>{paused ? "Play video" : "Pause video"}</button></figcaption>
+          <figcaption className={styles.processCaption}><span className={styles.processLabel}>THE ART OF PAINT REFINEMENT</span><button type="button" className={`button small outline ${styles.processToggle}`} onClick={() => { setAllowReducedMotion(true); setPaused(value => !value); }}><span aria-hidden="true">{paused ? "▷" : "Ⅱ"}</span>{paused ? "Play video" : "Pause video"}</button></figcaption>
         </figure>
         <div className={styles.craftCopy}><h3>More than a wash.{" "}<br />A refinement of the paint.</h3><p>A wash removes dirt. Paint correction addresses suitable imperfections in the clear coat through carefully selected machine polishing. Light reflects more clearly, revealing depth that washing alone can’t restore.</p></div>
         <div className={styles.concerns}>{benefits.map((benefit, index) => <article key={benefit.title}><small>0{index + 1}</small><div><h4>{benefit.title}</h4><p>{benefit.text}</p></div></article>)}</div>
@@ -102,7 +99,7 @@ export function PaintCorrection({ service }: { service: Service }) {
         </div>
         <p className={styles.approachNote}>Correction percentages are targets, not promises. Paint thickness, previous repairs and defect depth determine the safe result.</p>
       </div>
-      <aside className={styles.bookingCard} aria-label="Paint correction service details"><span className={styles.cardTag}>PAINT CORRECTION</span><div className={styles.price}>{servicePrice(service)}</div><p className={styles.duration}>Estimated appointment <strong>{serviceDuration(service.duration_minutes)}</strong></p><ul>{service.includes.map(item => <li key={item}>{bookingInclusionLabels.get(item.trim().toLowerCase()) ?? item}</li>)}</ul><Link href={booking} className="button gold">Book your correction</Link><p className={styles.cardNote}>{service.pricing_mode === "quote" ? "Your vehicle and paint condition guide your final quote." : "Sedan pricing shown. Vehicle size and paint condition guide your final quote."} Scope agreed before work begins.</p></aside>
+      <aside className={styles.bookingCard} aria-label="Paint correction service details"><span className={styles.cardTag}>PAINT CORRECTION</span><div className={styles.price}>{servicePrice(service)}</div><p className={styles.duration}>Estimated appointment <strong>{serviceDuration(service.duration_minutes)}</strong></p><ul>{service.includes.map(item => <li key={item}>{bookingInclusionLabels.get(item.trim().toLowerCase()) ?? item}</li>)}</ul><Link href={booking} className="button">Book your correction</Link><p className={styles.cardNote}>{service.pricing_mode === "quote" ? "Your vehicle and paint condition guide your final quote." : "Sedan pricing shown. Vehicle size and paint condition guide your final quote."} Scope agreed before work begins.</p></aside>
     </section>
 
     <section className={styles.journey} id="your-visit" aria-labelledby="journey-title">
@@ -113,9 +110,7 @@ export function PaintCorrection({ service }: { service: Service }) {
 
     <section className={styles.finish} id="paint-questions" aria-labelledby="finish-title">
       <div className={styles.faqs}><p className={styles.eyebrow}>04 / GOOD TO KNOW</p>{questions.map(item => <details key={item.title}><summary>{item.title}<span aria-hidden="true">+</span></summary><p>{item.answer}</p></details>)}</div>
-      <div className={styles.finalAction}><p className={styles.eyebrow}>LET’S GET YOUR FINISH BACK.</p><h2 id="finish-title">See your paint<br /><span>differently.</span></h2><p>Choose a time and tell us about your car.<br />We’ll help you find the right correction.</p><div><Link className="button gold" href={booking}>Book paint correction</Link><Link className="button outline on-dark" href="/contact">Ask about your vehicle</Link></div></div>
+      <div className={styles.finalAction}><p className={styles.eyebrow}>LET’S GET YOUR FINISH BACK.</p><h2 id="finish-title">See your paint<br /><span>differently.</span></h2><p>Choose a time and tell us about your car.<br />We’ll help you find the right correction.</p><div><Link className="button" href={booking}>Book paint correction</Link><Link className="button outline" href="/contact">Ask about your vehicle</Link></div></div>
     </section>
-
-    <aside className={styles.bookingDock} data-visible={dock} aria-label="Quick paint correction booking"><div><span>PAINT CORRECTION</span><strong>{servicePrice(service)}</strong></div><Link href={booking} className="button gold small" tabIndex={dock ? 0 : -1}>Book your correction</Link></aside>
   </div>;
 }

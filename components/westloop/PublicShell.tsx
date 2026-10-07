@@ -39,7 +39,6 @@ const navigation = [
 
 export function PublicHeader({ business }: { business: BusinessSettings }) {
   const pathname = usePathname();
-  const bookingButton = pathname === "/services/paint-correction" ? "button gold" : "button";
   const [open, setOpen] = useState(false);
   const header = useRef<HTMLElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
@@ -76,9 +75,9 @@ export function PublicHeader({ business }: { business: BusinessSettings }) {
               {label}
             </Link>
           ))}
-          <Link href="/booking" className={`${bookingButton} ceramics-menu-book`} onClick={() => setOpen(false)}>Book an appointment</Link>
+          <Link href="/booking" className="button ceramics-menu-book" onClick={() => setOpen(false)}>Book an appointment</Link>
         </nav>
-        <Link className={`${bookingButton} small ceramics-header-book`} href="/booking">Book now</Link>
+        <Link className="button small ceramics-header-book" href="/booking">Book now</Link>
         <button ref={toggle} className="ceramics-menu-toggle" aria-expanded={open} aria-controls="ceramics-navigation" aria-label={open ? "Close navigation" : "Open navigation"} onClick={() => setOpen((value) => !value)}>
           <span>{open ? "Close" : "Menu"}</span><span className="ceramics-menu-icon" aria-hidden="true"><i /><i /></span>
         </button>
@@ -87,7 +86,7 @@ export function PublicHeader({ business }: { business: BusinessSettings }) {
   );
 }
 
-export function PublicFooter({ business, showBookingCTA = true, mobileBookingCTA = showBookingCTA }: { business: BusinessSettings; showBookingCTA?: boolean; mobileBookingCTA?: boolean }) {
+export function PublicFooter({ business, showBookingCTA = true, mobileBookingCTA = showBookingCTA, mobileBookingHref = "/booking" }: { business: BusinessSettings; showBookingCTA?: boolean; mobileBookingCTA?: boolean; mobileBookingHref?: string }) {
   return (
     <>
       {showBookingCTA && <section className="ceramics-final-cta" aria-labelledby="final-cta-heading">
@@ -106,7 +105,7 @@ export function PublicFooter({ business, showBookingCTA = true, mobileBookingCTA
           <div className="ceramics-footer-bottom"><span>© {new Date().getFullYear()} {business.name}</span><div><Link href="/privacy-notice">Privacy notice</Link><Link href="/service-rules">Service terms</Link><a href="/hero/credits.txt" target="_blank" rel="noreferrer">Visual credits</a><Link href="/admin">Team access</Link></div></div>
         </div>
       </footer>
-      <div className="mobile-bar ceramics-mobile-bar"><Link className="button small" href={mobileBookingCTA ? "/booking" : "/contact"}>{mobileBookingCTA ? "Book appointment" : "Contact the studio"}</Link><CallLink phone={business.phone} className="button small outline" /></div>
+      <div className="mobile-bar ceramics-mobile-bar"><Link className="button small" href={mobileBookingCTA ? mobileBookingHref : "/contact"}>{mobileBookingCTA ? "Book appointment" : "Contact the studio"}</Link><CallLink phone={business.phone} className="button small outline" /></div>
     </>
   );
 }

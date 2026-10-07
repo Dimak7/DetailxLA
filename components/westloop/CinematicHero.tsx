@@ -198,7 +198,7 @@ export function CinematicHero() {
           Paint correction and complete interior and exterior care in Chicago’s West Loop.
         </p>
         <div className={styles.actions}>
-          <Link href="/services" className="button gold">See services &amp; prices</Link>
+          <Link href="/services" className="button light">See services &amp; prices</Link>
           <Link href="/booking" className="button outline on-dark">Book your service</Link>
         </div>
       </div>

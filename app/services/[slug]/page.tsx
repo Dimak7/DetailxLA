@@ -8,7 +8,6 @@ import { PageShell } from "@/components/westloop/PageShell";
 import { ServiceCards } from "@/components/westloop/ServiceCards";
 import { CeramicFilm } from "@/components/westloop/CeramicFilm";
 import { PaintCorrection } from "@/components/westloop/PaintCorrection";
-import paintStyles from "@/components/westloop/PaintCorrection.module.css";
 import { money } from "@/lib/platform/types";
 import { siteUrl } from "@/lib/platform/settings";
 import { BRAND_NAME } from "@/lib/brand";
@@ -54,7 +53,7 @@ export default async function Page({ params }: PageProps) {
     ],
   };
   if (service.slug === "paint-correction") return (
-    <PageShell business={d.business} className={paintStyles.shell} showBookingCTA={false} mobileBookingCTA={false}>
+    <PageShell business={d.business} showBookingCTA={false} mobileBookingCTA mobileBookingHref={bookingHref}>
       <PaintCorrection service={service} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
     </PageShell>
@@ -105,7 +104,7 @@ export default async function Page({ params }: PageProps) {
 
         <section className={`${styles.section} ${styles.faqSection}`} aria-labelledby="faq-heading"><div className={styles.faqLayout}><div><p className={styles.eyebrow}>GOOD QUESTIONS</p><h2 id="faq-heading">Know what<br /><em>to expect.</em></h2><p className={styles.bodyCopy}>A clear understanding of the service is part of a good result.</p></div><div className={styles.faqs}>{content.faqs.map((faq) => <details key={faq.question}><summary>{faq.question}<span aria-hidden="true">+</span></summary><p>{faq.answer}</p></details>)}</div></div></section>
 
-        <section className={styles.consultation}><p className={styles.eyebrow}>{service.name.toUpperCase()}</p><h2>Ready to get started?</h2><p>Choose a time and tell us about your car. We will confirm the details that matter before the work begins.</p><div className={styles.actions}><Link className="button gold" href={bookingHref}>Book {service.name.toLowerCase()}</Link><Link className={styles.lightTextLink} href="/contact">Ask a question</Link></div></section>
+        <section className={styles.consultation}><p className={styles.eyebrow}>{service.name.toUpperCase()}</p><h2>Ready to get started?</h2><p>Choose a time and tell us about your car. We will confirm the details that matter before the work begins.</p><div className={styles.actions}><Link className="button" href={bookingHref}>Book {service.name.toLowerCase()}</Link><Link className={styles.textLink} href="/contact">Ask a question</Link></div></section>
 
         {related.length > 0 && <section className={styles.section} aria-labelledby="related-heading"><div className={styles.sectionHeading}><div><p className={styles.eyebrow}>MORE SERVICES</p><h2 id="related-heading">Other ways to care for your car.</h2></div><Link className={styles.textLink} href="/services">View all services</Link></div><ServiceCards services={related} compact /></section>}
       </div>

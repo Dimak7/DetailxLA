@@ -8,12 +8,14 @@ export function PageShell({
   children,
   showBookingCTA = true,
   mobileBookingCTA = showBookingCTA,
+  mobileBookingHref = "/booking",
   className = "",
 }: {
   business: BusinessSettings;
   children: React.ReactNode;
   showBookingCTA?: boolean;
   mobileBookingCTA?: boolean;
+  mobileBookingHref?: string;
   className?: string;
 }) {
   const publicBusiness = publicSettings(business);
@@ -32,7 +34,7 @@ export function PageShell({
         }}
       />
       <main id="main">{children}</main>
-      <PublicFooter business={publicBusiness} showBookingCTA={showBookingCTA} mobileBookingCTA={mobileBookingCTA} />
+      <PublicFooter business={publicBusiness} showBookingCTA={showBookingCTA} mobileBookingCTA={mobileBookingCTA} mobileBookingHref={mobileBookingHref} />
     </div>
   );
 }
