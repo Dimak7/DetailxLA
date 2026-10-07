@@ -33,7 +33,7 @@ export default async function Home() {
   const fullDetail = services.find((s) => s.slug === "full-detail");
   const detailing = ["interior-detail", "exterior-detail"].flatMap((slug) => services.filter((s) => s.slug === slug));
   const featured = [
-    { slug: "full-detail", purpose: "Clean the whole car", copy: "Interior and exterior detailing in one visit.", image: "/brand/editorial/green-car-hand-wash.webp", imageAlt: "Hand washing a green vehicle with rich foam", displayPrice: "Starting from $250" },
+    { slug: "full-detail", purpose: "Clean the whole car", copy: "Interior and exterior detailing in one visit.", image: "/brand/editorial/green-car-hand-wash.webp", imageAlt: "Hand washing a green vehicle with rich foam", displayPrice: "Starting from $500" },
     { slug: "paint-correction", purpose: "Improve the paint", copy: "Polishing to reduce light swirls, haze and fine marks.", image: "/brand/editorial/classic-mustang-finish.webp", imageAlt: "Glossy black classic Mustang paint and chrome after refinement" },
     { slug: "ceramic-coating", purpose: "Protect the finish", copy: "Prepared paint, lasting gloss and easier upkeep.", image: "/brand/editorial/vintage-green-lifestyle.webp", imageAlt: "Driver admiring the reflection in a polished vintage green car" },
   ].flatMap((item) => {

@@ -348,4 +348,22 @@ WITH migration AS (
 UPDATE wl.services
 SET price_cents=25000, pricing_mode='starting', updated_at=now()
 WHERE slug='full-detail' AND EXISTS (SELECT 1 FROM migration);
+-- Restore the approved Full Detail price and publish the studio's social profiles.
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (8)
+  ON CONFLICT DO NOTHING
+  RETURNING version
+), service_update AS (
+  UPDATE wl.services
+  SET price_cents=50000, pricing_mode='starting', updated_at=now()
+  WHERE slug='full-detail' AND EXISTS (SELECT 1 FROM migration)
+  RETURNING id
+)
+UPDATE wl.settings
+SET value=jsonb_set(
+      jsonb_set(value, '{instagram_url}', '"https://www.instagram.com/westloopautospa/"'::jsonb),
+      '{google_review_url}', '"https://share.google/wcuAF8LhyOu4FOpsx"'::jsonb
+    ),
+    updated_at=now()
+WHERE key='business' AND EXISTS (SELECT 1 FROM migration);
 `;
