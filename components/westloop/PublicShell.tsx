@@ -105,6 +105,7 @@ export function PublicFooter({ business, showBookingCTA = true, mobileBookingCTA
           <div className="ceramics-footer-bottom"><span>© {new Date().getFullYear()} {business.name}</span><div><Link href="/privacy-notice">Privacy notice</Link><Link href="/service-rules">Service terms</Link><a href="/hero/credits.txt" target="_blank" rel="noreferrer">Visual credits</a><Link href="/admin">Team access</Link></div></div>
         </div>
       </footer>
+      <div className="operopsy-credit" aria-label="Website and product credits"><div className="wrap operopsy-credit-inner"><span className="operopsy-signature"><span className="operopsy-symbol" aria-hidden="true">o.</span><strong>OPEROPSY <small>LLC</small></strong></span><p>Website &amp; product designed and developed by <strong>Operopsy LLC.</strong><span>Copyright © {new Date().getFullYear()}</span></p></div></div>
       <div className="mobile-bar ceramics-mobile-bar"><Link className="button small" href={mobileBookingCTA ? mobileBookingHref : "/contact"}>{mobileBookingCTA ? "Book appointment" : "Contact the studio"}</Link><CallLink phone={business.phone} className="button small outline" /></div>
     </>
   );

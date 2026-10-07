@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { PaintFilm } from "./PaintFilm";
+import Image from "next/image";
 import { serviceDuration, servicePrice } from "@/lib/service-content";
 import { servicePackages } from "@/lib/booking-options";
 import { money, type Service } from "@/lib/platform/types";
@@ -29,8 +28,6 @@ const bookingInclusionLabels = new Map([
 ]);
 
 export function PaintCorrection({ service }: { service: Service }) {
-  const [paused, setPaused] = useState(false);
-  const [allowReducedMotion, setAllowReducedMotion] = useState(false);
   const booking = `/booking?service=${encodeURIComponent(service.id)}`;
   const correctionPackages = servicePackages("paint-correction");
   const questions = [
@@ -40,17 +37,10 @@ export function PaintCorrection({ service }: { service: Service }) {
     { title: "What should I tell you before booking?", answer: "Share your car’s make, model and the marks that bother you. Mention previous polishing, repainting, coatings, wraps or paint protection film. Photos help start the conversation, but the paint still needs an in-person assessment." },
   ];
 
-  useEffect(() => {
-    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setPaused(preference.matches);
-    update();
-    preference.addEventListener("change", update);
-    return () => preference.removeEventListener("change", update);
-  }, []);
 
   return <div className={`${serviceStyles.page} ${styles.page}`}>
     <section className={styles.hero} aria-labelledby="paint-title">
-      <div className={styles.heroFilm}><PaintFilm kind="hero" paused={paused} allowReducedMotion={allowReducedMotion} /></div>
+      <div className={styles.heroFilm}><Image src="/brand/photos/paint-beading.webp" alt="Water beading on black paint beside a microfiber towel" fill sizes="100vw" priority style={{ objectFit: "cover" }} /></div>
       <div className={styles.heroShade} aria-hidden="true" />
       <div className={styles.heroHeading}>
         <p className={styles.heroEyebrow}>WEST LOOP CERAMICS / CHICAGO</p>
@@ -62,7 +52,7 @@ export function PaintCorrection({ service }: { service: Service }) {
           <p className={styles.heroDescription}>Still swirled or hazy after a wash?<br />Precision polishing brings back clarity and gloss.</p>
           <div className={styles.heroActions}><Link className="button light" href={booking}>Book paint correction</Link><a className="button outline on-dark" href="#the-craft">Discover the difference</a></div>
         </div>
-        <div className={styles.heroControls}><span>YOUR FINISH, REFINED</span><button type="button" onClick={() => { setAllowReducedMotion(true); setPaused(value => !value); }} className="button small outline on-dark"><span aria-hidden="true">{paused ? "▷" : "Ⅱ"}</span>{paused ? "Play films" : "Pause films"}</button></div>
+        <div className={styles.heroControls}><span>YOUR FINISH, REFINED</span></div>
       </div>
     </section>
     <div className={serviceStyles.appointmentStrip}>
@@ -75,8 +65,8 @@ export function PaintCorrection({ service }: { service: Service }) {
       <div className={styles.craftHeading}><p className={styles.eyebrow}>01 / THE DIFFERENCE</p><h2 id="craft-title">Clean is the starting point.<br /><span>Clarity is the next step.</span></h2></div>
       <div className={styles.craftGrid}>
         <figure className={styles.processShowcase}>
-          <div className={styles.processFilm}><PaintFilm kind="process" paused={paused} allowReducedMotion={allowReducedMotion} /></div>
-          <figcaption className={styles.processCaption}><span className={styles.processLabel}>THE ART OF PAINT REFINEMENT</span><button type="button" className={`button small outline ${styles.processToggle}`} onClick={() => { setAllowReducedMotion(true); setPaused(value => !value); }}><span aria-hidden="true">{paused ? "▷" : "Ⅱ"}</span>{paused ? "Play video" : "Pause video"}</button></figcaption>
+          <div className={styles.processFilm}><Image src="/brand/photos/hand-wash.webp" alt="Careful hand washing of a black vehicle" fill sizes="(max-width: 760px) 100vw, 55vw" style={{ objectFit: "cover" }} /></div>
+          <figcaption className={styles.processCaption}><span className={styles.processLabel}>CARE STARTS WITH A CLEAN SURFACE</span></figcaption>
         </figure>
         <div className={styles.craftCopy}><h3>More than a wash.{" "}<br />A refinement of the paint.</h3><p>A wash removes dirt. Paint correction addresses suitable imperfections in the clear coat through carefully selected machine polishing. Light reflects more clearly, revealing depth that washing alone can’t restore.</p></div>
         <div className={styles.concerns}>{benefits.map((benefit, index) => <article key={benefit.title}><small>0{index + 1}</small><div><h4>{benefit.title}</h4><p>{benefit.text}</p></div></article>)}</div>

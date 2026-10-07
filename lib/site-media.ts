@@ -3,4 +3,4 @@
  * Add an English WebVTT caption track if the film includes speech.
  */
 export const ceramicFilm: { src: string; captions?: string } | null = null;
-export const ceramicFilmPoster = "/brand/photography/ceramic-coating.webp";
+export const ceramicFilmPoster = "/brand/photos/paint-beading.webp";

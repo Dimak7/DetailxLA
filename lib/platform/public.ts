@@ -1,3 +1,4 @@
+import { customerPhotoPath } from "../photo-paths";
 import { query } from "./db";
 import { settings, publicSettings } from "./settings";
 import type { Service, GalleryItem, Review } from "./types";
@@ -14,5 +15,5 @@ export async function publicData() {
       "SELECT id,name,rating,text,created_at FROM wl.reviews WHERE status='published' ORDER BY created_at DESC LIMIT 12",
     ),
   ]);
-  return { business: publicSettings(business), services, gallery, reviews };
+  return { business: publicSettings(business), services: services.map((service) => ({ ...service, image_url: customerPhotoPath(service.image_url) })), gallery: gallery.map((item) => ({ ...item, image_url: customerPhotoPath(item.image_url), before_url: customerPhotoPath(item.before_url) })), reviews };
 }
