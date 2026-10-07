@@ -75,7 +75,7 @@ const catalog = [
     "full-detail",
     "Signature care",
     "Our signature interior and exterior reset.",
-    50000,
+    25000,
     240,
     [
       "Full interior detail",
@@ -84,7 +84,7 @@ const catalog = [
       "Trim refresh",
       "Wax protection",
     ],
-    "fixed",
+    "starting",
     "full-detail-studio.webp",
   ],
   [

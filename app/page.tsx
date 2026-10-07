@@ -33,9 +33,9 @@ export default async function Home() {
   const fullDetail = services.find((s) => s.slug === "full-detail");
   const detailing = ["interior-detail", "exterior-detail"].flatMap((slug) => services.filter((s) => s.slug === slug));
   const featured = [
-    { slug: "full-detail", purpose: "Clean the whole car", copy: "Interior and exterior detailing in one visit." },
-    { slug: "paint-correction", purpose: "Improve the paint", copy: "Polishing to reduce light swirls, haze and fine marks." },
-    { slug: "ceramic-coating", purpose: "Protect the finish", copy: "Prepared paint, lasting gloss and easier upkeep." },
+    { slug: "full-detail", purpose: "Clean the whole car", copy: "Interior and exterior detailing in one visit.", image: "/brand/editorial/green-car-hand-wash.webp", imageAlt: "Hand washing a green vehicle with rich foam", displayPrice: "Starting from $250" },
+    { slug: "paint-correction", purpose: "Improve the paint", copy: "Polishing to reduce light swirls, haze and fine marks.", image: "/brand/editorial/classic-mustang-finish.webp", imageAlt: "Glossy black classic Mustang paint and chrome after refinement" },
+    { slug: "ceramic-coating", purpose: "Protect the finish", copy: "Prepared paint, lasting gloss and easier upkeep.", image: "/brand/editorial/vintage-green-lifestyle.webp", imageAlt: "Driver admiring the reflection in a polished vintage green car" },
   ].flatMap((item) => {
     const service = services.find((s) => s.slug === item.slug);
     return service ? [{ ...item, service }] : [];
@@ -57,17 +57,20 @@ export default async function Home() {
       <CinematicHero />
       <section className={styles.quickServices} id="detailing" aria-labelledby="choose-care-heading"><div className="wrap" id="services">
         <div className={styles.quickHeading}><div><p className="eyebrow">YOUR CAR. THE RIGHT CARE.</p><h2 id="choose-care-heading">What does your car need?</h2></div><Link className="text-link" href="/services">All services &amp; prices</Link></div>
-        <div className={styles.quickGrid}>{featured.map(({ purpose, copy, service }) => <article className={styles.quickCard} key={service.id}>
-          <p className={styles.purpose}>{purpose}</p><h3>{service.name}</h3><p>{copy}</p>
-          <div className={styles.quickPrice}><strong>{servicePrice(service)}</strong><Link href={`/services/${service.slug}`}>See details</Link></div>
-          <Link className={`button small ${styles.quickBook}`} href={`/booking?service=${encodeURIComponent(service.id)}`}>{service.slug === "ceramic-coating" || service.pricing_mode === "quote" ? "Request a consultation" : `Book ${service.name.toLowerCase()}`}</Link>
+        <div className={styles.quickGrid}>{featured.map(({ purpose, copy, image, imageAlt, displayPrice, service }) => <article className={styles.quickCard} key={service.id}>
+          <div className={styles.quickMedia}><Image src={image} alt={imageAlt} fill sizes="(max-width: 760px) 100vw, 33vw" /></div>
+          <div className={styles.quickCardBody}>
+            <p className={styles.purpose}>{purpose}</p><h3>{service.name}</h3><p>{copy}</p>
+            <div className={styles.quickPrice}><strong>{displayPrice ?? servicePrice(service)}</strong><Link href={`/services/${service.slug}`}>See details</Link></div>
+            <Link className={`button small ${styles.quickBook}`} href={`/booking?service=${encodeURIComponent(service.id)}`}>{service.slug === "ceramic-coating" || service.pricing_mode === "quote" ? "Request a consultation" : `Book ${service.name.toLowerCase()}`}</Link>
+          </div>
         </article>)}</div>
       </div></section>
       {fullDetail && <section className={`${styles.detailingFeature} wrap`} id="full-detail" aria-labelledby="detailing-heading">
         <div className={styles.detailingImage}><Image src="/brand/photography/full-detail-studio.webp" alt="Graphite luxury sedan receiving a meticulous finishing pass in a professional Chicago studio" fill sizes="(max-width: 760px) 100vw, 48vw" /></div>
         <div className={styles.detailingCopy}><p className="eyebrow">FULL SERVICE DETAILING</p><h2 id="detailing-heading">A clean cabin.<br /><em>A fresh exterior.</em></h2>
           <p>Everyday dust, road grime and the places a quick wash misses. Our full detail brings interior and exterior care together, so your whole car feels cared for.</p>
-          <div className={styles.detailingPrice}><strong>{servicePrice(fullDetail)}</strong><span>Interior + exterior · {fullDetail.name}</span></div>
+          <div className={styles.detailingPrice}><strong>{servicePrice(fullDetail).replace(/^From /, "Starting from ")}</strong><span>Interior + exterior · {fullDetail.name}</span></div>
           <div className={styles.links}><Link className="button" href={`/booking?service=${encodeURIComponent(fullDetail.id)}`}>{fullDetail.pricing_mode === "quote" ? "Request full detailing" : "Book a full detail"}</Link><Link className="text-link" href={`/services/${fullDetail.slug}`}>What’s included</Link></div>
           {detailing.length > 0 && <div className={styles.focusedDetails}><p>Only need one area?</p>{detailing.map((service) => <Link key={service.id} href={`/services/${service.slug}`}><span>{service.name}</span><strong>{servicePrice(service)}</strong></Link>)}</div>}
         </div>
@@ -82,15 +85,15 @@ export default async function Home() {
         <div className={styles.featureVisual}><CeramicFilm /></div>
       </section>}
       <section className={`${styles.process} wrap`} id="process">
-        <div className={styles.processImage}><Image src="/brand/photography/paint-correction.webp" alt="Professional paint correction under precise vertical inspection lights" fill sizes="(max-width: 760px) 100vw, 44vw" /></div>
+        <div className={styles.processImage}><Image src="/brand/editorial/interior-steam.webp" alt="Steam cleaning a saddle leather luxury interior" fill sizes="(max-width: 760px) 100vw, 44vw" /></div>
         <div className={styles.processCopy}><p className="eyebrow">OUR PROCESS</p><h2>The finish matters.<br /><em>So does the process.</em></h2><p>Premium care should feel clear from the first conversation to the first drive home.</p>
           {[["01", "Understand your vehicle", "Tell us what you want cleaned or improved. We help you choose the right service."], ["02", "Agree the details", "We confirm the price and what is included before work begins."], ["03", "Finish. Inspect. Advise.", "We check the completed work, then share simple aftercare advice."]].map(([n, title, body]) => <div className={styles.processStep} key={n}><span>{n}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}
           <Link className="text-link" href="/contact">Ask about your vehicle</Link>
         </div>
       </section>
       <section className={styles.detailStrip} aria-label="Attention to every surface">
-        <figure><Image src="/brand/photography/ceramic-coating.webp" alt="Ceramic coating applied across deep graphite automotive paint" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>PAINTWORK</span><h3>Depth in every reflection.</h3></figcaption></figure>
-        <figure><Image src="/brand/photography/interior-detail.webp" alt="Immaculate saddle leather cabin after professional interior detailing" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>INTERIOR CARE</span><h3>Care you feel, every day.</h3></figcaption></figure>
+        <figure><Image src="/brand/editorial/wheel-foam.webp" alt="Vintage wheel covered in dense cleaning foam" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>EVERY SURFACE</span><h3>Nothing gets overlooked.</h3></figcaption></figure>
+        <figure><Image src="/brand/editorial/vintage-cabin-lifestyle.webp" alt="Relaxed driver in a beautifully kept vintage car cabin" fill sizes="(max-width: 760px) 100vw, 50vw" /><figcaption><span>THE DRIVE HOME</span><h3>Care you feel, every day.</h3></figcaption></figure>
       </section>
       {reviews.length > 0 && <section className={`${styles.reviews} wrap`}><p className="eyebrow">FROM THE DRIVER’S SEAT</p><h2>Good care gets remembered.</h2><div>{reviews.slice(0, 3).map((r) => <blockquote key={r.id}><span aria-label={`${r.rating} out of 5 stars`}>{"★".repeat(r.rating)}</span><p>“{r.text}”</p><cite>{r.name}</cite><small>Verified appointment</small></blockquote>)}</div></section>}
       <section className={`${styles.faq} wrap`}><div><p className="eyebrow">BEFORE YOU BOOK</p><h2>Answers before your appointment.</h2><p>Not sure where to start? Tell us about your vehicle and we’ll help you choose.</p><Link className="text-link" href="/contact">Ask the studio</Link></div><div className={styles.questions}>{questions.map(([question, answer]) => <details key={question}><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div></section>

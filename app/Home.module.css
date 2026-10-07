@@ -36,10 +36,18 @@
 .quickHeading :global(.eyebrow){margin-bottom:10px}
 .quickHeading>a{flex-shrink:0;min-height:44px;display:inline-flex;align-items:center;font-size:13px}
 .quickGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.quickCard{display:flex;flex-direction:column;min-width:0;padding:26px;background:#f8f5ef;border:1px solid #d2c8b8}
+.quickCard{display:flex;flex-direction:column;min-width:0;background:#f8f5ef;border:1px solid #d2c8b8;overflow:hidden}
+.quickMedia{position:relative;aspect-ratio:1.38;overflow:hidden;background:#282923}
+.quickMedia:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 64%,rgba(20,22,19,.2));pointer-events:none}
+.quickMedia img{object-fit:cover;filter:saturate(.82) contrast(1.04);transition:transform 800ms cubic-bezier(.2,.7,.2,1),filter 500ms ease}
+.quickCard:nth-child(1) .quickMedia img{object-position:center 58%}
+.quickCard:nth-child(2) .quickMedia img{object-position:center 64%}
+.quickCard:nth-child(3) .quickMedia img{object-position:center 42%}
+.quickCard:hover .quickMedia img{transform:scale(1.025);filter:saturate(.95) contrast(1.03)}
+.quickCardBody{display:flex;flex:1;flex-direction:column;padding:24px 26px 26px}
 .quickCard .purpose{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#785337;margin:0 0 12px}
 .quickCard h3{font-family:var(--font-display),Georgia,serif;font-size:32px;font-weight:400;line-height:1.1;letter-spacing:-.02em;margin:0 0 12px;color:#151719}
-.quickCard>p{font-size:14px;line-height:1.65;color:#605d55;margin:0 0 20px}
+.quickCardBody>p{font-size:14px;line-height:1.65;color:#605d55;margin:0 0 20px}
 .quickPrice{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px 16px;margin-top:auto}
 .quickPrice strong{font-size:20px;font-weight:500;color:#38342d}
 .quickPrice a{display:inline-flex;min-height:44px;align-items:center;font-size:12px;color:#795638;text-decoration:underline;text-underline-offset:4px}
@@ -64,9 +72,10 @@
   .quickHeading{align-items:start;flex-direction:column;gap:4px;margin-bottom:18px}
   .quickHeading h2{font-size:36px}
   .quickGrid{grid-template-columns:minmax(0,1fr);gap:12px}
-  .quickCard{padding:22px}
+  .quickMedia{aspect-ratio:1.6}
+  .quickCardBody{padding:20px 22px 22px}
   .quickCard h3{font-size:30px;margin-bottom:8px}
-  .quickCard>p{font-size:13px;margin-bottom:10px}
+  .quickCardBody>p{font-size:13px;margin-bottom:10px}
   .quickCard .purpose{font-size:10px;margin-bottom:8px}
   .quickPrice strong{font-size:19px}
   .quickBook{margin-top:8px}

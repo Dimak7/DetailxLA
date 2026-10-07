@@ -339,4 +339,13 @@ WITH migration AS (
 UPDATE wl.services
 SET name='Extensive Interior Detail', updated_at=now()
 WHERE slug='deep-interior-cleaning' AND EXISTS (SELECT 1 FROM migration);
+-- Keep the advertised Full Detail starting price consistent through booking and checkout.
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (7)
+  ON CONFLICT DO NOTHING
+  RETURNING version
+)
+UPDATE wl.services
+SET price_cents=25000, pricing_mode='starting', updated_at=now()
+WHERE slug='full-detail' AND EXISTS (SELECT 1 FROM migration);
 `;
