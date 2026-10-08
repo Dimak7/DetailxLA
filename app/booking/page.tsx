@@ -37,7 +37,7 @@ export default async function Page({
         <h1>
           Make it <em>exceptional.</em>
         </h1>
-        <p>{selectedService ? `${selectedService.name}, selected for your visit. Add your vehicle and find an available time.` : "Choose your care. Tell us about your vehicle. Find a time that works."}</p>
+        <p>{selectedService ? `${selectedService.name} is selected. Add your vehicle, review the estimate and choose an available appointment.` : "Choose the care your vehicle needs, review the estimate and reserve an available time. Your details stay visible before you confirm."}</p>
       </section>
       <BookingWizard
         services={d.services}

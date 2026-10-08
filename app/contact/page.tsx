@@ -21,12 +21,12 @@ export default async function Page() {
             <br />
             <em>good hands.</em>
           </h1>
-          <p className={styles.lead}>Questions about detailing, paint correction or ceramic coating? Let’s find the right care for your car.</p>
+          <p className={styles.lead}>Questions about detailing, paint correction or ceramic coating? Tell us what you drive and what you want to improve. We’ll recommend a clear next step.</p>
         </div>
         <div className={styles.panel}>
           <p className={styles.eyebrow}>A QUESTION BEFORE YOU BOOK?</p>
           <h2 id="enquiry-title">Tell us about your car.</h2>
-          <p className={styles.panelIntro}>Share your vehicle and what you’d like to improve. We’ll help you choose the right service.</p>
+          <p className={styles.panelIntro}>Share the vehicle, its condition and your priorities. We’ll help you compare the right service, expected scope and booking path.</p>
           <ContactForm />
         </div>
         <aside className={styles.studio} aria-labelledby="studio-title">
@@ -38,7 +38,7 @@ export default async function Page() {
             {business.phone && <div><dt>Call us</dt><dd><CallLink phone={business.phone} /></dd></div>}
             {business.service_area && <div><dt>Serving</dt><dd>{business.service_area}</dd></div>}
           </dl>
-          <div className={styles.booking}><h3>Ready to book?</h3><p>Choose your service and find a time that works for you.</p><Link href="/booking" className="button outline">Book an appointment</Link></div>
+          <div className={styles.booking}><h3>Ready to book?</h3><p>Choose a service, review your estimate and reserve an available time online.</p><Link href="/booking" className="button outline">Book an appointment</Link></div>
         </aside>
       </section>
     </PageShell>

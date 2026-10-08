@@ -11,7 +11,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-hand-wash",
     "title": "A careful hand wash",
-    "caption": "A sponge lifts dirt from the exterior finish.",
+    "caption": "A careful contact wash lifts road film while respecting the finish beneath it.",
     "category": "Exterior",
     "image_url": "/brand/photos/hand-wash.webp",
     "before_url": "",
@@ -21,7 +21,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-mercedes-interior",
     "title": "A fresh cabin",
-    "caption": "White leather, clean surfaces and a cabin ready for the drive.",
+    "caption": "Clean leather, crisp touchpoints and a cabin that feels composed again.",
     "category": "Interior",
     "image_url": "/brand/photos/mercedes-interior.webp",
     "before_url": "",
@@ -31,7 +31,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-green-car-foam",
     "title": "Foam wash",
-    "caption": "A green sports car covered in cleaning foam.",
+    "caption": "Dense foam begins the exterior reset by loosening dirt before contact washing.",
     "category": "Exterior",
     "image_url": "/brand/photos/green-car-foam.webp",
     "before_url": "",
@@ -41,7 +41,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-interior-cleaning",
     "title": "Interior care",
-    "caption": "A brush works cleaner into an interior door panel.",
+    "caption": "Material-appropriate tools reach the seams, textures and everyday touchpoints.",
     "category": "Interior",
     "image_url": "/brand/photos/interior-cleaning.webp",
     "before_url": "",
@@ -51,7 +51,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-wheel-cleaning",
     "title": "Every spoke",
-    "caption": "A soft brush reaches into the wheel.",
+    "caption": "A soft detailing brush reaches the spokes, hardware and tighter wheel surfaces.",
     "category": "Detail Work",
     "image_url": "/brand/photos/wheel-cleaning.webp",
     "before_url": "",
@@ -61,7 +61,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-mercedes-foam",
     "title": "In the wash bay",
-    "caption": "A black Mercedes during its foam wash.",
+    "caption": "Preparation in progress before the final finish is inspected and protected.",
     "category": "Exterior",
     "image_url": "/brand/photos/mercedes-foam.webp",
     "before_url": "",
@@ -71,7 +71,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-paint-beading",
     "title": "The finishing details",
-    "caption": "Water beading and a microfiber towel on black paint.",
+    "caption": "Tight water behavior and a clear reflection reveal the quality of the prepared surface.",
     "category": "The Finish",
     "image_url": "/brand/photos/paint-beading.webp",
     "before_url": "",
@@ -81,6 +81,9 @@ const featuredPortfolio: GalleryItem[] = [
 ];
 export default async function Page() {
   const d = await publicData();
+  const galleryItems = [...featuredPortfolio, ...d.gallery].filter((item, index, items) =>
+    items.findIndex((candidate) => candidate.image_url === item.image_url) === index,
+  );
   return (
     <PageShell business={d.business}>
       <section className="page-intro wrap">
@@ -90,10 +93,10 @@ export default async function Page() {
           <br />
           <em>is in the details.</em>
         </h1>
-        <p>A closer look at the surfaces, finishes and craftsmanship behind every service.</p>
+        <p>See the work up close: careful washing, interior touchpoints, wheel details and the final surfaces that make a car feel complete.</p>
       </section>
       <section className="wrap section no-top">
-        <Gallery items={[...featuredPortfolio, ...d.gallery]} />
+        <Gallery items={galleryItems} />
       </section>
     </PageShell>
   );

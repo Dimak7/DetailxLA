@@ -29,6 +29,15 @@
   .questions summary{font-size:14px}
 }
 
+/* Keep useful context visible even while an FAQ answer is collapsed. */
+.questions summary>.questionText{display:grid;gap:4px;font-size:inherit;font-weight:inherit;color:inherit;transition:none}
+.questions details[open] summary>.questionText{transform:none}
+.questionText strong{font:inherit}
+.questionText small{font-size:11px;font-weight:400;line-height:1.5;color:#81786d}
+.questions summary>.faqToggle{font-size:23px;font-weight:400;color:#956b44;transition:transform .2s}
+.questions details[open] summary>.faqToggle{transform:rotate(45deg)}
+@media(max-width:760px){.questionText small{font-size:10px}}
+
 /* Let customers choose their care before the longer service stories. */
 .quickServices{padding:54px 0;background:#e8e2d7;color:#151719;scroll-margin-top:100px}
 .quickHeading{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:24px}
