@@ -366,4 +366,14 @@ SET value=jsonb_set(
     ),
     updated_at=now()
 WHERE key='business' AND EXISTS (SELECT 1 FROM migration);
+-- Keep the public profile, review requests and business metadata on the current Google listing.
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (9)
+  ON CONFLICT DO NOTHING
+  RETURNING version
+)
+UPDATE wl.settings
+SET value=jsonb_set(value, '{google_review_url}', '"https://share.google/fSuy9uzpFoOVDamV4"'::jsonb),
+    updated_at=now()
+WHERE key='business' AND EXISTS (SELECT 1 FROM migration);
 `;

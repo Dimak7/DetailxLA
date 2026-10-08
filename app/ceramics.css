@@ -17,6 +17,7 @@
   overflow: clip;
 }
 .ceramics-site .wrap { max-width: 1480px; padding-inline: 6%; }
+.ceramics-site main :is(img, video) { filter: saturate(.48) sepia(.1) contrast(1.06) brightness(.94); }
 .ceramics-site .section { padding-top: 104px; padding-bottom: 104px; }
 .ceramics-site .section.no-top { padding-top: 0; }
 :where(.ceramics-site) h1, :where(.ceramics-site) h2 { font-weight: 500; letter-spacing: -.045em; }

@@ -45,6 +45,7 @@ export default async function Home() {
     "@context": "https://schema.org", "@type": "AutomotiveBusiness",
     name: business.name, url: siteUrl(), areaServed: "Chicago, Illinois",
     openingHoursSpecification: openingHoursSpecification(business),
+    sameAs: [business.instagram_url, business.google_review_url].filter(Boolean),
     ...(business.phone ? { telephone: business.phone } : {}),
     ...(business.address ? { address: { "@type": "PostalAddress", streetAddress: business.address, addressLocality: "Chicago", addressRegion: "IL", addressCountry: "US" } } : {}),
   };

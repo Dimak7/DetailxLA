@@ -76,6 +76,7 @@
 .focusedDetails>a{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;font-size:13px;color:#35382f;text-decoration:underline;text-underline-offset:4px}
 .focusedDetails strong{font-weight:500;white-space:nowrap}
 .coating{padding-top:60px;padding-bottom:80px;border-top:1px solid #d8cfc0;align-items:center}
+.quickCard:hover .quickMedia img{filter:saturate(.58) sepia(.08) contrast(1.06) brightness(.96)}
 @media(max-width:760px){
   .quickServices{padding:32px 0}
   .quickHeading{align-items:start;flex-direction:column;gap:4px;margin-bottom:18px}

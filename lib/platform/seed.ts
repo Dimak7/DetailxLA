@@ -22,7 +22,7 @@ export const defaultSettings: BusinessSettings = {
   logo_url: "",
   favicon_url: "",
   instagram_url: "https://www.instagram.com/westloopautospa/",
-  google_review_url: "https://share.google/wcuAF8LhyOu4FOpsx",
+  google_review_url: "https://share.google/fSuy9uzpFoOVDamV4",
   google_tag_id: "",
   ga4_id: "",
   google_ads_id: "",
