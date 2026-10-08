@@ -275,9 +275,9 @@
 /* A quiet maker signature below the studio footer. */
 /* Wordmark proportions and symbol from operopsy.com; DM Sans is subset to the logo. */
 @font-face{font-family:"Operopsy Wordmark";src:url("/brand/operopsy/wordmark.woff2") format("woff2");font-style:normal;font-weight:650;font-display:swap}
-.ceramics-site .operopsy-credit{display:block;border-top:1px solid #343538;background:#101213;color:#aaa69f;padding:19px 0;text-decoration:none}
+.ceramics-site .operopsy-credit{display:block;border-top:1px solid #343538;background:#101213;color:#aaa69f;padding:15px 0;text-decoration:none}
 .ceramics-site .operopsy-credit-inner{display:flex;justify-content:space-between;align-items:center;gap:20px}
-.ceramics-site .operopsy-signature{display:inline-flex;align-items:center;gap:9px;flex-shrink:0;min-height:44px;max-width:100%;color:#ded4c5;font-family:"Operopsy Wordmark",Arial,sans-serif;font-size:27px;letter-spacing:-1.7px;font-weight:650;line-height:1;white-space:nowrap;text-decoration:none}
+.ceramics-site .operopsy-signature{display:inline-flex;align-items:center;gap:8px;flex-shrink:0;min-height:40px;max-width:100%;color:#ded4c5;font-family:"Operopsy Wordmark",Arial,sans-serif;font-size:26px;letter-spacing:-1.6px;font-weight:650;line-height:1;white-space:nowrap;text-decoration:none}
 .ceramics-site .operopsy-symbol{width:24px;height:27px;border:6px solid currentColor;transform:rotate(-17deg);border-radius:2px;margin-right:2px;flex-shrink:0}
 .ceramics-site .operopsy-credit p{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:flex-end;gap:4px;margin:0;color:#aaa69f;font-size:11px;line-height:1.8}
 .ceramics-site .operopsy-credit p>strong{font-weight:500;color:#ded4c5;text-decoration:underline;text-underline-offset:3px;text-decoration-color:#756d63}

@@ -212,6 +212,22 @@ test("Relational platform integration", async (t) => {
           ).line_items[0].base_price_money.amount,
           37500,
         );
+        const returnUrl = new URL(
+          (
+            requestBody.checkout_options as { redirect_url: string }
+          ).redirect_url,
+        );
+        assert.equal(returnUrl.origin, "http://localhost:3000");
+        assert.equal(returnUrl.pathname, "/booking/confirmation");
+        assert.equal(returnUrl.searchParams.get("id"), booking.booking.id);
+        assert.ok(returnUrl.searchParams.get("token"));
+        assert.equal(returnUrl.searchParams.get("payment"), "returned");
+        assert.ok(
+          await verifyReceipt(
+            booking.booking.id,
+            returnUrl.searchParams.get("token")!,
+          ),
+        );
         const payment = (
           await query<{ provider: string; metadata: Record<string, string> }>(
             "SELECT provider,metadata FROM wl.payments WHERE booking_id=$1 AND provider='square'",
