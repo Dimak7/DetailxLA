@@ -59,6 +59,7 @@ export const bookingInput = z.object({
   session_id: z.uuid(),
   attribution: attributionSchema.default({
     source: "",
+    lead_stream: "",
     medium: "",
     campaign: "",
     term: "",
@@ -357,26 +358,12 @@ export async function createBooking(value: unknown, admin = false) {
         "INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,'upsell',$3,1,$4)",
         [randomUUID(), id, addOn.name, addOn.priceCents],
       );
-    const leadId = input.lead_id || randomUUID();
-    if (input.lead_id)
+    const leadId = input.lead_id || null;
+    if (leadId)
       await q(
         "UPDATE wl.leads SET customer_id=$1,status='booked',updated_at=now() WHERE id=$2",
         [customerId, leadId],
       );
-    else {
-      await q(
-        "INSERT INTO wl.leads(id,name,email,phone,status,customer_id,attribution_id) VALUES($1,$2,$3,$4,'booked',$5,$6)",
-        [
-          leadId,
-          input.first_name + " " + input.last_name,
-          input.email,
-          input.phone,
-          customerId,
-          attributionId,
-        ],
-      );
-      await q("UPDATE wl.bookings SET lead_id=$1 WHERE id=$2", [leadId, id]);
-    }
     await q(
       "INSERT INTO wl.timeline(id,customer_id,booking_id,lead_id,type,body) VALUES($1,$2,$3,$4,'booking_created',$5)",
       [
@@ -404,17 +391,13 @@ export async function createBooking(value: unknown, admin = false) {
         JSON.stringify({ value_cents: price, currency: "USD" }),
       ],
     );
-    await q(
-      "INSERT INTO wl.events(id,name,session_id,customer_id,booking_id,attribution_id) VALUES($1,'lead_created',$2,$3,$4,$5)",
-      ["lead:" + leadId, input.session_id, customerId, id, attributionId],
-    );
     await enqueueBooking(q, booking, s, token, "booking_request");
     await enqueue(q, {
       key: "meta:booking:" + id,
       channel: "meta",
       recipient: s.meta_dataset_id || s.meta_pixel_id,
       body: JSON.stringify(
-        metaEvent("Lead", "booking:" + id, {
+        metaEvent("Schedule", "booking:" + id, {
           email: input.email,
           phone: input.phone,
           value: price,

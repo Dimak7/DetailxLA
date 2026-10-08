@@ -21,6 +21,7 @@ import {
   bookingStatuses,
   leadStatuses,
   channels,
+  leadStreams,
   type Session,
   type BusinessSettings,
   type Service,
@@ -335,6 +336,7 @@ export function AdminWorkspace({
         email: "",
         phone: "",
         source: "Phone",
+        lead_stream: "Unassigned",
         campaign: "",
         status: "new",
         notes: "",
@@ -346,6 +348,7 @@ export function AdminWorkspace({
         f("email", "Email", "email"),
         f("phone", "Phone"),
         f("source", "Source", "select", { options: [...channels] }),
+        f("lead_stream", "Lead stream", "select", { options: [...leadStreams] }),
         f("campaign", "Campaign"),
         f("status", "Status", "select", { options: [...leadStatuses] }),
         f("assigned_to", "Assign to", "nullable-select", {
@@ -1228,22 +1231,29 @@ export function AdminWorkspace({
             </section>}
           </div>
           {canViewGrowthReports && <section className="paper">
-            <h2>Channel performance</h2>
+            <div className="section-heading"><div><p className="eyebrow">ACQUISITION</p><h2>Channel performance</h2></div></div>
+            <div className="stats-grid acquisition-stats">
+              <article className="stat"><p>True enquiries</p><strong>{s(rep.leads)}</strong><small>Website enquiries and manually entered prospects.</small></article>
+              <article className="stat"><p>Bookings</p><strong>{s(rep.bookings.total)}</strong><small>Reserved appointments in this reporting period.</small></article>
+              <article className="stat"><p>New clients</p><strong>{s(rep.customers.new_customers)}</strong><small>New customer records, kept separate from leads.</small></article>
+            </div>
             {table(
               [
                 "Channel",
-                "Leads",
+                "Enquiries",
                 "Bookings",
-                "Revenue",
+                "Clients",
+                "Paid revenue",
                 "Spend",
                 "CPL",
                 "CPA",
                 "ROAS",
               ],
-              rep.channels.map((r) => [
+              rep.channels.filter((r) => n(r.leads) || n(r.bookings) || n(r.clients) || n(r.revenue) || r.spend != null || ["Google Ads", "Meta Ads"].includes(r.channel)).map((r) => [
                 r.channel,
                 s(r.leads),
                 s(r.bookings),
+                s(r.clients),
                 money(r.revenue),
                 r.spend == null ? "Not entered" : money(r.spend),
                 r.cpl == null ? "—" : money(r.cpl),
@@ -1253,24 +1263,40 @@ export function AdminWorkspace({
               { comparison: true, label: "Channel performance" },
             )}
             <p className="small-note">
-              Spend is manually entered unless an ad reporting connector is
-              added. Missing spend is not zero spend. Source is linked to the
-              actual booking and payment record.
+              Enquiries are contact-form or manually entered prospects. A direct booking is not also counted as a lead. Paid revenue uses verified collected payments. Spend remains manual until ad-account reporting credentials are connected; missing spend is not zero.
             </p>
+          </section>}
+          {canViewGrowthReports && <section className="paper">
+            <div className="section-heading"><div><p className="eyebrow">OWNERSHIP</p><h2>Lead stream performance</h2></div></div>
+            {table(
+              ["Lead stream", "Enquiries", "Bookings", "Clients", "Paid revenue", "Spend", "CPL", "CPA", "ROAS"],
+              rep.lead_streams.map((r) => [
+                <><strong>{r.lead_stream}</strong><small>{r.lead_stream === "Unassigned" ? "Add lead_stream to campaign URLs" : "Tagged acquisition stream"}</small></>,
+                s(r.leads), s(r.bookings), s(r.clients), money(r.revenue),
+                r.spend == null ? "Not entered" : money(r.spend),
+                r.cpl == null ? "—" : money(r.cpl),
+                r.cpa == null ? "—" : money(r.cpa),
+                r.roas == null ? "—" : r.roas.toFixed(2) + "×",
+              ]),
+              { comparison: true, label: "Lead stream performance" },
+            )}
+            <p className="small-note">Use <strong>lead_stream=dima</strong> for Dima campaign URLs and <strong>lead_stream=west-loop</strong> for West Loop campaign URLs. Click IDs identify the ad platform; this tag identifies who owns the lead stream.</p>
           </section>}
           {section !== "dashboard" && (
             <>
               <section className="paper">
                 <h2>Campaign attribution</h2>
                 {table(
-                  ["Channel", "Campaign", "Leads", "Bookings", "Revenue"],
+                  ["Channel", "Lead stream", "Campaign", "Enquiries", "Bookings", "Clients", "Paid revenue"],
                   rep.campaigns
                     .filter((r) => n(r.leads) || n(r.bookings) || n(r.revenue))
                     .map((r) => [
                       s(r.source),
+                      s(r.lead_stream),
                       s(r.campaign) || "(not tagged)",
                       s(r.leads),
                       s(r.bookings),
+                      s(r.clients),
                       money(n(r.revenue)),
                     ]),
                 )}
@@ -1291,6 +1317,15 @@ export function AdminWorkspace({
           {section === "marketing" && (
             <>
               <section className="paper">
+                <div className="section-heading"><div><p className="eyebrow">DATA QUALITY</p><h2>Tracking &amp; ad connections</h2></div></div>
+                <div className="stats-grid acquisition-stats">
+                  <article className="stat"><p>Website attribution</p><strong>Active</strong><small>UTMs, Google click IDs, social click IDs, referrer and lead stream are stored with each visit.</small></article>
+                  <article className="stat"><p>Google Ads</p><strong>{business.google_ads_id ? "Conversions configured" : "Not configured"}</strong><small>Conversion tags do not import campaign spend. Google Ads reporting API is not connected yet.</small></article>
+                  <article className="stat"><p>Meta Ads</p><strong>{business.meta_pixel_id ? "Tracking configured" : "Not configured"}</strong><small>Pixel/CAPI tracking does not import Ads Manager spend. Meta reporting API is not connected yet.</small></article>
+                  <article className="stat"><p>Spend source</p><strong>Manual</strong><small>Only verified spend entered below is used for CPL, CPA and ROAS.</small></article>
+                </div>
+              </section>
+              <section className="paper">
                 <div className="section-heading">
                   <h2>Ad spend</h2>
                   <button
@@ -1301,6 +1336,7 @@ export function AdminWorkspace({
                         "save_spend",
                         {
                           channel: "Google Ads",
+                          lead_stream: "Unassigned",
                           campaign: "",
                           spend_date: dateToday(),
                           amount_cents: 0,
@@ -1308,6 +1344,9 @@ export function AdminWorkspace({
                         [
                           f("channel", "Channel", "select", {
                             options: [...channels],
+                          }),
+                          f("lead_stream", "Lead stream", "select", {
+                            options: [...leadStreams],
                           }),
                           f("campaign", "Campaign"),
                           f("spend_date", "Spend date", "date"),
@@ -1320,10 +1359,11 @@ export function AdminWorkspace({
                   </button>
                 </div>
                 {table(
-                  ["Date", "Channel", "Campaign", "Amount"],
+                  ["Date", "Channel", "Lead stream", "Campaign", "Amount"],
                   rows(data.spend).map((r) => [
                     s(r.spend_date),
                     s(r.channel),
+                    s(r.lead_stream),
                     s(r.campaign),
                     money(n(r.amount_cents)),
                   ]),
@@ -1741,7 +1781,7 @@ export function AdminWorkspace({
       )}
       {section === "leads" &&
         table(
-          ["Lead", "Source / campaign", "Status", "Contact", "Actions"],
+          ["Lead", "Source / stream", "Status", "Contact", "Actions"],
           list.map((r) => [
             <>
               {s(r.name)}
@@ -1749,7 +1789,7 @@ export function AdminWorkspace({
             </>,
             <>
               {s(r.source)}
-              <small>{s(r.campaign)}</small>
+              <small>{s(r.lead_stream)}{s(r.campaign) ? " · " + s(r.campaign) : ""}</small>
             </>,
             status(r.status),
             <>

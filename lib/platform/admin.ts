@@ -92,7 +92,7 @@ function operationalReport(full: Awaited<ReturnType<typeof report>>) {
     net_operating_profit: _profit, operating_margin: _margin,
     financial_series: _financialSeries, spend: _spend,
     conversion_rate: _conversionRate, events: _events,
-    channels: _channels, google_ads: _googleAds, campaigns: _campaigns,
+    channels: _channels, lead_streams: _leadStreams, google_ads: _googleAds, campaigns: _campaigns,
     ...operations
   } = full;
   return operations;
@@ -301,7 +301,7 @@ export async function adminData(
   if (section === "leads")
     return {
       rows: await query(
-        "SELECT l.*,a.source,a.campaign FROM wl.leads l LEFT JOIN wl.attributions a ON a.id=l.attribution_id WHERE (l.name||' '||l.email||' '||l.phone) ILIKE $1 ORDER BY l.created_at DESC LIMIT $2 OFFSET $3",
+        "SELECT l.*,a.source,a.lead_stream,a.campaign FROM wl.leads l LEFT JOIN wl.attributions a ON a.id=l.attribution_id WHERE l.origin<>'booking' AND (l.name||' '||l.email||' '||l.phone) ILIKE $1 ORDER BY l.created_at DESC LIMIT $2 OFFSET $3",
         ["%" + search + "%", limit, offset],
       ),
       team,
@@ -888,6 +888,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         ]),
         notes: txt,
         source: z.string().max(100),
+        lead_stream: z.enum(["Dima Leads", "West Loop Leads", "Unassigned"]).default("Unassigned"),
         campaign: z.string().max(500).default(""),
         assigned_to: uuid.nullable(),
       })
@@ -895,10 +896,11 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     await transaction(async (q) => {
       const attributionId = await saveAttribution(q, randomUUID(), {
         source: l.source,
+        lead_stream: l.lead_stream,
         campaign: l.campaign,
       });
       await q(
-        "INSERT INTO wl.leads(id,name,email,phone,status,notes,assigned_to,attribution_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(id) DO UPDATE SET name=$2,email=$3,phone=$4,status=$5,notes=$6,assigned_to=$7,updated_at=now()",
+        "INSERT INTO wl.leads(id,name,email,phone,status,notes,assigned_to,attribution_id,origin) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'manual') ON CONFLICT(id) DO UPDATE SET name=$2,email=$3,phone=$4,status=$5,notes=$6,assigned_to=$7,attribution_id=$8,updated_at=now()",
         [
           l.id || randomUUID(),
           l.name,
@@ -1117,6 +1119,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     const s = z
       .object({
         channel: z.string().max(80),
+        lead_stream: z.enum(["Dima Leads", "West Loop Leads", "Unassigned"]).default("Unassigned"),
         campaign: z.string().max(500),
         spend_date: z.string(),
         amount_cents: z.number().int().min(0).max(100000000),
@@ -1124,8 +1127,8 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       .parse(data);
     if (!validDate(s.spend_date)) throw new AppError("Invalid spend date.");
     await query(
-      "INSERT INTO wl.ad_spend(id,channel,campaign,spend_date,amount_cents) VALUES($1,$2,$3,$4,$5)",
-      [randomUUID(), s.channel, s.campaign, s.spend_date, s.amount_cents],
+      "INSERT INTO wl.ad_spend(id,channel,lead_stream,campaign,spend_date,amount_cents) VALUES($1,$2,$3,$4,$5,$6)",
+      [randomUUID(), s.channel, s.lead_stream, s.campaign, s.spend_date, s.amount_cents],
     );
   }
   if (action === "save_gallery") {

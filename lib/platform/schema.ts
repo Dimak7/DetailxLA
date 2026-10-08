@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS wl.password_resets (token_hash text PRIMARY KEY, user
 CREATE TABLE IF NOT EXISTS wl.rate_limits (key text PRIMARY KEY, count integer NOT NULL DEFAULT 1, expires_at timestamptz NOT NULL);
 CREATE TABLE IF NOT EXISTS wl.attributions (
  id uuid PRIMARY KEY, session_id text NOT NULL UNIQUE, source text NOT NULL DEFAULT 'Direct',
+ lead_stream text NOT NULL DEFAULT 'Unassigned',
  medium text NOT NULL DEFAULT '', campaign text NOT NULL DEFAULT '', term text NOT NULL DEFAULT '',
  content text NOT NULL DEFAULT '', gclid text NOT NULL DEFAULT '', gbraid text NOT NULL DEFAULT '', wbraid text NOT NULL DEFAULT '', fbclid text NOT NULL DEFAULT '',
  landing_page text NOT NULL DEFAULT '', referrer text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now());
@@ -37,7 +38,8 @@ CREATE TABLE IF NOT EXISTS wl.leads (
  id uuid PRIMARY KEY, name text NOT NULL, email text NOT NULL DEFAULT '', phone text NOT NULL DEFAULT '',
  status text NOT NULL DEFAULT 'new' CHECK(status IN ('new','contacted','qualified','booked','won','lost')),
  notes text NOT NULL DEFAULT '', assigned_to uuid REFERENCES wl.users(id), customer_id uuid REFERENCES wl.customers(id),
- attribution_id uuid REFERENCES wl.attributions(id), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+ attribution_id uuid REFERENCES wl.attributions(id), origin text NOT NULL DEFAULT 'manual' CHECK(origin IN ('manual','website','booking')),
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.bookings (
  id uuid PRIMARY KEY, request_key text NOT NULL UNIQUE, request_hash text NOT NULL,
  reference text NOT NULL UNIQUE, customer_id uuid NOT NULL REFERENCES wl.customers(id), vehicle_id uuid NOT NULL REFERENCES wl.vehicles(id),
@@ -95,7 +97,7 @@ CREATE TABLE IF NOT EXISTS wl.gallery (
  id uuid PRIMARY KEY, title text NOT NULL, caption text NOT NULL DEFAULT '', category text NOT NULL,
  image_url text NOT NULL, before_url text NOT NULL DEFAULT '', sort_order integer NOT NULL DEFAULT 0, published boolean NOT NULL DEFAULT false);
 CREATE TABLE IF NOT EXISTS wl.ad_spend (
- id uuid PRIMARY KEY, channel text NOT NULL, campaign text NOT NULL DEFAULT '', spend_date text NOT NULL,
+ id uuid PRIMARY KEY, channel text NOT NULL, lead_stream text NOT NULL DEFAULT 'Unassigned', campaign text NOT NULL DEFAULT '', spend_date text NOT NULL,
  amount_cents integer NOT NULL CHECK(amount_cents >= 0), origin text NOT NULL DEFAULT 'manual');
 CREATE TABLE IF NOT EXISTS wl.employees (
  id uuid PRIMARY KEY, user_id uuid UNIQUE REFERENCES wl.users(id), phone text NOT NULL DEFAULT '', position text NOT NULL DEFAULT 'Other',
@@ -376,4 +378,23 @@ UPDATE wl.settings
 SET value=jsonb_set(value, '{google_review_url}', '"https://share.google/fSuy9uzpFoOVDamV4"'::jsonb),
     updated_at=now()
 WHERE key='business' AND EXISTS (SELECT 1 FROM migration);
+-- Separate enquiries from direct bookings and split reporting by acquisition owner.
+ALTER TABLE wl.attributions ADD COLUMN IF NOT EXISTS lead_stream text NOT NULL DEFAULT 'Unassigned';
+ALTER TABLE wl.leads ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'manual';
+ALTER TABLE wl.ad_spend ADD COLUMN IF NOT EXISTS lead_stream text NOT NULL DEFAULT 'Unassigned';
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (10)
+  ON CONFLICT DO NOTHING
+  RETURNING version
+), lead_update AS (
+  UPDATE wl.leads l SET origin='booking'
+  WHERE origin='manual' AND EXISTS (SELECT 1 FROM migration) AND EXISTS (
+  SELECT 1 FROM wl.bookings b WHERE b.lead_id=l.id
+    AND abs(EXTRACT(EPOCH FROM (b.created_at-l.created_at))) < 60
+  ) RETURNING id
+)
+UPDATE wl.attributions SET source='Organic Social'
+WHERE source='Meta Ads' AND landing_page<>''
+  AND lower(medium) !~ '(^|[_ -])(cpc|ppc|paid|paid social|paidsocial)($|[_ -])'
+  AND EXISTS (SELECT 1 FROM migration);
 `;

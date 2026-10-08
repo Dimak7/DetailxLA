@@ -8,6 +8,7 @@ export type Session = {
 };
 export type Attribution = {
   source: string;
+  lead_stream: string;
   medium: string;
   campaign: string;
   term: string;
@@ -166,6 +167,7 @@ export const leadStatuses = [
 export const channels = [
   "Google Ads",
   "Meta Ads",
+  "Organic Social",
   "Organic",
   "Direct",
   "Referral",
@@ -174,6 +176,7 @@ export const channels = [
   "Phone",
   "Other",
 ] as const;
+export const leadStreams = ["Dima Leads", "West Loop Leads", "Unassigned"] as const;
 export function money(cents: number | null | undefined) {
   return cents == null
     ? "By consultation"

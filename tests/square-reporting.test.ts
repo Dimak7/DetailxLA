@@ -263,7 +263,7 @@ test("Square revenue reports use the canonical production ledger", async (t) => 
       tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
       const attributionId = randomUUID();
       await query(
-        "INSERT INTO wl.attributions(id,session_id,source,campaign,gclid,created_at) VALUES($1,$2,'Google Ads','square-campaign','fixture-click',$3)",
+        "INSERT INTO wl.attributions(id,session_id,source,lead_stream,campaign,gclid,created_at) VALUES($1,$2,'Google Ads','Dima Leads','square-campaign','fixture-click',$3)",
         [attributionId, randomUUID(), at],
       );
       const booking = await bookingFixture({ paidAt: at, attributionId });
@@ -275,7 +275,7 @@ test("Square revenue reports use the canonical production ledger", async (t) => 
       await localPayment(booking, { provider: "stripe", amount: 3000, fee: 90, paidAt: at });
       await squarePayment({ amount: 6000, fee: 150, paidAt: at });
       await squarePayment({ amount: 9999, paidAt: `${tomorrow.toISOString().slice(0, 10)}T18:00:00Z` });
-      await query("INSERT INTO wl.ad_spend(id,channel,campaign,spend_date,amount_cents) VALUES($1,'Google Ads','square-campaign',$2,2000)", [randomUUID(), today]);
+      await query("INSERT INTO wl.ad_spend(id,channel,lead_stream,campaign,spend_date,amount_cents) VALUES($1,'Google Ads','Dima Leads','square-campaign',$2,2000)", [randomUUID(), today]);
       const result = await report(range(today));
       assert.equal(result.revenue, 16000);
       assert.equal(result.refunds, 1000);
@@ -291,7 +291,9 @@ test("Square revenue reports use the canonical production ledger", async (t) => 
       assert.equal(result.google_ads.paid_revenue, 10000);
       assert.equal(result.google_ads.roas, 5);
       assert.equal(result.channels.find((row) => row.channel === "Google Ads")?.revenue, 10000);
-      assert.deepEqual(result.campaigns, [{ source: "Google Ads", campaign: "square-campaign", leads: 0, bookings: 1, revenue: 10000 }]);
+      assert.equal(result.channels.find((row) => row.channel === "Google Ads")?.clients, 1);
+      assert.equal(result.lead_streams.find((row) => row.lead_stream === "Dima Leads")?.revenue, 10000);
+      assert.deepEqual(result.campaigns, [{ source: "Google Ads", lead_stream: "Dima Leads", campaign: "square-campaign", leads: 0, bookings: 1, clients: 1, revenue: 10000 }]);
       assert.deepEqual(result.topServices, [{ service_name: "Fixture detail", revenue: 10000, bookings: 1 }]);
     });
 

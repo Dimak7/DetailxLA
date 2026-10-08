@@ -25,6 +25,7 @@ type TrackingWindow = Window & {
 
 const emptyAttribution: Attribution = {
   source: "",
+  lead_stream: "",
   medium: "",
   campaign: "",
   term: "",
@@ -67,6 +68,7 @@ export function visitor() {
   } catch {}
   let attribution = completeAttribution({
     source: p.get("utm_source") || "",
+    lead_stream: p.get("lead_stream") || p.get("utm_account") || "",
     medium: p.get("utm_medium") || "",
     campaign: p.get("utm_campaign") || "",
     term: p.get("utm_term") || "",
@@ -79,7 +81,8 @@ export function visitor() {
     referrer,
   });
   const hasCampaign = Boolean(
-    attribution.source ||
+      attribution.source ||
+      attribution.lead_stream ||
       attribution.medium ||
       attribution.campaign ||
       attribution.gclid ||

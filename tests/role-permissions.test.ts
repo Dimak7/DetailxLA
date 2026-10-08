@@ -81,7 +81,7 @@ test("role boundaries are enforced in API responses, employee accounts and assig
     assert.deepEqual(managerDashboard.spend, []);
     assert.deepEqual(managerDashboard.campaigns, []);
     assert.equal("inventory" in managerDashboard, false);
-    for (const key of ["expenses", "expense_summary", "net_operating_profit", "operating_margin", "financial_series", "spend", "conversion_rate", "events", "channels", "google_ads", "campaigns"])
+    for (const key of ["expenses", "expense_summary", "net_operating_profit", "operating_margin", "financial_series", "spend", "conversion_rate", "events", "channels", "lead_streams", "google_ads", "campaigns"])
       assert.equal(key in managerDashboard.report, false, `manager dashboard must not expose ${key}`);
     for (const key of ["revenue", "bookings", "customers", "labor_cost", "topServices", "series"])
       assert.ok(key in managerDashboard.report, `manager dashboard retains operational ${key}`);

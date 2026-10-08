@@ -1,5 +1,5 @@
 import { query } from "./db";
-import { dateToday, channels, type Row } from "./types";
+import { dateToday, channels, leadStreams, type Row } from "./types";
 import { validDate } from "./bookings";
 import { AppError } from "./auth";
 import { expenseSummary } from "./finance";
@@ -71,17 +71,18 @@ export async function report(params: URLSearchParams) {
       values,
     ),
     query<Row>(
-      `SELECT count(*)::int count FROM wl.leads WHERE ${time}`,
+      `SELECT count(*)::int count FROM wl.leads WHERE origin<>'booking' AND ${time}`,
       values,
     ),
     query<Row>(
       "SELECT COALESCE(SUM(amount_cents),0)::int total FROM wl.ad_spend WHERE spend_date BETWEEN $1 AND $2",
       values,
     ),
-    query<{ source: string; campaign: string; leads: number; bookings: number; revenue: number | string }>(
-      `SELECT a.source,a.campaign,
- (SELECT count(*)::int FROM wl.leads l WHERE l.attribution_id=a.id AND (l.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) leads,
+    query<{ source: string; lead_stream: string; campaign: string; leads: number; bookings: number; clients: number; revenue: number | string }>(
+      `SELECT a.source,a.lead_stream,a.campaign,
+ (SELECT count(*)::int FROM wl.leads l WHERE l.attribution_id=a.id AND l.origin<>'booking' AND (l.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) leads,
  (SELECT count(*)::int FROM wl.bookings b WHERE b.attribution_id=a.id AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) bookings,
+ (SELECT count(DISTINCT b.customer_id)::int FROM wl.bookings b WHERE b.attribution_id=a.id AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) clients,
  COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::bigint FROM wl.revenue_payments p JOIN wl.bookings b ON p.booking_id=b.id WHERE b.attribution_id=a.id AND ${payments}),0)::bigint revenue FROM wl.attributions a`,
       values,
     ),
@@ -113,8 +114,8 @@ export async function report(params: URLSearchParams) {
     ),
   ]);
   const expenses = await expenseSummary(start, end);
-  const channelSpend = await query<{ channel: string; total: number }>(
-    "SELECT channel,SUM(amount_cents)::int total FROM wl.ad_spend WHERE spend_date BETWEEN $1 AND $2 GROUP BY channel",
+  const channelSpend = await query<{ channel: string; lead_stream: string; total: number }>(
+    "SELECT channel,lead_stream,SUM(amount_cents)::int total FROM wl.ad_spend WHERE spend_date BETWEEN $1 AND $2 GROUP BY channel,lead_stream",
     values,
   );
   const googleAds = (
@@ -140,26 +141,53 @@ export async function report(params: URLSearchParams) {
       values,
     )
   )[0];
-  const googleAdsSpend =
-    channelSpend.find((entry) => entry.channel === "Google Ads")?.total ?? null;
-  const channelPerformance = channels.map((channel) => {
-    const rows = performance.filter((r) => r.source === channel),
-      sum = (key: "leads" | "bookings" | "revenue") => rows.reduce((n, r) => n + Number(r[key]), 0),
-      adSpend = channelSpend.find((s) => s.channel === channel)?.total ?? null;
+  const spendFor = (match: (row: (typeof channelSpend)[number]) => boolean) => {
+    const matching = channelSpend.filter(match);
+    return matching.length ? matching.reduce((total, row) => total + Number(row.total), 0) : null;
+  };
+  const performanceFor = (
+    label: string,
+    match: (row: (typeof performance)[number]) => boolean,
+    spendMatch: (row: (typeof channelSpend)[number]) => boolean,
+  ) => {
+    const rows = performance.filter(match),
+      sum = (key: "leads" | "bookings" | "clients" | "revenue") => rows.reduce((total, row) => total + Number(row[key]), 0),
+      adSpend = spendFor(spendMatch);
     const l = sum("leads"),
       b = sum("bookings"),
+      clients = sum("clients"),
       revenue = sum("revenue");
     return {
-      channel,
+      label,
       leads: l,
       bookings: b,
+      clients,
       revenue,
       spend: adSpend,
       cpl: adSpend != null && l ? adSpend / l : null,
       cpa: adSpend != null && b ? adSpend / b : null,
       roas: adSpend ? revenue / adSpend : null,
     };
-  });
+  };
+  const channelPerformance = channels.map((channel) => ({
+    channel,
+    ...performanceFor(channel, (row) => row.source === channel, (row) => row.channel === channel),
+  }));
+  const streamPerformance = leadStreams.map((leadStream) => ({
+    lead_stream: leadStream,
+    ...performanceFor(leadStream, (row) => row.lead_stream === leadStream, (row) => row.lead_stream === leadStream),
+  }));
+  const campaignPerformance = new Map<string, { source: string; lead_stream: string; campaign: string; leads: number; bookings: number; clients: number; revenue: number }>();
+  for (const row of performance) {
+    const key = [row.source, row.lead_stream, row.campaign].join("\u0000"),
+      current = campaignPerformance.get(key) || { source: row.source, lead_stream: row.lead_stream, campaign: row.campaign, leads: 0, bookings: 0, clients: 0, revenue: 0 };
+    current.leads += Number(row.leads);
+    current.bookings += Number(row.bookings);
+    current.clients += Number(row.clients);
+    current.revenue += Number(row.revenue);
+    campaignPerformance.set(key, current);
+  }
+  const googleAdsSpend = spendFor((entry) => entry.channel === "Google Ads");
   const windows = await query<Row>(
     `SELECT
  COALESCE(SUM(amount_cents-refunded_cents) FILTER(WHERE (paid_at AT TIME ZONE 'America/Chicago')::date=$1::date),0)::bigint AS today,
@@ -225,6 +253,7 @@ export async function report(params: URLSearchParams) {
     conversion_rate: visits ? (totalBookings / visits) * 100 : null,
     events,
     channels: channelPerformance,
+    lead_streams: streamPerformance,
     google_ads: {
       sessions: Number(googleAds.sessions),
       click_sessions: Number(googleAds.click_sessions),
@@ -237,7 +266,7 @@ export async function report(params: URLSearchParams) {
         ? Number(googleAds.paid_revenue) / googleAdsSpend
         : null,
     },
-    campaigns: performance.map((row) => ({ ...row, revenue: Number(row.revenue) })),
+    campaigns: [...campaignPerformance.values()],
     series: series.map((row) => ({ ...row, revenue: Number(row.revenue) })),
     topServices: topServices.map((row) => ({ ...row, revenue: Number(row.revenue) })),
   };

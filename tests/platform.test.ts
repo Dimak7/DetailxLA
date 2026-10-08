@@ -93,7 +93,7 @@ test("Relational platform integration", async (t) => {
       marketing_sms: false,
     };
     await t.test(
-      "booking creates connected customer, vehicle, lead, attribution, events and outbox",
+      "booking creates a client and appointment without duplicating it as a lead",
       async () => {
         booking = await createBooking(input);
         assert.equal(booking.booking.price_cents, 37500);
@@ -121,7 +121,9 @@ test("Relational platform integration", async (t) => {
         );
         assert.equal((await query("SELECT * FROM wl.customers")).length, 1);
         assert.equal((await query("SELECT * FROM wl.vehicles")).length, 1);
-        assert.equal((await query("SELECT * FROM wl.leads")).length, 1);
+        assert.equal((await query("SELECT * FROM wl.leads")).length, 0);
+        assert.equal((await query("SELECT * FROM wl.events WHERE name='lead_created'")).length, 0);
+        assert.equal((await query<{ lead_id: string | null }>("SELECT lead_id FROM wl.bookings"))[0].lead_id, null);
         assert.equal(
           (
             await query<{ source: string }>(

@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     await transaction(async (q) => {
       const a = await saveAttribution(q, b.session_id, b.attribution);
       await q(
-        "INSERT INTO wl.leads(id,name,email,phone,notes,attribution_id) VALUES($1,$2,$3,$4,$5,$6)",
+        "INSERT INTO wl.leads(id,name,email,phone,notes,attribution_id,origin) VALUES($1,$2,$3,$4,$5,$6,'website')",
         [id, b.name, b.email.toLowerCase(), b.phone, b.notes, a],
       );
       await q(
