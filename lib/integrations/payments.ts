@@ -29,6 +29,20 @@ type SquareRefund = {
   status?: string;
   amount_money?: SquareMoney;
 };
+
+function awaitingQuoteApproval(booking: Booking) {
+  const snapshot = booking.service_snapshot;
+  return booking.status === "new" && booking.deposit_cents === 0 && (
+    snapshot.requires_quote || snapshot.pricing_mode === "quote" || snapshot.slug === "ceramic-coating"
+    || snapshot.selected_services?.some((service) => service.pricing_mode === "quote" || service.slug === "ceramic-coating")
+  );
+}
+
+// Gateway product labels have a smaller character allowance than an appointment's
+// combined service list; the complete list stays on the private booking receipt.
+function checkoutLabel(value: string) {
+  return Array.from(value).slice(0, 240).join("");
+}
 export type SquareEvent = {
   event_id: string;
   type: string;
@@ -54,7 +68,7 @@ async function preparePayment(
   const b = await bookingById(bookingId);
   if (!b || ["cancelled", "no_show"].includes(b.status))
     throw new AppError("This appointment cannot be paid online.");
-  if (b.price_cents == null)
+  if (b.price_cents == null || awaitingQuoteApproval(b))
     throw new AppError("A quote must be agreed before creating an invoice.");
   const payment = await transaction(async (q) => {
     const current = (
@@ -63,7 +77,7 @@ async function preparePayment(
       ])
     ).rows[0];
     if (
-      current.price_cents == null ||
+      current.price_cents == null || awaitingQuoteApproval(current) ||
       ["cancelled", "no_show"].includes(current.status)
     )
       throw new AppError("This appointment cannot be paid online.");
@@ -152,13 +166,13 @@ async function createSquareCheckout(b: Booking, p: PaymentRow) {
       },
       body: JSON.stringify({
         idempotency_key: p.id,
-        description: b.reference + " - " + b.service_name,
+        description: checkoutLabel(b.reference + " - " + b.service_name),
         order: {
           location_id: locationId,
           reference_id: p.id,
           line_items: [
             {
-              name: (await settings()).name + " - " + b.service_name,
+              name: checkoutLabel((await settings()).name + " - " + b.service_name),
               quantity: "1",
               base_price_money: { amount: p.amount_cents, currency: "USD" },
             },
@@ -216,7 +230,7 @@ async function createStripeCheckout(b: Booking, p: PaymentRow) {
             currency: "usd",
             unit_amount: p.amount_cents,
             product_data: {
-              name: (await settings()).name + " - " + b.service_name,
+              name: checkoutLabel((await settings()).name + " - " + b.service_name),
             },
           },
         },

@@ -26,6 +26,8 @@ test("private receipt snapshots use applicable verified invoices, retain truthfu
       VALUES($1::uuid,$1::text,'private-hash','RECEIPT-FIXTURE',$2,$3,$4,'Full Detail',
       '{"pricing_mode":"fixed","slug":"full-detail","private":"private-snapshot-data"}',
       '2026-10-10',600,120,'confirmed',20000,5000,'Studio address','private-booking-note','private-internal-note')`,[booking,customer,vehicle,service]);
+    const line = randomUUID();
+    await query("INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,$3,'base_service','Full Detail',1,20000)",[line,booking,service]);
     const invoice = async (provider:string,status:string,amount:number,refunded:number,environment:string|undefined,created:string) => {
       const id = randomUUID();
       await query(`INSERT INTO wl.payments(id,booking_id,customer_id,provider,status,amount_cents,refunded_cents,metadata,created_at,checkout_url,external_id)
@@ -54,12 +56,14 @@ test("private receipt snapshots use applicable verified invoices, retain truthfu
     assert.equal(receipt.startMinute,600);
     assert.equal(receipt.location,"Studio address");
     assert.equal(receipt.quoteBased,false);
+    assert.equal(receipt.discountCents,0);
+    assert.deepEqual(receipt.lineItems,[{ id:line,name:"Full Detail",quantity:1,totalCents:20000 }],"Receipt lines expose only customer-facing names, quantities and prices");
     assert.deepEqual(receipt.payments.map((row) => row.id).sort(),[production,stripe,manual].sort());
     assert.equal(receipt.payments.find((row) => row.id === production)!.amount_cents,10000);
     assert.equal(receipt.payments.some((row) => row.id === refunded || row.id === sandbox),false);
     assert.deepEqual(Object.keys(receipt).sort(),[
       "id","reference","status","serviceName","vehicle","date","startMinute","location","priceCents","depositCents",
-      "paidCents","refundedCents","provider","payments","pendingPayment","pendingCheckoutUrl","failedPayment","quoteBased",
+      "paidCents","refundedCents","provider","payments","pendingPayment","pendingCheckoutUrl","failedPayment","quoteBased","lineItems","discountCents",
     ].sort());
     const serialized = JSON.stringify(receipt);
     for (const privateValue of [customer,vehicle,"private-email","+15555550199","private-customer-note","PRIVATE-PLATE","PRIVATE-VIN","private-hash","private-snapshot-data","private-booking-note","private-internal-note","PRIVATE-PAYMENT-METADATA","private-provider","private.example"])

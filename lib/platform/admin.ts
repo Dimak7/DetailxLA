@@ -23,7 +23,7 @@ import { enqueue, enqueueBooking } from "./outbox";
 import { createCheckout } from "../integrations/payments";
 import { squareRevenueStatus, syncSquarePayments } from "../integrations/square-reporting";
 import { saveAttribution } from "./attribution";
-import type { Session, Service, Customer, Row } from "./types";
+import type { Session, Service, BookingSnapshot, Customer, Row } from "./types";
 const uuid = z.uuid();
 const txt = z.string().trim().max(2000);
 const asset = z
@@ -57,7 +57,7 @@ export const serviceSchema = z.object({
 /** Keep the booking amount, payroll basis, and customer-facing total in sync with job adjustments. */
 async function syncBookingFinancialTotal(q: Query, bookingId: string) {
   const booking = (await q<Row>(
-    "SELECT id,service_name,price_cents FROM wl.bookings WHERE id=$1 FOR UPDATE",
+    "SELECT id,service_id,service_name,price_cents FROM wl.bookings WHERE id=$1 FOR UPDATE",
     [bookingId],
   )).rows[0];
   if (!booking) throw new AppError("Booking not found.", 404);
@@ -69,8 +69,8 @@ async function syncBookingFinancialTotal(q: Query, bookingId: string) {
   // Capture the agreed amount before the first adjustment so later totals remain auditable.
   if (!base)
     await q(
-      "INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,'base_service',$3,1,$4)",
-      [randomUUID(), bookingId, String(booking.service_name), Number(booking.price_cents || 0)],
+      "INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,$3,'base_service',$4,1,$5)",
+      [randomUUID(), bookingId, booking.service_id, String(booking.service_name), Number(booking.price_cents || 0)],
     );
 
   const totals = (await q<Row>(
@@ -82,7 +82,9 @@ async function syncBookingFinancialTotal(q: Query, bookingId: string) {
   const grossCents = Number(totals.gross_cents || 0);
   const discountCents = Number(totals.discount_cents || 0);
   const netCents = Math.max(0, grossCents - discountCents);
-  await q("UPDATE wl.bookings SET price_cents=$2,updated_at=now() WHERE id=$1", [bookingId, netCents]);
+  // Adding an upsell or a discount cannot turn an unpriced quote into an agreed invoice.
+  // A manager sets the agreed total explicitly after each requested service is priced.
+  await q("UPDATE wl.bookings SET price_cents=$2,updated_at=now() WHERE id=$1", [bookingId, booking.price_cents === null ? null : netCents]);
   return { grossCents, discountCents, netCents };
 }
 function operationalReport(full: Awaited<ReturnType<typeof report>>) {
@@ -364,7 +366,7 @@ export async function adminData(
     )[0].total;
     const fields = staff
       ? "b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.customer_id,b.notes,b.location,b.assigned_to"
-      : "b.*";
+      : `b.*,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',li.id,'service_id',li.service_id,'kind',li.kind,'name',li.name,'quantity',li.quantity,'unit_price_cents',li.unit_price_cents) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items`;
     args.push(
       section === "calendar" ? 2000 : limit,
       section === "calendar" ? 0 : offset,
@@ -461,20 +463,35 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   if (action === "save_booking_line_item") {
     if (user.role === "staff")
       throw new AppError("A manager must change appointment pricing.", 403);
-    const item = z.object({ id: uuid.optional(), booking_id: uuid, kind: z.enum(["base_service","upsell"]), name: z.string().trim().min(2).max(160), quantity: z.number().int().min(1).max(1000).default(1), unit_price_cents: z.number().int().min(0).max(100000000) }).parse(data);
+    const item = z.object({ id: uuid.optional(), booking_id: uuid, service_id: uuid.nullable().optional(), kind: z.enum(["base_service","upsell"]), name: z.string().trim().min(2).max(160), quantity: z.number().int().min(1).max(1000).default(1), unit_price_cents: z.number().int().min(0).max(100000000) }).parse(data);
+    if (item.kind === "base_service") item.name = item.name.replace(/ · By quote$/i, "");
     const id = item.id || randomUUID();
     return transaction(async (q) => {
-      await q("SELECT id FROM wl.bookings WHERE id=$1 FOR UPDATE", [item.booking_id]);
+      const booking = (await q<{ service_id: string; service_snapshot: BookingSnapshot }>("SELECT service_id,service_snapshot FROM wl.bookings WHERE id=$1 FOR UPDATE", [item.booking_id])).rows[0];
+      if (!booking) throw new AppError("Booking not found.", 404);
+      let serviceId = item.service_id ?? booking.service_id;
+      if (item.service_id && item.service_id !== booking.service_id && !booking.service_snapshot.selected_services?.some((service) => service.id === item.service_id))
+        throw new AppError("Choose a service included in this appointment.");
       if (item.id) {
-        const existing = (await q<{ booking_id: string }>(
-          "SELECT booking_id FROM wl.booking_line_items WHERE id=$1 FOR UPDATE", [item.id],
+        const existing = (await q<{ booking_id: string; service_id: string | null }>(
+          "SELECT booking_id,service_id FROM wl.booking_line_items WHERE id=$1 FOR UPDATE", [item.id],
         )).rows[0];
         if (!existing) throw new AppError("Booking line item not found.", 404);
         if (existing.booking_id !== item.booking_id)
           throw new AppError("This line item belongs to another appointment.");
+        serviceId = existing.service_id || booking.service_id;
       }
       await syncBookingFinancialTotal(q, item.booking_id);
-      await q("INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET kind=$3,name=$4,quantity=$5,unit_price_cents=$6", [id,item.booking_id,item.kind,item.name,item.quantity,item.unit_price_cents,user.user_id]);
+      await q("INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(id) DO UPDATE SET kind=$4,name=$5,quantity=$6,unit_price_cents=$7", [id,item.booking_id,serviceId,item.kind,item.name,item.quantity,item.unit_price_cents,user.user_id]);
+      if (booking.service_snapshot.selected_services?.length) {
+        const serviceTotals = (await q<{ base_cents: number; total_cents: number }>(
+          "SELECT COALESCE(SUM(quantity*unit_price_cents) FILTER(WHERE kind='base_service'),0)::int base_cents,COALESCE(SUM(quantity*unit_price_cents),0)::int total_cents FROM wl.booking_line_items WHERE booking_id=$1 AND COALESCE(service_id,$2::uuid)=$3::uuid", [item.booking_id,booking.service_id,serviceId],
+        )).rows[0];
+        const snapshot = { ...booking.service_snapshot, selected_services: booking.service_snapshot.selected_services.map((service) => service.id === serviceId
+          ? { ...service, base_cents: item.kind === "base_service" ? Number(serviceTotals.base_cents) : service.base_cents, total_cents: service.base_cents === null && item.kind !== "base_service" ? null : Number(serviceTotals.total_cents) }
+          : service) };
+        await q("UPDATE wl.bookings SET service_snapshot=$2::jsonb WHERE id=$1", [item.booking_id,JSON.stringify(snapshot)]);
+      }
       const totals = await syncBookingFinancialTotal(q, item.booking_id);
       await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_line_item',$3,'saved',$4::jsonb)", [randomUUID(),user.user_id,id,JSON.stringify({ ...item, ...totals })]);
       return { id, ...totals };

@@ -86,6 +86,9 @@ export function BookingConfirmation({ initialReceipt, token, checkoutHint, cance
         <section className={styles.appointmentCard} aria-labelledby="appointment-details">
           <p className={styles.eyebrow}>APPOINTMENT DETAILS</p>
           <h2 id="appointment-details">{receipt.serviceName}</h2>
+          {(receipt.lineItems?.length ?? 0) > 1 && <ul className={styles.services} aria-label="Selected services and extras">
+            {receipt.lineItems!.map((item) => <li key={item.id}><span>{item.name}{item.quantity > 1 ? ` × ${item.quantity}` : ""}</span><strong>{money(item.totalCents)}</strong></li>)}
+          </ul>}
           <dl className={styles.details}>
             <div><dt>Date</dt><dd>{appointmentDate(receipt.date)}</dd></div>
             <div><dt>Time</dt><dd>{timeLabel(receipt.startMinute)} <span className={styles.timezone}>Central time (Chicago)</span></dd></div>
@@ -101,6 +104,7 @@ export function BookingConfirmation({ initialReceipt, token, checkoutHint, cance
           <p className={styles.eyebrow}>PAYMENT SUMMARY</p>
           <h2 id="payment-details">Clear from the start.</h2>
           <dl className={styles.amounts}>
+            {Boolean(receipt.discountCents) && <div><dt>Discount included</dt><dd>−{money(receipt.discountCents!)}</dd></div>}
             <div><dt>{receipt.priceCents === null ? "Service price" : view.kind === "quote" ? "Starting estimate" : "Service estimate"}</dt><dd>{money(receipt.priceCents)}</dd></div>
             <div><dt>{hasRefund ? "Net payment recorded" : "Payment recorded"}</dt><dd>{money(receipt.paidCents)}</dd></div>
             {hasRefund ? <div><dt>Refund recorded</dt><dd>{money(receipt.refundedCents)}</dd></div>

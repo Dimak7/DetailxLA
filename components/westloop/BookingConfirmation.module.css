@@ -13,6 +13,10 @@
 .paymentCard { background: #ebe5da; }
 .layout h2 { font-family: var(--font-display), Georgia, serif; font-size: 34px; line-height: 1.1; font-weight: 400; letter-spacing: -.02em; margin: 0 0 25px; overflow-wrap: anywhere; }
 .details, .amounts { margin: 0; }
+.services { margin: 0 0 24px; padding: 0; list-style: none; }
+.services li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #ded6c9; font-size: 12px; line-height: 1.7; }
+.services li span { min-width: 0; overflow-wrap: anywhere; }
+.services li strong { flex-shrink: 0; font-weight: 500; }
 .details > div { display: grid; grid-template-columns: 93px minmax(0, 1fr); gap: 16px; border-top: 1px solid #ded6c9; padding: 16px 0; }
 .details dt, .amounts dt { font-size: 11px; line-height: 1.7; color: #706557; }
 .details dd { font-size: 13px; line-height: 1.65; margin: 0; overflow-wrap: anywhere; }

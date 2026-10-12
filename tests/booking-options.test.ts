@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   bookingAddOns,
   bookingSelection,
+  bookingCartSelection,
   defaultServicePackage,
   servicePackages,
   vehicleSizeLabel,
@@ -55,4 +56,48 @@ test("package selection can remain quote-based without inventing a total", () =>
 test("currency formatting preserves real cents without adding unnecessary zeros", () => {
   assert.equal(money(56500), "$565");
   assert.equal(money(28250), "$282.50");
+});
+
+test("multiple services combine server prices, size adjustments and duration", () => {
+  const full = { ...service("full-detail", 50000), duration_minutes: 240 };
+  const interior = { ...service("interior-detail", 30000), id: "00000000-0000-4000-8000-000000000002", duration_minutes: 180 };
+  const cart = bookingCartSelection([full, interior], "SUV", [
+    { service_id: full.id, addons: ["engine-bay"] },
+    { service_id: interior.id, addons: ["car-seat"] },
+  ]);
+  assert.equal(cart.items.length, 2);
+  assert.equal(cart.totalCents, 92500);
+  assert.equal(cart.durationMinutes, 420);
+  assert.equal(cart.requiresQuote, false);
+});
+
+test("ceramic anywhere in a cart requires consultation and unknown quotes keep the total unknown", () => {
+  const full = service("full-detail", 50000);
+  const ceramic = { ...service("ceramic-coating"), id: "00000000-0000-4000-8000-000000000002" };
+  for (const order of [[full, ceramic], [ceramic, full]]) {
+    const cart = bookingCartSelection(order, "Sedan", order.map((item) => ({ service_id: item.id })));
+    assert.equal(cart.totalCents, 105000);
+    assert.equal(cart.requiresQuote, true);
+  }
+  const correction = { ...service("paint-correction"), id: ceramic.id };
+  const cart = bookingCartSelection([full, correction], "Sedan", [
+    { service_id: full.id }, { service_id: correction.id, service_package: "correction-level-3" },
+  ]);
+  assert.equal(cart.totalCents, null);
+  assert.equal(cart.requiresQuote, true);
+});
+
+test("cart rejects duplicate services, duplicate upgrades, unavailable services and double charged service upgrades", () => {
+  const exterior = service("exterior-detail");
+  const correction = { ...service("paint-correction"), id: "00000000-0000-4000-8000-000000000002" };
+  assert.throws(() => bookingCartSelection([exterior], "Sedan", [{ service_id: exterior.id }, { service_id: exterior.id }]), /each service only once/);
+  assert.throws(() => bookingCartSelection([exterior, correction], "Sedan", [
+    { service_id: exterior.id, addons: ["trim-restoration"] }, { service_id: correction.id, addons: ["trim-restoration"] },
+  ]), /only once/);
+  assert.throws(() => bookingCartSelection([{ ...exterior, active: false }], "Sedan", [{ service_id: exterior.id }]), /no longer available/);
+  const headlight = { ...correction, slug: "headlight-restoration" };
+  assert.throws(() => bookingCartSelection([exterior, headlight], "Sedan", [
+    { service_id: exterior.id, addons: ["headlight-restoration"] }, { service_id: headlight.id },
+  ]), /already selected as a service/);
+  assert.throws(() => bookingCartSelection([exterior], "Sedan", [{ service_id: exterior.id, service_package: "invalid" }]), /valid service package/);
 });

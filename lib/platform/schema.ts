@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS wl.booking_line_items (
  id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.bookings(id) ON DELETE CASCADE,
  kind text NOT NULL CHECK(kind IN ('base_service','upsell')), name text NOT NULL, quantity integer NOT NULL DEFAULT 1 CHECK(quantity>0), unit_price_cents integer NOT NULL CHECK(unit_price_cents>=0), created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS wl_booking_line_items_booking ON wl.booking_line_items(booking_id);
+ALTER TABLE wl.booking_line_items ADD COLUMN IF NOT EXISTS service_id uuid REFERENCES wl.services(id);
 CREATE TABLE IF NOT EXISTS wl.booking_discounts (
  id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.bookings(id) ON DELETE CASCADE,
  kind text NOT NULL CHECK(kind IN ('fixed','percent')), value integer NOT NULL CHECK(value>=0), amount_cents integer NOT NULL CHECK(amount_cents>=0), reason text NOT NULL DEFAULT '', code text NOT NULL DEFAULT '', applied_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());

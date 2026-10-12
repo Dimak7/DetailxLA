@@ -14,6 +14,12 @@ export type ServicePackage = {
   description: string;
 };
 
+export type BookingServiceChoice = {
+  service_id: string;
+  service_package?: string;
+  addons?: string[];
+};
+
 const addOns: Record<string, BookingAddOn> = {
   "engine-bay": { id: "engine-bay", name: "Engine Bay", priceCents: 6500, description: "A careful clean and finish for accessible engine-bay surfaces." },
   "ceramic-sealant": { id: "ceramic-sealant", name: "Ceramic Sealant", priceCents: 3500, description: "Adds protection, gloss and water repellency to the exterior finish." },
@@ -80,6 +86,7 @@ export function bookingSelection(
     ? availablePackages.find((item) => item.id === (packageId || availablePackages[0].id))
     : undefined;
   if (availablePackages.length && !selectedPackage) throw new Error("Choose a valid service package.");
+  if (!availablePackages.length && packageId) throw new Error("Choose a valid service package.");
 
   const availableAddOns = bookingAddOns(service.slug);
   const uniqueIds = [...new Set(addOnIds)];
@@ -94,6 +101,44 @@ export function bookingSelection(
     baseCents,
     addOnCents,
     totalCents: baseCents === null ? null : baseCents + addOnCents,
+  };
+}
+
+/** Price every selected service from the catalogue; never trust a client total. */
+export function bookingCartSelection(
+  services: Service[],
+  vehicleType: string,
+  choices: BookingServiceChoice[],
+) {
+  if (!choices.length || choices.length > 12)
+    throw new Error("Choose between one and twelve services.");
+  if (new Set(choices.map((choice) => choice.service_id)).size !== choices.length)
+    throw new Error("Choose each service only once.");
+  const selectedServices = choices.map((choice) => {
+    const service = services.find((item) => item.id === choice.service_id && item.active);
+    if (!service) throw new Error("One of your selected services is no longer available.");
+    return service;
+  });
+  const upgradeIds = new Set<string>();
+  const items = choices.map((choice, index) => {
+    const service = selectedServices[index];
+    const selection = bookingSelection(service, vehicleType, choice.service_package, choice.addons);
+    for (const addOn of selection.selectedAddOns) {
+      if (upgradeIds.has(addOn.id))
+        throw new Error(`${addOn.name} is already included as an upgrade. Choose it only once.`);
+      if (selectedServices.some((item) => item.slug === addOn.id))
+        throw new Error(`${addOn.name} is already selected as a service. Remove the duplicate upgrade.`);
+      upgradeIds.add(addOn.id);
+    }
+    return { service, ...selection };
+  });
+  return {
+    items,
+    totalCents: items.some((item) => item.totalCents === null)
+      ? null
+      : items.reduce((sum, item) => sum + item.totalCents!, 0),
+    durationMinutes: items.reduce((sum, item) => sum + item.service.duration_minutes, 0),
+    requiresQuote: items.some((item) => item.totalCents === null || item.service.pricing_mode === "quote" || item.service.slug === "ceramic-coating"),
   };
 }
 

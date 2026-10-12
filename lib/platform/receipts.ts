@@ -7,11 +7,13 @@ export type BookingReceipt = {
   reference: string;
   status: "new" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show";
   serviceName: string;
+  lineItems?: Array<{ id: string; name: string; quantity: number; totalCents: number | null }>;
   vehicle: string;
   date: string;
   startMinute: number;
   location: string;
   priceCents: number | null;
+  discountCents?: number;
   depositCents: number;
   /** Verified collections remaining after refunds, used for the outstanding balance. */
   paidCents: number;
@@ -35,8 +37,10 @@ type ReceiptRow = {
   start_minute: number;
   location: string;
   price_cents: number | null;
+  discount_cents: number;
   deposit_cents: number;
   quote_based: boolean;
+  line_items: NonNullable<BookingReceipt["lineItems"]>;
   payment_rows: Array<{
     id: string;
     status: string;
@@ -70,8 +74,18 @@ export async function bookingReceipt(id: string): Promise<BookingReceipt | null>
     query<ReceiptRow>(
       `SELECT b.id,b.reference,b.status,b.service_name,b.booking_date,b.start_minute,b.location,
         b.price_cents,b.deposit_cents,v.year||' '||v.make||' '||v.model vehicle,
+        COALESCE((SELECT SUM(amount_cents) FROM wl.booking_discounts WHERE booking_id=b.id),0)::int discount_cents,
         COALESCE(b.price_cents IS NULL OR b.service_snapshot->>'pricing_mode'='quote'
-          OR b.service_snapshot->>'slug'='ceramic-coating',false) quote_based,
+          OR b.service_snapshot->>'slug'='ceramic-coating'
+          OR b.service_snapshot->>'requires_quote'='true'
+          OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(b.service_snapshot->'selected_services','[]'::jsonb)) selected
+            WHERE selected->>'pricing_mode'='quote' OR selected->>'slug'='ceramic-coating'),false) quote_based,
+        COALESCE((SELECT jsonb_agg(jsonb_build_object(
+          'id',li.id,'name',li.name,'quantity',li.quantity,'totalCents',CASE WHEN b.price_cents IS NULL AND li.kind='base_service'
+            AND EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(b.service_snapshot->'selected_services','[]'::jsonb)) selected
+              WHERE selected->>'id'=li.service_id::text AND selected->>'base_cents' IS NULL)
+            THEN NULL ELSE li.quantity*li.unit_price_cents END
+          ) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items,
         COALESCE((SELECT jsonb_agg(jsonb_build_object(
           'id',p.id,'status',p.status,'provider',p.provider,'kind',p.kind,
           'amount_cents',p.amount_cents,'refunded_cents',p.refunded_cents,'checkout_url',p.checkout_url,
@@ -95,6 +109,7 @@ export async function bookingReceipt(id: string): Promise<BookingReceipt | null>
   const owed = target === null ? 0 : Math.max(0,Number(target) - paidCents);
   const canResume = latest?.status === "pending" && latest.checkout_issued
     && row.price_cents !== null && !["cancelled","no_show"].includes(row.status)
+    && !(row.status === "new" && row.quote_based && Number(row.deposit_cents) === 0)
     && row.payment_rows.every((payment) => Number(payment.refunded_cents) === 0)
     && owed > 0 && Number(latest.amount_cents) === owed
     && owed <= Math.max(0,Number(row.price_cents) - paidCents);
@@ -103,11 +118,13 @@ export async function bookingReceipt(id: string): Promise<BookingReceipt | null>
     reference: row.reference,
     status: row.status,
     serviceName: row.service_name,
+    lineItems: row.line_items.map((item) => ({ ...item, quantity: Number(item.quantity), totalCents: item.totalCents === null ? null : Number(item.totalCents) })),
     vehicle: row.vehicle,
     date: row.booking_date,
     startMinute: Number(row.start_minute),
     location: row.location,
     priceCents: row.price_cents === null ? null : Number(row.price_cents),
+    discountCents: Number(row.discount_cents),
     depositCents: Number(row.deposit_cents),
     paidCents,
     refundedCents,

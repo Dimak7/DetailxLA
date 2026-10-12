@@ -13,7 +13,7 @@ import { enqueue, enqueueBooking } from "./outbox";
 import { metaEvent } from "../integrations/providers";
 import { squareEnvironment } from "../integrations/square-reporting";
 import { businessHoursForDay } from "./business-hours";
-import { bookingSelection } from "../booking-options";
+import { bookingCartSelection } from "../booking-options";
 import {
   dateToday,
   type Booking,
@@ -21,11 +21,17 @@ import {
   type BusinessSettings,
 } from "./types";
 
-export const bookingInput = z.object({
-  request_key: z.uuid(),
+const serviceChoiceInput = z.object({
   service_id: z.uuid(),
   service_package: z.string().max(80).default(""),
   addons: z.array(z.string().max(80)).max(12).default([]),
+});
+export const bookingInput = z.object({
+  request_key: z.uuid(),
+  service_id: z.uuid().optional(),
+  service_package: z.string().max(80).default(""),
+  addons: z.array(z.string().max(80)).max(12).default([]),
+  services: z.array(serviceChoiceInput).min(1).max(12).optional(),
   first_name: z.string().trim().min(1).max(80),
   last_name: z.string().trim().min(1).max(80),
   email: z
@@ -73,6 +79,11 @@ export const bookingInput = z.object({
   }),
   device: z.string().max(100).default(""),
   lead_id: z.uuid().optional(),
+}).superRefine((input, context) => {
+  if (!input.services && !input.service_id)
+    context.addIssue({ code: "custom", message: "Choose at least one service.", path: ["services"] });
+  if (input.services && new Set(input.services.map((item) => item.service_id)).size !== input.services.length)
+    context.addIssue({ code: "custom", message: "Choose each service only once.", path: ["services"] });
 });
 export function bookingDepositCents(
   service: Service,
@@ -122,12 +133,14 @@ async function validateSlot(
   q: Query,
   date: string,
   start: number,
-  service: Service,
+  service: Pick<Service, "duration_minutes">,
   s: BusinessSettings,
   exclude?: string,
 ) {
   if (!validDate(date)) throw new AppError("Choose a valid date.");
   const hours = businessHoursForDay(s, new Date(date + "T12:00:00Z").getUTCDay());
+  if (hours && service.duration_minutes > minute(hours.close_time) - minute(hours.open_time))
+    throw new AppError("These services need more time than this day's opening hours. Choose another day or contact the studio to arrange separate appointments.");
   if (
     !hours ||
     start < minute(hours.open_time) ||
@@ -160,21 +173,21 @@ async function validateSlot(
 }
 export async function availability(
   date: string,
-  serviceId: string,
+  serviceId: string | string[],
   exclude?: string,
 ) {
   if (!validDate(date)) throw new AppError("Choose a valid date.");
-  const s = await settings(),
-    service = (
-      await query<Service>(
-        "SELECT * FROM wl.services WHERE id=$1 AND active=true",
-        [serviceId],
-      )
-    )[0];
-  if (!service) throw new AppError("This service is unavailable.", 404);
+  const serviceIds = z.array(z.uuid()).min(1).max(12).parse(typeof serviceId === "string" ? [serviceId] : serviceId);
+  if (new Set(serviceIds).size !== serviceIds.length) throw new AppError("Choose each service only once.");
+  const s = await settings();
+  const services = await query<Service>("SELECT * FROM wl.services WHERE id=ANY($1::uuid[]) AND active=true", [serviceIds]);
+  if (services.length !== serviceIds.length) throw new AppError("One of your selected services is unavailable.", 404);
+  const service = { duration_minutes: services.reduce((sum, item) => sum + item.duration_minutes, 0) };
   const slots: Array<{ minute: number; available: boolean }> = [];
   const hours = businessHoursForDay(s, new Date(date + "T12:00:00Z").getUTCDay());
   if (!hours) return slots;
+  if (service.duration_minutes > minute(hours.close_time) - minute(hours.open_time))
+    throw new AppError("These services need more time than this day's opening hours. Choose another day or contact the studio to arrange separate appointments.");
   const q: Query = async (sql, p) => ({ rows: await query(sql, p) });
   for (
     let start = Math.ceil(minute(hours.open_time) / 30) * 30;
@@ -213,14 +226,21 @@ export async function createBooking(value: unknown, admin = false) {
         throw new AppError("This request has already been used.", 409);
       return previous;
     }
-    const service = (
+    const choices = input.services || [{ service_id: input.service_id!, service_package: input.service_package, addons: input.addons }];
+    const services = (
       await q<Service>(
-        "SELECT * FROM wl.services WHERE id=$1 AND active=true FOR SHARE",
-        [input.service_id],
+        "SELECT * FROM wl.services WHERE id=ANY($1::uuid[]) AND active=true FOR SHARE",
+        [choices.map((choice) => choice.service_id)],
       )
-    ).rows[0];
-    if (!service) throw new AppError("This service is no longer available.");
-    await validateSlot(q, input.date, input.start_minute, service, s);
+    ).rows;
+    let selection: ReturnType<typeof bookingCartSelection>;
+    try {
+      selection = bookingCartSelection(services, input.vehicle_type, choices);
+    } catch (error) {
+      throw new AppError(error instanceof Error ? error.message : "Choose valid booking options.");
+    }
+    const service = selection.items[0].service;
+    await validateSlot(q, input.date, input.start_minute, { duration_minutes: selection.durationMinutes }, s);
     if (
       (s.appointment_mode === "mobile" || s.appointment_mode === "both") &&
       input.location.length < 5
@@ -300,26 +320,23 @@ export async function createBooking(value: unknown, admin = false) {
         ],
       )
     ).rows[0];
-    let selection: ReturnType<typeof bookingSelection>;
-    try {
-      selection = bookingSelection(
-        service,
-        input.vehicle_type,
-        input.service_package,
-        input.addons,
-      );
-    } catch (error) {
-      throw new AppError(error instanceof Error ? error.message : "Choose valid booking options.");
-    }
     const price = selection.totalCents,
-      deposit = bookingDepositCents(service, price, s, provider);
-    const serviceName = selection.selectedPackage
-      ? `${service.name} · ${selection.selectedPackage.name}`
-      : service.name;
+      deposit = selection.requiresQuote ? 0 : bookingDepositCents(service, price, s, provider);
+    const itemName = (item: typeof selection.items[number]) => item.selectedPackage
+      ? `${item.service.name} · ${item.selectedPackage.name}`
+      : item.service.name;
+    const serviceName = selection.items.map(itemName).join(" + ");
+    const selectedServices = selection.items.map((item) => ({
+      ...item.service,
+      selected_package: item.selectedPackage || null,
+      selected_addons: item.selectedAddOns,
+      base_cents: item.baseCents,
+      total_cents: item.totalCents,
+    }));
     const serviceSnapshot = {
-      ...service,
-      selected_package: selection.selectedPackage || null,
-      selected_addons: selection.selectedAddOns,
+      ...selectedServices[0],
+      selected_services: selectedServices,
+      requires_quote: selection.requiresQuote,
     };
     const booking = (
       await q<Booking>(
@@ -337,7 +354,7 @@ export async function createBooking(value: unknown, admin = false) {
           JSON.stringify(serviceSnapshot),
           input.date,
           input.start_minute,
-          service.duration_minutes,
+          selection.durationMinutes,
           s.buffer_minutes,
           price,
           deposit,
@@ -348,16 +365,17 @@ export async function createBooking(value: unknown, admin = false) {
         ],
       )
     ).rows[0];
-    if (selection.baseCents !== null)
+    for (const item of selection.items) {
       await q(
-        "INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,'base_service',$3,1,$4)",
-        [randomUUID(), id, serviceName, selection.baseCents],
+        "INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,$3,'base_service',$4,1,$5)",
+        [randomUUID(), id, item.service.id, itemName(item) + (item.baseCents === null && !itemName(item).includes("By Quote") ? " · By quote" : ""), item.baseCents ?? 0],
       );
-    for (const addOn of selection.selectedAddOns)
-      await q(
-        "INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,'upsell',$3,1,$4)",
-        [randomUUID(), id, addOn.name, addOn.priceCents],
-      );
+      for (const addOn of item.selectedAddOns)
+        await q(
+          "INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,$3,'upsell',$4,1,$5)",
+          [randomUUID(), id, item.service.id, addOn.name, addOn.priceCents],
+        );
+    }
     const leadId = input.lead_id || null;
     if (leadId)
       await q(
@@ -534,15 +552,13 @@ export async function updateBooking(
         );
     }
     if (data.price_cents !== undefined && data.price_cents !== b.price_cents) {
-      const lines = (await q<{ id: string; kind: string; quantity: number; unit_price_cents: number }>(
-        "SELECT id,kind,quantity,unit_price_cents FROM wl.booking_line_items WHERE booking_id=$1 FOR UPDATE", [id],
+      const lines = (await q<{ id: string; service_id: string | null; kind: string; quantity: number; unit_price_cents: number }>(
+        "SELECT id,service_id,kind,quantity,unit_price_cents FROM wl.booking_line_items WHERE booking_id=$1 ORDER BY created_at,id FOR UPDATE", [id],
       )).rows;
       if (lines.length) {
         if (data.price_cents === null)
           throw new AppError("Enter an agreed service price for this appointment's existing line items.");
         const baseLines = lines.filter((line) => line.kind === "base_service");
-        if (baseLines.length > 1)
-          throw new AppError("Adjust the multiple base service line items before changing the agreed total.");
         const upsells = lines.filter((line) => line.kind === "upsell")
           .reduce((sum, line) => sum + line.quantity * line.unit_price_cents, 0);
         const discount = Number((await q<{ amount: string }>(
@@ -551,10 +567,42 @@ export async function updateBooking(
         const baseCents = data.price_cents + discount - upsells;
         if (baseCents < 0)
           throw new AppError("This agreed total would make the base service price negative. Adjust the upsells or discounts instead.");
-        if (baseLines[0])
-          await q("UPDATE wl.booking_line_items SET quantity=1,unit_price_cents=$2 WHERE id=$1", [baseLines[0].id, baseCents]);
-        else
-          await q("INSERT INTO wl.booking_line_items(id,booking_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,'base_service',$3,1,$4,$5)", [randomUUID(), id, b.service_name, baseCents, actor]);
+        const unknownLines = baseLines.filter((line) => b.service_snapshot.selected_services?.some((item) => item.id === line.service_id && item.base_cents === null));
+        if (unknownLines.length > 1)
+          throw new AppError("Enter a price for each quoted service before setting the agreed total.");
+        const allocations = new Map<string, number>();
+        if (unknownLines.length === 1) {
+          const knownTotal = baseLines.filter((line) => line.id !== unknownLines[0].id).reduce((sum, line) => sum + line.quantity * line.unit_price_cents, 0);
+          if (baseCents < knownTotal)
+            throw new AppError("The agreed total is below the already priced services and upgrades. Adjust those service prices first.");
+          for (const line of baseLines) allocations.set(line.id, line.id === unknownLines[0].id ? baseCents - knownTotal : line.quantity * line.unit_price_cents);
+        } else if (baseLines.length === 1) {
+          allocations.set(baseLines[0].id, baseCents);
+        } else if (baseLines.length > 1) {
+          const previousTotal = baseLines.reduce((sum, line) => sum + line.quantity * line.unit_price_cents, 0);
+          if (previousTotal === 0 && baseCents > 0)
+            throw new AppError("Enter a price for each service before setting the agreed total.");
+          let allocated = 0;
+          for (const [index, line] of baseLines.entries()) {
+            const amount = index === baseLines.length - 1 ? baseCents - allocated : previousTotal ? Math.floor(baseCents * line.quantity * line.unit_price_cents / previousTotal) : 0;
+            allocations.set(line.id, amount);
+            allocated += amount;
+          }
+        }
+        for (const [lineId, amount] of allocations)
+          await q("UPDATE wl.booking_line_items SET quantity=1,unit_price_cents=$2,name=regexp_replace(name,' · By quote$','','i') WHERE id=$1", [lineId, amount]);
+        if (!baseLines.length)
+          await q("INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,'base_service',$4,1,$5,$6)", [randomUUID(), id, b.service_id, b.service_name, baseCents, actor]);
+        if (b.service_snapshot.selected_services) {
+          const selected = b.service_snapshot.selected_services.map((service) => {
+            const serviceLines = baseLines.filter((line) => line.service_id === service.id);
+            if (!serviceLines.length) return service;
+            const base = serviceLines.reduce((sum, line) => sum + (allocations.get(line.id) ?? line.quantity * line.unit_price_cents), 0);
+            const upgrades = lines.filter((line) => line.kind === "upsell" && line.service_id === service.id).reduce((sum, line) => sum + line.quantity * line.unit_price_cents, 0);
+            return { ...service, base_cents: base, total_cents: base + upgrades };
+          });
+          await q("UPDATE wl.bookings SET service_snapshot=$2::jsonb WHERE id=$1", [id, JSON.stringify({ ...b.service_snapshot, ...selected[0], selected_services: selected })]);
+        }
         await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'booking',$3,'agreed_price_updated',$4::jsonb,$5::jsonb)",
           [randomUUID(), actor, id, JSON.stringify({ price_cents: b.price_cents, base_line_items: baseLines }), JSON.stringify({ price_cents: data.price_cents, base_service_cents: baseCents, upsell_cents: upsells, discount_cents: discount })]);
       }

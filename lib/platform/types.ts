@@ -36,6 +36,16 @@ export type Service = {
   sort_order: number;
   image_url: string;
 };
+export type BookingServiceSnapshot = Service & {
+  selected_package?: { id: string; name: string; priceCents: number | null; description: string } | null;
+  selected_addons?: Array<{ id: string; name: string; priceCents: number; description: string }>;
+  base_cents?: number | null;
+  total_cents?: number | null;
+};
+export type BookingSnapshot = BookingServiceSnapshot & {
+  selected_services?: BookingServiceSnapshot[];
+  requires_quote?: boolean;
+};
 export type BusinessSettings = {
   name: string;
   phone: string;
@@ -91,7 +101,7 @@ export type Booking = {
   vehicle_id: string;
   service_id: string;
   service_name: string;
-  service_snapshot: Service;
+  service_snapshot: BookingSnapshot;
   booking_date: string;
   start_minute: number;
   duration_minutes: number;

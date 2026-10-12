@@ -9,7 +9,7 @@ export async function GET(request: Request) {
       ok: true,
       slots: await availability(
         p.get("date") || "",
-        z.uuid().parse(p.get("service_id")),
+        z.array(z.uuid()).min(1).max(12).parse(p.getAll("service_id")),
       ),
     });
   } catch (e) {

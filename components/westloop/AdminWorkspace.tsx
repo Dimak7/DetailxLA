@@ -34,6 +34,11 @@ type CalendarShift = R & { start_minute: number; end_minute: number };
 const rows = (v: unknown) => (Array.isArray(v) ? v : []) as R[];
 const s = (v: unknown) => (v == null ? "" : String(v));
 const n = (v: unknown) => Number(v || 0);
+const serviceLinePrice = (booking: R, item: R) => {
+  const service = rows((booking.service_snapshot as R | undefined)?.selected_services)
+    .find((selection) => selection.id === item.service_id);
+  return service?.base_cents === null ? money(null) : money(n(item.quantity) * n(item.unit_price_cents));
+};
 const title = (v: string) =>
   v.replaceAll("_", " ").replace(/\b\w/g, (x) => x.toUpperCase());
 const f = (
@@ -299,11 +304,21 @@ export function AdminWorkspace({
     );
   }
   function upsellEdit(r: R) {
-    edit("Add upsell to " + s(r.reference), "save_booking_line_item", { booking_id: r.id, kind: "upsell", name: "", quantity: 1, unit_price_cents: 0 }, [
+    const services = rows((r.service_snapshot as R | undefined)?.selected_services);
+    edit("Add upsell to " + s(r.reference), "save_booking_line_item", { booking_id: r.id, service_id: r.service_id, kind: "upsell", name: "", quantity: 1, unit_price_cents: 0 }, [
+      ...(services.length > 1 ? [f("service_id", "For service", "select", { options: services.map((service) => ({ value: s(service.id), label: s(service.name) })) })] : []),
       f("name", "Upsell name", "text", { required: true, hint: "Example: Engine bay detail or pet-hair removal" }),
       f("quantity", "Quantity", "number", { min: 1, max: 1000 }),
       f("unit_price_cents", "Price per item ($)", "money", { min: 0 }),
     ]);
+  }
+  function servicePricesEdit(booking: R) {
+    const items = rows(booking.line_items).filter((item) => item.kind === "base_service");
+    const values = (item: R) => ({ ...item, booking_id: booking.id, unit_price_cents: n(item.unit_price_cents) / 100 });
+    edit("Service prices · " + s(booking.reference), "save_booking_line_item", values(items[0]), [
+      f("id", "Service", "select", { options: items.map((item) => ({ value: s(item.id), label: `${s(item.name)} — ${serviceLinePrice(booking,item)}` })) }),
+      f("unit_price_cents", "Agreed service price ($)", "money", { min: 0, hint: booking.price_cents == null ? "Save each service price, then use Manage to enter the agreed appointment total and confirm the quote." : "Only change a price after agreeing it with the customer." }),
+    ], undefined, (key,value) => key === "id" ? values(items.find((item) => item.id === value)!) : undefined);
   }
   function discountEdit(r: R) {
     edit("Apply discount to " + s(r.reference), "save_booking_discount", { booking_id: r.id, kind: "fixed", value: 0, reason: "", code: "" }, [
@@ -803,6 +818,7 @@ export function AdminWorkspace({
           : []),
         <>
           <button onClick={() => bookingEdit(r)}>Manage</button>
+          {!staff && rows(r.line_items).filter((item) => item.kind === "base_service").length > 1 && <button onClick={() => servicePricesEdit(r)}>Service prices</button>}
           {!staff && <button onClick={() => upsellEdit(r)}>Add upsell</button>}
           {!staff && <button onClick={() => discountEdit(r)}>Discount</button>}
           {!staff && <button onClick={() => tipEdit(r)}>Tip</button>}
@@ -1302,9 +1318,10 @@ export function AdminWorkspace({
                 )}
               </section>
               <section className="paper">
-                <h2>Services by paid revenue</h2>
+                <h2>Services &amp; combinations by paid revenue</h2>
+                <p className="small-note">Appointments with multiple services appear as one combination, so each payment is counted once.</p>
                 {table(
-                  ["Service", "Paid bookings", "Revenue"],
+                  ["Service or combination", "Paid bookings", "Revenue"],
                   rep.topServices.map((r) => [
                     s(r.service_name),
                     s(r.bookings),
