@@ -104,6 +104,9 @@ export async function deliver(m: Message) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: m.recipient,
+          ...(s.telegram_thread_id && m.recipient === s.telegram_chat_id
+            ? { message_thread_id: Number(s.telegram_thread_id) }
+            : {}),
           text: s.name + "\n\n" + m.subject + "\n\n" + m.body,
           reply_markup: {
             inline_keyboard: [

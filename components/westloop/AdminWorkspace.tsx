@@ -650,6 +650,9 @@ export function AdminWorkspace({
       Notifications: [
         f("email_from", "Verified sender (Resend)"),
         f("telegram_chat_id", "Telegram chat ID"),
+        f("telegram_thread_id", "Telegram topic ID", "text", {
+          hint: "Optional: send notifications to this group topic. Leave blank for the main chat.",
+        }),
         f("sms_from", "Twilio phone number"),
         ...[
           "email_key",

@@ -60,6 +60,7 @@ export const settingsSchema = z
     meta_dataset_id: z.string().regex(/^\d*$/),
     email_from: z.string().max(240),
     telegram_chat_id: z.string().max(80),
+    telegram_thread_id: z.string().regex(/^(|[1-9]\d*)$/).max(16).default(""),
     sms_from: z.string().max(40),
     email_provider: z.literal("resend"),
   })
@@ -109,6 +110,7 @@ export async function settings(): Promise<BusinessSettings> {
     meta_pixel_id: process.env.META_PIXEL_ID || "",
     email_from: process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || "",
     telegram_chat_id: process.env.TELEGRAM_CHAT_ID || "",
+    telegram_thread_id: process.env.TELEGRAM_MESSAGE_THREAD_ID || "",
     sms_from:
       process.env.SMS_FROM_NUMBER || process.env.TWILIO_FROM_NUMBER || "",
     ...Object.fromEntries(
@@ -121,7 +123,7 @@ export async function settings(): Promise<BusinessSettings> {
   return { ...business, name: resolveBusinessName(business.name) };
 }
 export function publicSettings(business: BusinessSettings): BusinessSettings {
-  return { ...business, email_from: "", telegram_chat_id: "", sms_from: "" };
+  return { ...business, email_from: "", telegram_chat_id: "", telegram_thread_id: "", sms_from: "" };
 }
 export function effectiveDepositPercent(s: BusinessSettings) {
   const configured = Number(process.env.BOOKING_DEPOSIT_PERCENT);

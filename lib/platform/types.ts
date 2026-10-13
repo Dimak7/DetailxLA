@@ -74,6 +74,7 @@ export type BusinessSettings = {
   meta_dataset_id: string;
   email_from: string;
   telegram_chat_id: string;
+  telegram_thread_id: string;
   sms_from: string;
   email_provider: "resend";
 };

@@ -32,6 +32,7 @@ export const defaultSettings: BusinessSettings = {
   meta_dataset_id: "",
   email_from: "",
   telegram_chat_id: "",
+  telegram_thread_id: "",
   sms_from: "",
   email_provider: "resend",
 };
