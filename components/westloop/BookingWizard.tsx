@@ -307,7 +307,7 @@ export function BookingWizard({
         {step === 0 && (
           <>
             <h2 ref={stepHeading} tabIndex={-1} className="booking-step-heading">What does your car need?</h2>
-            <p>Choose one or more services for the same vehicle. We’ll keep them together in one appointment.</p>
+            <p>Select as many services as you need for the same vehicle. For example, combine Interior Detail, Ceramic Coating and Headlight Restoration in one appointment.</p>
             <p className="small-note" role="status">{selectedServices.length ? `${selectedServices.length} service${selectedServices.length === 1 ? "" : "s"} selected · ${durationMinutes / 60} hours total` : "Select all the care your car needs."}</p>
             {services.map((s) => (
               <label className="service-option" key={s.id}>
@@ -374,6 +374,22 @@ export function BookingWizard({
               Vehicle condition may change the scope. We discuss additional work
               before it begins.
             </p>
+            {services.some((item) => !draft.services.some((choice) => choice.service_id === item.id)) && (
+              <section className="booking-additional-services" aria-labelledby="additional-services-heading">
+                <p className="eyebrow">COMPLETE YOUR VISIT</p>
+                <h3 id="additional-services-heading">Additional services</h3>
+                <p>Add more care for the same vehicle. Your estimate and appointment time update together.</p>
+                <div className="booking-additional-list">
+                  {services.filter((item) => !draft.services.some((choice) => choice.service_id === item.id)).map((item) => (
+                    <button type="button" key={item.id} className="booking-add-service" disabled={busy || draft.services.length >= 12} onClick={() => toggleService(item)} aria-label={`Add ${item.name}`}>
+                      <span><strong>{item.name}</strong><small>{item.duration_minutes / 60} hours · {item.pricing_mode === "starting" ? "From " : ""}{money(item.pricing_mode === "quote" ? null : item.price_cents)}</small></span>
+                      <span className="booking-add-label">+ Add</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="small-note" role="status">{selectedServices.length} service{selectedServices.length === 1 ? "" : "s"} selected · {durationMinutes / 60} hours total</p>
+              </section>
+            )}
             {selectedServices.map(({ service: selectedService, choice }) => {
               const packages = servicePackages(selectedService.slug);
               const availableAddOns = bookingAddOns(selectedService.slug).filter((item) => !selectedServices.some(({ service }) => service.slug === item.id));
@@ -576,6 +592,7 @@ export function BookingWizard({
             <button type="button" className="booking-remove-service" disabled={busy} onClick={() => { toggleService(selectedService); setStep(0); }} aria-label={`Remove ${selectedService.name}`}>Remove</button>
           </div>;
         })}
+        {step > 0 && <button type="button" className="booking-edit-services" disabled={busy} onClick={() => setStep(0)}>+ Add or change services</button>}
         {durationMinutes > 0 && <div className="summary-row"><span>Total service time</span><strong>{durationMinutes / 60} hours</strong></div>}
         <div className="summary-row">
           <span>Vehicle</span>

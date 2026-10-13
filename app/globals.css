@@ -2891,3 +2891,16 @@ td small {
   .booking-package, .booking-addon { grid-template-columns: auto minmax(0, 1fr); }
   .booking-package b, .booking-addon b { grid-column: 2; justify-self: start; }
 }
+
+.booking-additional-services { margin: 28px 0; padding: 24px; border: 1px solid var(--line); background: #f4f6ef; border-radius: 12px; }
+.booking-additional-services h3 { margin: 0 0 10px; font-size: 24px; }
+.booking-additional-services .eyebrow { margin: 0 0 8px; }
+.booking-additional-list { display: grid; gap: 10px; margin-top: 18px; }
+.booking-add-service { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); text-align: left; cursor: pointer; }
+.booking-add-service strong, .booking-add-service small { display: block; }
+.booking-add-service small { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.booking-add-service:hover { border-color: var(--gold); }
+.booking-add-label { white-space: nowrap; font-weight: 600; }
+.booking-add-service:disabled { opacity: .5; cursor: not-allowed; }
+.booking-edit-services { margin: 12px 0 20px; padding: 10px 0; border: 0; background: transparent; color: var(--ink); text-decoration: underline; cursor: pointer; }
+@media (max-width: 600px) { .booking-additional-services { padding: 16px; } .booking-add-service { padding: 12px; } }
