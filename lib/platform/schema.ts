@@ -409,4 +409,10 @@ CREATE TABLE IF NOT EXISTS wl.marketing_commission_payouts (
  amount_cents integer NOT NULL CHECK(amount_cents > 0), reference text NOT NULL,
  recorded_by uuid NOT NULL REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS wl_marketing_commission_payout_booking ON wl.marketing_commission_payouts(booking_id);
+
+CREATE TABLE IF NOT EXISTS wl.meta_ads_reports (
+ scope_key text NOT NULL, start_day text NOT NULL, end_day text NOT NULL,
+ payload jsonb, synced_at timestamptz, attempted_at timestamptz,
+ locked_at timestamptz, error text NOT NULL DEFAULT '',
+ PRIMARY KEY(scope_key,start_day,end_day));
 `;

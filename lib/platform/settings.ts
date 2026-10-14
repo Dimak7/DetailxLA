@@ -4,7 +4,7 @@ import {
   createHash,
   randomBytes,
 } from "node:crypto";
-import { query, transaction } from "./db";
+import { query, transaction, type Query } from "./db";
 import { defaultSettings } from "./seed";
 import type { BusinessSettings } from "./types";
 import { z } from "zod";
@@ -83,6 +83,7 @@ const envKeys: Record<string, string[]> = {
   square_location_id: ["SQUARE_LOCATION_ID"],
   square_webhook_signature_key: ["SQUARE_WEBHOOK_SIGNATURE_KEY"],
   meta_token: ["META_ACCESS_TOKEN"],
+  meta_ads_reporting_token: ["META_ADS_REPORTING_TOKEN"],
   telegram_webhook: ["TELEGRAM_WEBHOOK_SECRET"],
 };
 export const secretKeys = Object.keys(envKeys);
@@ -181,6 +182,13 @@ export async function secret(key: string) {
   }
   return "";
 }
+export async function saveSecret(q: Query, key: string, value: string) {
+  if (!secretKeys.includes(key) || !value) return;
+  const iv = randomBytes(12), cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
+  const data = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const ciphertext = [iv, cipher.getAuthTag(), data].map((v) => v.toString("base64")).join(".");
+  await q("INSERT INTO wl.secrets(key,ciphertext) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET ciphertext=$2,updated_at=now()", [key,ciphertext]);
+}
 export async function saveSettings(
   input: unknown,
   credentials: Record<string, string> = {},
@@ -255,6 +263,6 @@ export async function integrationStatus() {
     meta: Boolean(s.meta_pixel_id),
     meta_capi: c.meta_token && Boolean(s.meta_dataset_id || s.meta_pixel_id),
     google_ads_reporting: false,
-    meta_ads_reporting: false,
+    meta_ads_reporting: c.meta_ads_reporting_token && Boolean((await query("SELECT key FROM wl.settings WHERE key='meta_ads_reporting'"))[0]),
   };
 }

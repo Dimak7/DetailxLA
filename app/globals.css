@@ -2915,3 +2915,12 @@ td small {
 .marketing-commissions td,.marketing-commissions th { padding: 12px; border-bottom: 1px solid var(--line); }
 .marketing-commissions td button { display: block; margin-top: 8px; }
 .marketing-commission-review { margin-top: 20px; background: #f4f6ef; }
+
+.ads-performance .record-actions { margin: 18px 0; }
+.ads-performance .table-wrap { overflow-x: auto; margin: 18px 0; }
+.ads-performance table { width: 100%; border-collapse: collapse; text-align: left; }
+.ads-performance th,.ads-performance td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.ads-performance small { display: block; margin-top: 6px; }
+.ads-connection-form { margin-top: 24px; border: 1px solid var(--line); border-radius: 12px; padding: 22px; background: #f4f6ef; }
+.ads-connection-form label { display: block; margin: 16px 0; }
+.ads-connection-form input:not([type=checkbox]),.ads-connection-form select { display: block; width: 100%; margin-top: 8px; }

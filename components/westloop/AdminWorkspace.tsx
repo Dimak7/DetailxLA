@@ -12,6 +12,7 @@ import {
   type RecordData as R,
 } from "./AdminControls";
 import { BookingWizard } from "./BookingWizard";
+import { AdsPerformance } from "./AdsPerformance";
 import { MarketingCommissions } from "./MarketingCommissions";
 import { SquareRevenue } from "./SquareRevenue";
 import type { squareRevenueStatus } from "@/lib/integrations/square-reporting";
@@ -1051,6 +1052,7 @@ export function AdminWorkspace({
           <p className="small-note">
             {rep.start} through {rep.end} · Central Time. Net sales are completed website appointments; collections include all Square payments and are shown less refunds, before processing fees.
           </p>
+          {section === "marketing" && <AdsPerformance report={rep}/>}
           {data.square != null && <SquareRevenue connection={data.square as Awaited<ReturnType<typeof squareRevenueStatus>>} summary={rep.square} />}
           <div className="stats-grid">
             {[
@@ -1284,7 +1286,7 @@ export function AdminWorkspace({
               { comparison: true, label: "Channel performance" },
             )}
             <p className="small-note">
-              Enquiries are contact-form or manually entered prospects. A direct booking is not also counted as a lead. Paid revenue uses verified collected payments. Spend remains manual until ad-account reporting credentials are connected; missing spend is not zero.
+              Enquiries are contact-form or manually entered prospects. A direct booking is not also counted as a lead. Paid revenue uses verified collected payments. This channel table uses manually entered spend. Imported Meta metrics appear in Marketing’s Ad account performance report; missing spend is not zero.
             </p>
           </section>}
           {canViewGrowthReports && <section className="paper">
@@ -1343,8 +1345,8 @@ export function AdminWorkspace({
                 <div className="stats-grid acquisition-stats">
                   <article className="stat"><p>Website attribution</p><strong>Active</strong><small>UTMs, Google click IDs, social click IDs, referrer and lead stream are stored with each visit.</small></article>
                   <article className="stat"><p>Google Ads</p><strong>{business.google_ads_id ? "Conversions configured" : "Not configured"}</strong><small>Conversion tags do not import campaign spend. Google Ads reporting API is not connected yet.</small></article>
-                  <article className="stat"><p>Meta Ads</p><strong>{business.meta_pixel_id ? "Tracking configured" : "Not configured"}</strong><small>Pixel/CAPI tracking does not import Ads Manager spend. Meta reporting API is not connected yet.</small></article>
-                  <article className="stat"><p>Spend source</p><strong>Manual</strong><small>Only verified spend entered below is used for CPL, CPA and ROAS.</small></article>
+                  <article className="stat"><p>Meta Ads</p><strong>{business.meta_pixel_id ? "Tracking configured" : "Not configured"}</strong><small>Pixel/CAPI tracking is separate from spend reporting. Use the Meta connection in Ad account performance above.</small></article>
+                  <article className="stat"><p>Spend source</p><strong>Separate reports</strong><small>Ad account performance uses imported Meta spend. Channel reports below use manual spend; the two are not added together.</small></article>
                 </div>
               </section>
               <section className="paper">

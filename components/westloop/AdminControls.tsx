@@ -318,8 +318,8 @@ export function IntegrationStatus({ value }: { value: RecordData }) {
       <p className="small-note">
         Connected configuration means required settings are present, not that
         delivery was verified. Check message logs for actual provider results.
-        Ad account reporting is not connected; enter verified spend manually in
-        Marketing.
+        Review ad-account sync status in Marketing. Manual spend entries are
+        separate from imported ad metrics.
       </p>
     </>
   );
