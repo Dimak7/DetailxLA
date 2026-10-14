@@ -38,9 +38,10 @@ test("ledger preserves lead source, prevents duplicate payouts, and identifies r
       return (await createBooking({request_key:randomUUID(),service_id:service.id,session_id:randomUUID(),attribution:{source:"google",medium:"cpc",lead_stream:"business-google"},first_name:"Test",last_name:"Commission",email,phone,make:"Test",model:"Car",year:2026,vehicle_type:"Sedan",date:d.toISOString().slice(0,10),start_minute:480,terms:true,...(leadId?{lead_id:leadId}:{})},true)).booking;
     };
     const aid = await transaction((q)=>saveAttribution(q,randomUUID(),{source:"Meta Ads",lead_stream:"business-meta"}));
-    const leadId=randomUUID();await query("INSERT INTO wl.leads(id,name,email,phone,attribution_id) VALUES($1,'Meta lead','commission-first@example.test','+13125550123',$2)",[leadId,aid]);
+    const leadId=randomUUID();await query("INSERT INTO wl.leads(id,name,email,phone,attribution_id,call_customer) VALUES($1,'Meta lead','commission-first@example.test','+13125550123',$2,true)",[leadId,aid]);
     const first=await makeBooking("commission-first@example.test","+1 (312) 555-0123",0,leadId);
     assert.equal((await marketingCommissionRows()).find((r)=>r.id===first.id)?.lead_stream,"Business Meta · 10%");
+    assert.equal((await query<{call_customer:boolean}>("SELECT call_customer FROM wl.leads WHERE id=$1",[leadId]))[0].call_customer,false);
     await assert.rejects(marketingCommissionAction(first.id,owner.id,"approve",""),/first completed/);
     await query("UPDATE wl.bookings SET status='completed',completed_at=now(),price_cents=40000 WHERE id=$1",[first.id]);
     const payId=randomUUID();await query("INSERT INTO wl.payments(id,booking_id,customer_id,amount_cents,provider,status,paid_at) VALUES($1,$2,$3,45000,'manual','paid',now())",[payId,first.id,first.customer_id]);

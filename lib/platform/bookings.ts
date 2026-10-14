@@ -379,7 +379,7 @@ export async function createBooking(value: unknown, admin = false) {
     const leadId = input.lead_id || null;
     if (leadId)
       await q(
-        "UPDATE wl.leads SET customer_id=$1,status='booked',updated_at=now() WHERE id=$2",
+        "UPDATE wl.leads SET customer_id=$1,status='booked',call_customer=false,updated_at=now() WHERE id=$2",
         [customerId, leadId],
       );
     await q(
@@ -674,7 +674,7 @@ export async function updateBooking(
       await enqueueBooking(q, next, s, token, "review_request");
     }
     if (b.lead_id && status === "completed")
-      await q("UPDATE wl.leads SET status='won' WHERE id=$1", [b.lead_id]);
+      await q("UPDATE wl.leads SET status='won',call_customer=false WHERE id=$1", [b.lead_id]);
     return next;
   });
 }
