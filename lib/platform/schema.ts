@@ -398,4 +398,15 @@ UPDATE wl.attributions SET source='Organic Social'
 WHERE source='Meta Ads' AND landing_page<>''
   AND lower(medium) !~ '(^|[_ -])(cpc|ppc|paid|paid social|paidsocial)($|[_ -])'
   AND EXISTS (SELECT 1 FROM migration);
+
+-- Marketing settlements are separate from employee compensation and customer payments.
+CREATE TABLE IF NOT EXISTS wl.marketing_commission_approvals (
+ booking_id uuid PRIMARY KEY REFERENCES wl.bookings(id), lead_stream text NOT NULL,
+ rate_bps integer NOT NULL CHECK(rate_bps IN (1000,2500)), basis_cents integer NOT NULL CHECK(basis_cents >= 0),
+ approved_by uuid NOT NULL REFERENCES wl.users(id), approved_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS wl.marketing_commission_payouts (
+ id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.marketing_commission_approvals(booking_id),
+ amount_cents integer NOT NULL CHECK(amount_cents > 0), reference text NOT NULL,
+ recorded_by uuid NOT NULL REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS wl_marketing_commission_payout_booking ON wl.marketing_commission_payouts(booking_id);
 `;

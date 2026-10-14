@@ -19,6 +19,9 @@ export const attributionSchema = z.object({
 });
 export function normalizeLeadStream(value: string) {
   const stream = value.trim().toLowerCase().replace(/[_-]+/g, " ");
+  if (stream === "business google") return "Business Google · 10%";
+  if (stream === "business meta") return "Business Meta · 10%";
+  if (stream === "dima google") return "Dima Google · 25%";
   if (/^dima(?: leads?)?$/.test(stream)) return "Dima Leads";
   if (/^(?:west ?loop|west loop leads?)$/.test(stream)) return "West Loop Leads";
   return leadStreams.includes(value as (typeof leadStreams)[number]) ? value : "Unassigned";

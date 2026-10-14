@@ -2904,3 +2904,14 @@ td small {
 .booking-add-service:disabled { opacity: .5; cursor: not-allowed; }
 .booking-edit-services { margin: 12px 0 20px; padding: 10px 0; border: 0; background: transparent; color: var(--ink); text-decoration: underline; cursor: pointer; }
 @media (max-width: 600px) { .booking-additional-services { padding: 16px; } .booking-add-service { padding: 12px; } }
+
+.marketing-stream-links { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 16px; margin: 24px 0; }
+.marketing-stream-links article,.marketing-commission-review { border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.marketing-commissions small { display: block; margin-top: 6px; }
+.marketing-stream-links label,.marketing-commission-review label { display: block; margin: 14px 0; }
+.marketing-stream-links input { width: 100%; min-width: 0; font-size: 12px; margin-top: 8px; }
+.marketing-commissions .table-wrap { overflow-x: auto; }
+.marketing-commissions table { width: 100%; text-align: left; }
+.marketing-commissions td,.marketing-commissions th { padding: 12px; border-bottom: 1px solid var(--line); }
+.marketing-commissions td button { display: block; margin-top: 8px; }
+.marketing-commission-review { margin-top: 20px; background: #f4f6ef; }

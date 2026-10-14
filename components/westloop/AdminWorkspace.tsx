@@ -12,6 +12,7 @@ import {
   type RecordData as R,
 } from "./AdminControls";
 import { BookingWizard } from "./BookingWizard";
+import { MarketingCommissions } from "./MarketingCommissions";
 import { SquareRevenue } from "./SquareRevenue";
 import type { squareRevenueStatus } from "@/lib/integrations/square-reporting";
 import {
@@ -902,6 +903,7 @@ export function AdminWorkspace({
         {section === "inventory" && <button className="button" onClick={() => inventoryEdit()}>Add inventory item +</button>}
       </div>
       {workspace && <nav className="workspace-tabs" aria-label={workspace.name + " sections"}>{workspace.items.filter((item) => allowedSections.includes(item)).map((item) => <Link className={item === section ? "active" : ""} href={"/admin/" + item} key={item}>{title(item)}</Link>)}</nav>}
+      {section === "marketing" && <MarketingCommissions />}
       {notice && (
         <div className="success-message" role="status">
           {notice}
@@ -1299,7 +1301,7 @@ export function AdminWorkspace({
               ]),
               { comparison: true, label: "Lead stream performance" },
             )}
-            <p className="small-note">Use <strong>lead_stream=dima</strong> for Dima campaign URLs and <strong>lead_stream=west-loop</strong> for West Loop campaign URLs. Click IDs identify the ad platform; this tag identifies who owns the lead stream.</p>
+            <p className="small-note">Use <strong>lead_stream=business-google</strong> and <strong>business-meta</strong> for the 10% streams, or <strong>dima-google</strong> for the 25% stream. Keep ad spend on the matching stream. Legacy Dima/West Loop labels remain separate until reviewed.</p>
           </section>}
           {section !== "dashboard" && (
             <>

@@ -23,7 +23,7 @@ import { enqueue, enqueueBooking } from "./outbox";
 import { createCheckout } from "../integrations/payments";
 import { squareRevenueStatus, syncSquarePayments } from "../integrations/square-reporting";
 import { saveAttribution } from "./attribution";
-import type { Session, Service, BookingSnapshot, Customer, Row } from "./types";
+import { leadStreams, type Session, type Service, type BookingSnapshot, type Customer, type Row } from "./types";
 const uuid = z.uuid();
 const txt = z.string().trim().max(2000);
 const asset = z
@@ -905,7 +905,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         ]),
         notes: txt,
         source: z.string().max(100),
-        lead_stream: z.enum(["Dima Leads", "West Loop Leads", "Unassigned"]).default("Unassigned"),
+        lead_stream: z.enum(leadStreams).default("Unassigned"),
         campaign: z.string().max(500).default(""),
         assigned_to: uuid.nullable(),
       })
@@ -1136,7 +1136,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     const s = z
       .object({
         channel: z.string().max(80),
-        lead_stream: z.enum(["Dima Leads", "West Loop Leads", "Unassigned"]).default("Unassigned"),
+        lead_stream: z.enum(leadStreams).default("Unassigned"),
         campaign: z.string().max(500),
         spend_date: z.string(),
         amount_cents: z.number().int().min(0).max(100000000),

@@ -187,7 +187,7 @@ export const channels = [
   "Phone",
   "Other",
 ] as const;
-export const leadStreams = ["Dima Leads", "West Loop Leads", "Unassigned"] as const;
+export const leadStreams = ["Business Google · 10%", "Business Meta · 10%", "Dima Google · 25%", "Dima Leads", "West Loop Leads", "Unassigned"] as const;
 export function money(cents: number | null | undefined) {
   return cents == null
     ? "By consultation"

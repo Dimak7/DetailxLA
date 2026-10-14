@@ -46,6 +46,14 @@ function completeAttribution(value: Partial<Attribution> = {}) {
 }
 
 export function visitor() {
+  const incoming = new URLSearchParams(location.search);
+  const incomingStream = incoming.get("lead_stream") || incoming.get("utm_account") || "";
+  // An explicit stream link may be opened after a different campaign in the same tab.
+  // Use a new attribution session rather than silently retaining the previous payout stream.
+  if (memorySession && incomingStream && incomingStream !== memorySession.attribution.lead_stream) {
+    memorySession = null;
+    try { sessionStorage.removeItem("wl_visitor"); } catch {}
+  }
   if (memorySession) return memorySession;
   try {
     const saved = sessionStorage.getItem("wl_visitor");
@@ -54,11 +62,13 @@ export function visitor() {
         session_id: string;
         attribution: Partial<Attribution>;
       };
-      memorySession = {
-        session_id: parsed.session_id,
-        attribution: completeAttribution(parsed.attribution),
-      };
-      return memorySession;
+      if (!incomingStream || incomingStream === parsed.attribution.lead_stream) {
+        memorySession = {
+          session_id: parsed.session_id,
+          attribution: completeAttribution(parsed.attribution),
+        };
+        return memorySession;
+      }
     }
   } catch {}
   const p = new URLSearchParams(location.search);

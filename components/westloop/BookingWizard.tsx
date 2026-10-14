@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   money,
   dateToday,
+  leadStreams,
   timeLabel,
   type Service,
   type BusinessSettings,
@@ -55,6 +56,8 @@ export function BookingWizard({
   lead?: { id: string; name: string; email: string; phone: string };
   onComplete?: () => void;
 }) {
+  const [manualStream, setManualStream] = useState("Unassigned");
+  const manualSession = useRef(crypto.randomUUID());
   const initialServiceRecord = services.find((s) => s.id === initialService);
   const [step, setStep] = useState(0),
     [draft, setDraft] = useState<Draft>({
@@ -205,6 +208,7 @@ export function BookingWizard({
         base = {
           ...draft,
           ...v,
+          ...(admin ? { session_id: manualSession.current, attribution: { ...v.attribution, source: "Phone", lead_stream: manualStream, medium: "", campaign: "", gclid: "", gbraid: "", wbraid: "", fbclid: "" } } : {}),
           ...(admin && lead ? { lead_id: lead.id } : {}),
           device: admin ? "admin" : innerWidth < 768 ? "mobile" : "desktop",
         };
@@ -304,6 +308,7 @@ export function BookingWizard({
             </span>
           ))}
         </div>
+        {admin && !lead && step === 0 && <label className="field">Marketing source for this phone/manual booking<select value={manualStream} onChange={(e) => setManualStream(e.target.value)}>{leadStreams.map((stream) => <option key={stream}>{stream}</option>)}</select><small>Select the campaign that generated the enquiry. Untagged or organic bookings should stay Unassigned.</small></label>}
         {step === 0 && (
           <>
             <h2 ref={stepHeading} tabIndex={-1} className="booking-step-heading">What does your car need?</h2>

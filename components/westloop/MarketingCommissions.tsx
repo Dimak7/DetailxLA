@@ -1,0 +1,61 @@
+"use client";
+import { useEffect, useState } from "react";
+import { money } from "@/lib/platform/types";
+import { marketingStreams } from "@/lib/marketing-streams";
+import type { marketingCommissionRows } from "@/lib/platform/marketing-commissions";
+type Row = Awaited<ReturnType<typeof marketingCommissionRows>>[number];
+export function MarketingCommissions() {
+  const [rows,setRows] = useState<Row[]>([]), [error,setError] = useState(""), [loading,setLoading] = useState(true), [busy,setBusy] = useState(false);
+  const [selected,setSelected] = useState<Row|null>(null), [verified,setVerified] = useState(false), [reference,setReference] = useState("");
+  const [payouts,setPayouts] = useState<Array<{id:string;amount_cents:number;reference:string;created_at:string;booking_reference:string;recorded_by:string}>>([]);
+  const [origin,setOrigin] = useState("");
+  async function load() {
+    const res = await fetch("/api/admin/marketing-commissions",{cache:"no-store"});
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Could not load commissions.");
+    setRows(data.rows); setPayouts(data.payouts || []);
+  }
+  useEffect(() => { setOrigin(location.origin); load().catch((e: Error) => setError(e.message)).finally(() => setLoading(false)); },[]);
+  async function save() {
+    if (!selected) return;
+    setBusy(true); setError("");
+    try {
+      const res = await fetch("/api/admin/marketing-commissions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({booking_id:selected.id,action:selected.can_approve?"approve":"record_paid",reference,verified_service_subtotal:verified})});
+      const data = await res.json(); if (!res.ok) throw new Error(data.error || "Could not save commission.");
+      await load(); setSelected(null);
+    } catch (e) {setError(e instanceof Error?e.message:"Could not save commission.");} finally {setBusy(false);}
+  }
+  return <section className="paper marketing-commissions">
+    <p className="eyebrow">DIMA · MARKETING</p><h2>Commissions & tracking links</h2>
+    <p>First completed job per customer only. Business-funded Google and Meta: 10%. Dima-funded Google: 25%. Service subtotal after discounts, excluding tax and tips; completed and fully paid before approval.</p>
+    <div className="marketing-stream-links">{marketingStreams.map((stream) => {
+      const link = `${origin}/booking?utm_source=${stream.channel}&utm_medium=${stream.channel === "google" ? "cpc" : "paid_social"}&lead_stream=${stream.tag}`;
+      return <article key={stream.tag}><strong>{stream.name}</strong><small>Ad budget: {stream.budget} · Commission recipient: Dima</small><label>Campaign landing link<input readOnly value={link} aria-label={`${stream.name} tracking link`} onFocus={(e) => e.target.select()}/></label></article>;
+    })}</div>
+    <p className="small-note">Use the same query parameters on quote/contact pages. Add a campaign tag to distinguish campaigns. Phone enquiries need a separate number per stream or a manually verified source. Meta instant forms must be imported as leads with their stream; they are not connected automatically. Existing Dima/West Loop labels do not receive an assumed rate.</p>
+    {error && <p role="alert" className="error-message">{error}</p>}
+    {loading ? <p>Loading commissions…</p> : <>
+      <div className="stats-grid">
+        <article className="stat"><p>Ready for approval</p><strong>{money(rows.filter((r)=>r.can_approve).reduce((sum,r)=>sum+r.earned_cents,0))}</strong></article>
+        <article className="stat"><p>Approved unpaid</p><strong>{money(rows.reduce((sum,r)=>sum+Math.max(0,r.due_cents),0))}</strong></article>
+        <article className="stat"><p>Recorded paid</p><strong>{money(rows.reduce((sum,r)=>sum+r.paid_cents,0))}</strong></article>
+        <article className="stat"><p>Adjustments to review</p><strong>{money(rows.reduce((sum,r)=>sum+Math.max(0,-r.due_cents),0))}</strong></article>
+      </div>
+      {rows.length ? <div className="table-wrap"><table><thead><tr>{["Booking / customer","Stream / budget","Service basis","Rate","Commission","Recorded paid","Status / action"].map((x)=><th key={x}>{x}</th>)}</tr></thead><tbody>{rows.map((r)=><tr key={r.id}>
+        <td><a href={`/admin/bookings?search=${encodeURIComponent(r.reference)}`}>{r.reference}</a><small>{r.customer_name} · {r.booking_date}</small><small>{r.service_name}</small></td>
+        <td>{r.lead_stream}<small>{r.lead_stream.startsWith("Dima Google")?"Dima-funded":"Business-funded"}</small></td>
+        <td>{money(r.basis_cents)}</td><td>{r.rate_bps/100}%</td><td>{money(r.earned_cents)}</td><td>{money(r.paid_cents)}</td>
+        <td>{r.state}{(r.can_approve || r.due_cents>0) && <button type="button" disabled={busy} onClick={()=>{setSelected(r);setVerified(false);setReference("");setError("");}}>{r.can_approve?"Review & approve":"Record paid"}</button>}</td>
+      </tr>)}</tbody></table></div> : <p>No bookings tagged with these commission streams yet.</p>}
+    </>}
+    {payouts.length > 0 && <details><summary>Recent recorded commission payments</summary><ul>{payouts.map((p)=><li key={p.id}>{p.booking_reference} · {money(p.amount_cents)} · {p.reference} · recorded by {p.recorded_by} on {new Date(p.created_at).toLocaleDateString("en-US",{timeZone:"America/Chicago"})}</li>)}</ul></details>}
+    {selected && <div className="marketing-commission-review" role="region" aria-label="Review commission">
+      <h3>{selected.can_approve?"Approve commission":"Record an existing payment"}: {selected.reference}</h3>
+      <p>{selected.lead_stream} · {money(selected.can_approve?selected.earned_cents:selected.due_cents)}. Recording a payout does not transfer money.</p>
+      <label><input type="checkbox" checked={verified} onChange={(e)=>setVerified(e.target.checked)}/> I verified the marketing source, first-job eligibility and service subtotal excluding tax and tips.</label>
+      {!selected.can_approve && <label>Payment / transfer reference<input value={reference} maxLength={240} onChange={(e)=>setReference(e.target.value)}/></label>}
+      <button type="button" disabled={busy || !verified || (!selected.can_approve && !reference.trim())} onClick={save}>{busy?"Saving…":selected.can_approve?"Approve":"Record paid"}</button> <button type="button" disabled={busy} onClick={()=>setSelected(null)}>Cancel</button>
+    </div>}
+    <p className="small-note">Refunds reduce the service basis conservatively. Refunds or reopened jobs after a payout appear as adjustments; payout history is retained. Square/POS payments must be linked to the booking to qualify. These totals cover all tagged bookings, independent of the date filter above.</p>
+  </section>;
+}

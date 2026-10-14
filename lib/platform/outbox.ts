@@ -66,8 +66,8 @@ export async function enqueueBooking(
   ).rows[0];
   const a = b.attribution_id
     ? (
-        await q<{ source: string }>(
-          "SELECT source FROM wl.attributions WHERE id=$1",
+        await q<{ source: string; lead_stream: string }>(
+          "SELECT source,lead_stream FROM wl.attributions WHERE id=$1",
           [b.attribution_id],
         )
       ).rows[0]
@@ -149,7 +149,7 @@ export async function enqueueBooking(
           channel,
           recipient: channel === "email" ? s.email : s.telegram_chat_id,
           subject: renderTemplate(t.subject, vars),
-          body: renderTemplate(t.body, vars),
+          body: renderTemplate(t.body, vars) + "\n\nMarketing stream: " + (a?.lead_stream || "Unassigned"),
           customerId: b.customer_id,
           bookingId: b.id,
         });
