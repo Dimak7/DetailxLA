@@ -8,6 +8,8 @@ import {
   type Service,
   type BusinessSettings,
 } from "@/lib/platform/types";
+import { BookingDatePicker } from "./BookingDatePicker";
+import { marketingStreamLabel } from "@/lib/marketing-streams";
 import { visitor, track, confirmedConversion } from "./Tracking";
 import { bookingDestination } from "@/lib/booking-handoff";
 import {
@@ -308,7 +310,7 @@ export function BookingWizard({
             </span>
           ))}
         </div>
-        {admin && !lead && step === 0 && <label className="field">Marketing source for this phone/manual booking<select value={manualStream} onChange={(e) => setManualStream(e.target.value)}>{leadStreams.map((stream) => <option key={stream}>{stream}</option>)}</select><small>Select the campaign that generated the enquiry. Untagged or organic bookings should stay Unassigned.</small></label>}
+        {admin && !lead && step === 0 && <label className="field">Marketing source for this phone/manual booking<select value={manualStream} onChange={(e) => setManualStream(e.target.value)}>{leadStreams.map((stream) => <option key={stream} value={stream}>{marketingStreamLabel(stream)}</option>)}</select><small>Select the campaign that generated the enquiry. Untagged or organic bookings should stay Unassigned.</small></label>}
         {step === 0 && (
           <>
             <h2 ref={stepHeading} tabIndex={-1} className="booking-step-heading">What does your car need?</h2>
@@ -444,20 +446,7 @@ export function BookingWizard({
         {step === 2 && (
           <>
             <h2 ref={stepHeading} tabIndex={-1} className="booking-step-heading">Make a little time.</h2>
-            <label className="field">
-              <span>Appointment date</span>
-              <input
-                type="date"
-                required
-                min={dateToday()}
-                max={dateToday(new Date(Date.now() + 365 * 86400000))}
-                value={draft.date}
-                onChange={(e) => {
-                  set("date", e.target.value);
-                  set("start_minute", -1);
-                }}
-              />
-            </label>
+            <BookingDatePicker min={dateToday()} max={dateToday(new Date(Date.now()+365*86400000))} value={draft.date} onChange={(date)=>{set("date",date);set("start_minute",-1);}} />
             <p className="small-note">
               All appointment times are Central Time (Chicago). Estimated
               service time: {durationMinutes / 60} hours for {selectedServices.length === 1 ? "your service" : "all selected services"}.

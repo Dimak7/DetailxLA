@@ -30,7 +30,7 @@ export function commissionAmounts(row: CommissionInput) {
 
 const phoneKey = (alias: string) => `CASE WHEN regexp_replace(${alias}.phone,'[^0-9]','','g') ~ '^1[0-9]{10}$' THEN right(regexp_replace(${alias}.phone,'[^0-9]','','g'),10) ELSE regexp_replace(${alias}.phone,'[^0-9]','','g') END`;
 export async function marketingCommissionRows(q?: Query, bookingId?: string) {
-  const sql = `SELECT b.id,b.reference,b.booking_date,b.status,b.price_cents,b.service_name,
+  const sql = `SELECT b.id,b.reference,b.booking_date,b.status,b.price_cents,b.service_name,b.completed_at,
     c.first_name||' '||c.last_name customer_name,a.lead_stream,a.source,a.campaign,
     CASE WHEN a.lead_stream='Dima Google · 25%' THEN 2500 ELSE 1000 END AS rate_bps,
     ap.basis_cents approved_basis_cents,ap.lead_stream approved_stream,ap.rate_bps approved_rate_bps,
@@ -54,7 +54,7 @@ export async function marketingCommissionRows(q?: Query, bookingId?: string) {
       price_cents: r.price_cents === null ? null : Number(r.price_cents),
       collected_cents: Number(r.collected_cents), refunded_cents: Number(r.refunded_cents),
       approved_basis_cents: r.approved_basis_cents === null ? null : Number(r.approved_basis_cents), paid_cents: Number(r.paid_cents),
-    } as unknown as CommissionInput & { reference: string; booking_date: string; service_name: string; customer_name: string; lead_stream: string; source: string; campaign: string };
+    } as unknown as CommissionInput & { reference: string; booking_date: string; completed_at: string | null; service_name: string; customer_name: string; lead_stream: string; source: string; campaign: string };
     return { ...row, ...commissionAmounts(row) };
   });
 }

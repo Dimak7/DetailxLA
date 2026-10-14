@@ -298,3 +298,28 @@
 .ceramics-site .operopsy-credit:focus-visible{outline:2px solid #ded4c5;outline-offset:-5px}
 .ceramics-site .operopsy-credit p>span{margin-left:14px;color:#aaa69f}
 @media(max-width:760px){.ceramics-site .operopsy-credit-inner{align-items:flex-start;flex-direction:column;gap:12px}.ceramics-site .operopsy-credit p{justify-content:flex-start}.ceramics-site .operopsy-credit p>span{display:block;width:100%;margin-left:0}}
+
+/* Generous appointment date targets, independent of the browser's small popup. */
+.booking-date-picker { border: 1px solid var(--line, #d8ded8); border-radius: 18px; padding: 24px; margin: 20px 0; width: 100%; max-width: 640px; background: #fff; }
+.booking-date-picker legend { font-size: 1.05rem; font-weight: 600; padding: 0 8px; }
+.booking-month-nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.booking-month-nav strong { font-size: 1.25rem; }
+.booking-month-nav button { width: 48px; min-height: 48px; border-radius: 50%; border: 1px solid #d8ded8; background: #f5f7f3; cursor: pointer; }
+.booking-calendar-weekdays, .booking-calendar-days { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 8px; }
+.booking-calendar-weekdays { text-align: center; font-size: .8rem; color: #647069; margin-bottom: 10px; }
+.booking-calendar-days button { min-height: 58px; padding: 8px; border: 1px solid #d8ded8; border-radius: 10px; background: #f9faf7; font-size: 1rem; cursor: pointer; }
+.booking-calendar-days button[aria-pressed="true"] { background: #315746; color: #fff; border-color: #315746; }
+.booking-calendar-days button[aria-current="date"] { box-shadow: inset 0 0 0 2px #9cad8e; }
+.booking-calendar-days button:disabled, .booking-month-nav button:disabled { opacity: .32; cursor: default; }
+.booking-date-picker button:focus-visible { outline: 3px solid #7f9e6b; outline-offset: 3px; }
+.compact-id { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; font: .78rem ui-monospace, monospace; color: #647069; }
+.marketing-stream-links details { min-width: 0; margin-top: 12px; }
+.marketing-stream-links input { width: 100%; min-width: 0; font-size: .8rem; }
+.tracking-link-actions { display: flex; align-items: center; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+.tracking-link-actions button { border: 1px solid #ccd6ce; border-radius: 8px; padding: 8px 14px; background: #f3f6ef; cursor: pointer; }
+.marketing-commissions td small { display: block; margin-top: 6px; }
+@media(max-width:600px) {
+  .booking-date-picker { padding: 14px; }
+  .booking-calendar-weekdays, .booking-calendar-days { gap: 4px; }
+  .booking-calendar-days button { min-height: 44px; padding: 4px; }
+}

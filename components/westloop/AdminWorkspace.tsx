@@ -13,6 +13,7 @@ import {
 } from "./AdminControls";
 import { BookingWizard } from "./BookingWizard";
 import { AdsPerformance } from "./AdsPerformance";
+import { marketingStreamLabel } from "@/lib/marketing-streams";
 import { MarketingCommissions } from "./MarketingCommissions";
 import { SquareRevenue } from "./SquareRevenue";
 import type { squareRevenueStatus } from "@/lib/integrations/square-reporting";
@@ -365,7 +366,7 @@ export function AdminWorkspace({
         f("email", "Email", "email"),
         f("phone", "Phone"),
         f("source", "Source", "select", { options: [...channels] }),
-        f("lead_stream", "Lead stream", "select", { options: [...leadStreams] }),
+        f("lead_stream", "Lead stream", "select", { options: leadStreams.map(value => ({ value, label: marketingStreamLabel(value) })) }),
         f("campaign", "Campaign"),
         f("status", "Status", "select", { options: [...leadStatuses] }),
         f("assigned_to", "Assign to", "nullable-select", {
@@ -1067,7 +1068,7 @@ export function AdminWorkspace({
                 ["Operating margin", rep.operating_margin == null ? "No paid revenue" : rep.operating_margin.toFixed(1) + "%", "Not tax or full accounting profit"],
               ] : []),
               ["Bookings", s(rep.bookings.total), "Created in period"],
-              ["New leads", s(rep.leads), "Recorded enquiries & bookings"],
+              ["New leads", s(rep.leads), "Quote and callback enquiries; excludes direct bookings"],
               ...(canViewGrowthReports ? [[
                 "Booking conversion",
                 rep.conversion_rate == null
@@ -1294,7 +1295,7 @@ export function AdminWorkspace({
             {table(
               ["Lead stream", "Enquiries", "Bookings", "Clients", "Paid revenue", "Spend", "CPL", "CPA", "ROAS"],
               rep.lead_streams.map((r) => [
-                <><strong>{r.lead_stream}</strong><small>{r.lead_stream === "Unassigned" ? "Add lead_stream to campaign URLs" : "Tagged acquisition stream"}</small></>,
+                <><strong>{marketingStreamLabel(r.lead_stream)}</strong><small>{r.lead_stream === "Unassigned" ? "Add lead_stream to campaign URLs" : "Tagged acquisition stream"}</small></>,
                 s(r.leads), s(r.bookings), s(r.clients), money(r.revenue),
                 r.spend == null ? "Not entered" : money(r.spend),
                 r.cpl == null ? "—" : money(r.cpl),
@@ -1303,7 +1304,7 @@ export function AdminWorkspace({
               ]),
               { comparison: true, label: "Lead stream performance" },
             )}
-            <p className="small-note">Use <strong>lead_stream=business-google</strong> and <strong>business-meta</strong> for the 10% streams, or <strong>dima-google</strong> for the 25% stream. Keep ad spend on the matching stream. Legacy Dima/West Loop labels remain separate until reviewed.</p>
+            <p className="small-note">Use the campaign links above to assign each booking to the correct funding source. Earnings are calculated automatically from eligible service revenue. Older sources remain separate until reviewed.</p>
           </section>}
           {section !== "dashboard" && (
             <>
@@ -1315,8 +1316,8 @@ export function AdminWorkspace({
                     .filter((r) => n(r.leads) || n(r.bookings) || n(r.revenue))
                     .map((r) => [
                       s(r.source),
-                      s(r.lead_stream),
-                      s(r.campaign) || "(not tagged)",
+                      marketingStreamLabel(s(r.lead_stream)),
+                      <span className="compact-id" title={s(r.campaign)}>{s(r.campaign) || "(not tagged)"}</span>,
                       s(r.leads),
                       s(r.bookings),
                       s(r.clients),
@@ -1370,7 +1371,7 @@ export function AdminWorkspace({
                             options: [...channels],
                           }),
                           f("lead_stream", "Lead stream", "select", {
-                            options: [...leadStreams],
+                            options: leadStreams.map(value => ({ value, label: marketingStreamLabel(value) })),
                           }),
                           f("campaign", "Campaign"),
                           f("spend_date", "Spend date", "date"),
@@ -1387,8 +1388,8 @@ export function AdminWorkspace({
                   rows(data.spend).map((r) => [
                     s(r.spend_date),
                     s(r.channel),
-                    s(r.lead_stream),
-                    s(r.campaign),
+                    marketingStreamLabel(s(r.lead_stream)),
+                    <span className="compact-id" title={s(r.campaign)}>{s(r.campaign)}</span>,
                     money(n(r.amount_cents)),
                   ]),
                 )}
@@ -1813,7 +1814,7 @@ export function AdminWorkspace({
             </>,
             <>
               {s(r.source)}
-              <small>{s(r.lead_stream)}{s(r.campaign) ? " · " + s(r.campaign) : ""}</small>
+              <small>{marketingStreamLabel(s(r.lead_stream))}{s(r.campaign) && <> · <span className="compact-id" title={s(r.campaign)}>{s(r.campaign)}</span></>}</small>
             </>,
             status(r.status),
             <>
