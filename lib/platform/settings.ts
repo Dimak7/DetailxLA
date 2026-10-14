@@ -83,6 +83,9 @@ const envKeys: Record<string, string[]> = {
   square_location_id: ["SQUARE_LOCATION_ID"],
   square_webhook_signature_key: ["SQUARE_WEBHOOK_SIGNATURE_KEY"],
   meta_token: ["META_ACCESS_TOKEN"],
+  meta_leads_page_token: ["META_LEADS_PAGE_TOKEN"],
+  meta_leads_app_secret: ["META_LEADS_APP_SECRET"],
+  meta_leads_verify_token: ["META_LEADS_VERIFY_TOKEN"],
   meta_ads_reporting_token: ["META_ADS_REPORTING_TOKEN"],
   telegram_webhook: ["TELEGRAM_WEBHOOK_SECRET"],
 };

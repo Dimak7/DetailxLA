@@ -323,3 +323,5 @@
   .booking-calendar-weekdays, .booking-calendar-days { gap: 4px; }
   .booking-calendar-days button { min-height: 44px; padding: 4px; }
 }
+.call-customer-tag { margin: 6px 0; background: #fff0cb; color: #6a4c09; }
+.lead-answers { white-space: pre-wrap; max-width: 420px; overflow-wrap: anywhere; }

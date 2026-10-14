@@ -1,3 +1,4 @@
+import { processMetaLeads } from "@/lib/integrations/meta-leads";
 import { NextResponse } from "next/server";
 import { processOutbox } from "@/lib/platform/worker";
 import { reconcileSquarePayments } from "@/lib/platform/square-jobs";
@@ -7,6 +8,7 @@ export async function POST(request: Request) {
     request.headers.get("authorization") !== "Bearer " + process.env.CRON_SECRET
   )
     return NextResponse.json({ ok: false }, { status: 401 });
+  await processMetaLeads(20);
   const [processed, square] = await Promise.all([processOutbox(50), reconcileSquarePayments()]);
   return NextResponse.json({ ok: true, processed, square });
 }

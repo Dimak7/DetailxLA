@@ -415,4 +415,13 @@ CREATE TABLE IF NOT EXISTS wl.meta_ads_reports (
  payload jsonb, synced_at timestamptz, attempted_at timestamptz,
  locked_at timestamptz, error text NOT NULL DEFAULT '',
  PRIMARY KEY(scope_key,start_day,end_day));
+ALTER TABLE wl.leads ADD COLUMN IF NOT EXISTS call_customer boolean NOT NULL DEFAULT false;
+ALTER TABLE wl.leads ADD COLUMN IF NOT EXISTS meta_payload jsonb;
+ALTER TABLE wl.leads DROP CONSTRAINT IF EXISTS leads_origin_check;
+ALTER TABLE wl.leads ADD CONSTRAINT leads_origin_check CHECK(origin IN ('manual','website','booking','meta'));
+CREATE TABLE IF NOT EXISTS wl.meta_lead_events (
+ leadgen_id text PRIMARY KEY,page_id text NOT NULL,form_id text NOT NULL,ad_id text NOT NULL DEFAULT '',
+ lead_id uuid REFERENCES wl.leads(id),attempts integer NOT NULL DEFAULT 0,
+ next_attempt_at timestamptz NOT NULL DEFAULT now(),locked_at timestamptz,error text NOT NULL DEFAULT '',
+ received_at timestamptz NOT NULL DEFAULT now(),imported_at timestamptz);
 `;

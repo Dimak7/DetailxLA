@@ -904,6 +904,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
           "lost",
         ]),
         notes: txt,
+        call_customer: z.boolean().optional(),
         source: z.string().max(100),
         lead_stream: z.enum(leadStreams).default("Unassigned"),
         campaign: z.string().max(500).default(""),
@@ -929,6 +930,8 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
           attributionId,
         ],
       );
+      if(l.id && (l.call_customer !== undefined || ["contacted","booked","won","lost"].includes(l.status)))
+        await q("UPDATE wl.leads SET call_customer=$2 WHERE id=$1",[l.id,["contacted","booked","won","lost"].includes(l.status)?false:l.call_customer]);
     });
   }
   if (action === "convert_lead") {

@@ -12,6 +12,7 @@ import {
   type RecordData as R,
 } from "./AdminControls";
 import { BookingWizard } from "./BookingWizard";
+import { MetaLeadForms } from "./MetaLeadForms";
 import { AdsPerformance } from "./AdsPerformance";
 import { marketingStreamLabel } from "@/lib/marketing-streams";
 import { MarketingCommissions } from "./MarketingCommissions";
@@ -369,6 +370,7 @@ export function AdminWorkspace({
         f("lead_stream", "Lead stream", "select", { options: leadStreams.map(value => ({ value, label: marketingStreamLabel(value) })) }),
         f("campaign", "Campaign"),
         f("status", "Status", "select", { options: [...leadStatuses] }),
+        f("call_customer", "Call Customer tag", "checkbox"),
         f("assigned_to", "Assign to", "nullable-select", {
           options: teamOptions,
         }),
@@ -1804,13 +1806,15 @@ export function AdminWorkspace({
           )}
         </>
       )}
+      {section === "leads" && allowedSections.includes("marketing") && <MetaLeadForms />}
       {section === "leads" &&
         table(
           ["Lead", "Source / stream", "Status", "Contact", "Actions"],
           list.map((r) => [
             <>
               {s(r.name)}
-              <small>{s(r.notes)}</small>
+              {!!r.call_customer && <span className="status-pill call-customer-tag">Call Customer</span>}
+              <details><summary>Form answers & notes</summary><p className="lead-answers">{s(r.notes)||"No notes"}</p></details>
             </>,
             <>
               {s(r.source)}
