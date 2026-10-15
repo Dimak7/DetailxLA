@@ -1,0 +1,56 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {query,closeDatabase} from '../lib/platform/db';
+import {adminAction,adminData} from '../lib/platform/admin';
+import {login,sessionFromToken} from '../lib/platform/auth';
+import {schema} from '../lib/platform/schema';
+import type {Session} from '../lib/platform/types';
+process.env.PGLITE_PATH='memory://crm-team';delete process.env.DATABASE_URL;
+Object.assign(process.env,{NODE_ENV:'test',ADMIN_EMAIL:'crm-owner@example.test',ADMIN_PASSWORD:'test-only-owner-password-1234'});
+test('removed team accounts lose sessions, retain profiles, and restore without silently reactivating',async()=>{
+ const owner=(await sessionFromToken(await login(process.env.ADMIN_EMAIL!,process.env.ADMIN_PASSWORD!,'owner-test')))!;
+ const person={name:'Former detailer',email:'former@example.test',role:'staff',phone:'3125550119',password:'test-only-detailer-password',active:true,position:'Detailer'};
+ const created=await adminAction('save_user',person,owner) as {id:string};
+ const token=await login(person.email,person.password,'former-test');assert.ok(await sessionFromToken(token));
+ await assert.rejects(adminAction('remove_user',{id:owner.user_id},owner),/own account/);
+ await assert.rejects(adminAction('remove_user',{id:owner.user_id},{...owner,user_id:created.id,role:'admin'}),/Only an owner/);
+ await assert.rejects(adminAction('remove_user',{id:created.id},{...owner,role:'manager'}),/cannot perform/);
+ await adminAction('remove_user',{id:created.id},owner);
+ assert.equal(await sessionFromToken(token),null);
+ await assert.rejects(login(person.email,person.password,'blocked'));
+ const employee=(await query<{id:string;active:boolean}>('SELECT id,active FROM wl.employees WHERE user_id=$1',[created.id]))[0];assert.ok(employee.id);assert.equal(employee.active,false);
+ const visible=await adminData('team',new URLSearchParams(),owner);assert.equal((visible.rows as {id:string}[]).some(r=>r.id===created.id),false);
+ const removed=await adminData('team',new URLSearchParams({removed:'1'}),owner);assert.ok((removed.rows as {id:string}[]).some(r=>r.id===created.id));
+ await assert.rejects(adminAction('save_user',{...person,id:created.id},owner),/Restore/);
+ await adminAction('restore_user',{id:created.id},owner);await assert.rejects(login(person.email,person.password,'still-disabled'));
+ await adminAction('save_user',{...person,id:created.id},owner);assert.ok(await sessionFromToken(await login(person.email,person.password,'restored')));
+ assert.equal((await query<{id:string}>('SELECT id FROM wl.employees WHERE user_id=$1',[created.id]))[0].id,employee.id);
+});
+test('lead outcomes, editable tags, filters and customer conversion preserve attribution and history',async()=>{
+ try {
+  const owner=(await sessionFromToken(await login(process.env.ADMIN_EMAIL!,process.env.ADMIN_PASSWORD!,'crm')))!;
+  const id=randomUUID();
+  await adminAction('save_lead',{id,name:'CRM test',email:'lead@example.test',phone:'3125550100',status:'new',notes:'Quote requested',source:'Google Ads',lead_stream:'Business Google · 10%',campaign:'campaign-1',assigned_to:null,call_customer:true},owner);
+  const attribution=(await query<{attribution_id:string}>('SELECT attribution_id FROM wl.leads WHERE id=$1',[id]))[0].attribution_id;
+  await adminAction('lead_outcome',{id,outcome:'call_again'},owner);
+  let row=(await query<{status:string;call_customer:boolean}>('SELECT status,call_customer FROM wl.leads WHERE id=$1',[id]))[0];assert.equal(row.status,'new');assert.equal(row.call_customer,true);
+  assert.equal((await query('SELECT * FROM wl.lead_tags WHERE lead_id=$1',[id])).length,2);
+  await adminAction('lead_outcome',{id,outcome:'contacted'},owner);assert.equal((await query('SELECT * FROM wl.lead_tags WHERE lead_id=$1',[id])).length,0);
+  await adminAction('lead_outcome',{id,outcome:'sold'},owner);row=(await query<{status:string;call_customer:boolean}>('SELECT status,call_customer FROM wl.leads WHERE id=$1',[id]))[0];assert.equal(row.status,'won');assert.equal(row.call_customer,false);
+  assert.equal((await query('SELECT * FROM wl.bookings')).length,0);
+  assert.equal((await query<{attribution_id:string}>('SELECT attribution_id FROM wl.leads WHERE id=$1',[id]))[0].attribution_id,attribution);
+  await adminAction('save_crm_tag',{name:'VIP',color:'#426b60'},owner);const tag=(await query<{id:string}>("SELECT id FROM wl.crm_tags WHERE name='VIP'"))[0];
+  await assert.rejects(adminAction('save_crm_tag',{name:'vip'},owner),/already exists/);
+  await assert.rejects(adminAction('tag_lead',{id,tag_id:tag.id,operation:'add'},{...owner,role:'staff'}),/cannot perform/);
+  await adminAction('tag_lead',{id,tag_id:tag.id,operation:'add'},owner);await adminAction('tag_lead',{id,tag_id:tag.id,operation:'add'},owner);
+  const filtered=await adminData('leads',new URLSearchParams({tag:tag.id}),owner);assert.equal((filtered.rows as unknown[]).length,1);
+  const cid=(await adminAction('convert_lead',{id},owner) as {customer_id:string}).customer_id;
+  const customer=await adminData('customers',new URLSearchParams({id:cid,tag:tag.id}),owner);assert.equal((customer.rows as unknown[]).length,1);
+  await adminAction('tag_lead',{id,tag_id:tag.id,operation:'remove'},owner);assert.equal((await query('SELECT * FROM wl.customer_tags WHERE customer_id=$1 AND tag_id=$2',[cid,tag.id])).length,1);
+  await adminAction('archive_crm_tag',{id:tag.id},owner);assert.equal(((await adminData('customers',new URLSearchParams({tag:tag.id}),owner)).rows as unknown[]).length,0);
+  await adminAction('restore_crm_tag',{id:tag.id},owner);assert.equal(((await adminData('customers',new URLSearchParams({tag:tag.id}),owner)).rows as unknown[]).length,1);
+  const initialDefault=(await query<{id:string}>("SELECT id FROM wl.crm_tags WHERE name='Needs quote'"))[0];await adminAction('save_crm_tag',{id:initialDefault.id,name:'Estimate needed',color:'#123456'},owner);for(const statement of schema.slice(schema.indexOf("INSERT INTO wl.crm_tags(id,name,color)")).split(";").filter(s=>s.trim()))await query(statement);assert.equal((await query("SELECT * FROM wl.crm_tags WHERE name='Needs quote'")).length,0);
+  assert.ok((await query('SELECT * FROM wl.timeline WHERE lead_id=$1',[id])).length>=5);
+ }finally{await closeDatabase();}
+});

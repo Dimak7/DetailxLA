@@ -1,4 +1,7 @@
 "use client";
+import {CrmTagLibrary,RecordTags,LeadOutcome} from "./CrmTags";
+import {RemoveTeamMember} from "./RemoveTeamMember";
+import type {CrmTag} from "@/lib/platform/crm";
 import {SpendBars,ProfitChart,MarketingCostReturn} from "./FinanceCharts";
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
@@ -67,6 +70,7 @@ const stamp = (v: unknown) =>
     : "Not yet";
 const accessRoleLabel = (role: unknown) =>
   s(role) === "staff" ? "Detailer" : title(s(role));
+function crmTagRows(value:unknown):CrmTag[]{return rows(value).map(t=>({id:s(t.id),name:s(t.name),color:s(t.color),archived_at:t.archived_at?s(t.archived_at):null}));}
 const workspaceSections = [
   { name: "Bookings", items: ["calendar", "bookings", "schedule", "services"] },
   { name: "CRM", items: ["customers", "leads", "reviews"] },
@@ -372,7 +376,7 @@ export function AdminWorkspace({
         f("source", "Source", "select", { options: [...channels] }),
         f("lead_stream", "Lead stream", "select", { options: leadStreams.map(value => ({ value, label: marketingStreamLabel(value) })) }),
         f("campaign", "Campaign"),
-        f("status", "Status", "select", { options: [...leadStatuses] }),
+        f("status", "Status", "select", { options: leadStatuses.map(value=>({value,label:value==="won"?"Sold":title(value)})) }),
         f("call_customer", "Call Customer tag", "checkbox"),
         f("assigned_to", "Assign to", "nullable-select", {
           options: teamOptions,
@@ -963,15 +967,15 @@ export function AdminWorkspace({
             </div>
           </section>
           <section className="paper">
-            <div className="section-heading"><div><p className="eyebrow">AUTHORIZED USERS</p><h2>{list.filter((member) => member.active).length} active logins</h2></div></div>
+            <div className="section-heading"><div><p className="eyebrow">AUTHORIZED USERS</p><h2>{list.filter((member) => member.active).length} active logins</h2></div><Link className="text-link" href={params.get("removed")==="1"?"/admin/team":"/admin/team?removed=1"}>{params.get("removed")==="1"?"Hide removed people":"Show removed people"}</Link></div>
             {table(
               ["Team member", "Role", "Employee profile", "Status", "Action"],
               list.map((member) => [
                 <><strong>{s(member.name)}</strong><small>{s(member.email)}</small></>,
                 accessRoleLabel(member.role),
                 member.employee_id ? <><strong>{s(member.position) || "Employee"}</strong><small>{s(member.phone) || "Phone not set"}</small></> : s(member.role) === "staff" ? "Profile missing" : "Not required",
-                status(member.active ? "active" : "disabled"),
-                (user.role === "owner" || member.role !== "owner") ? <button onClick={() => teamEdit(member)}>Edit access</button> : "Owner only",
+                status(member.removed_at?"removed":member.active ? "active" : "disabled"),
+                (user.role === "owner" || member.role !== "owner") ? <>{!member.removed_at&&<button onClick={() => teamEdit(member)}>Edit access</button>}{member.id!==user.user_id&&<RemoveTeamMember id={s(member.id)} name={s(member.name)} removed={!!member.removed_at}/>}</> : "Owner only",
               ]),
             )}
           </section>
@@ -1695,6 +1699,7 @@ export function AdminWorkspace({
             <button onClick={() => serviceEdit(r)}>Edit service</button>,
           ]),
         )}
+      {["customers","leads"].includes(section)&&<CrmTagLibrary tags={crmTagRows(data.tags)}/>}
       {section === "customers" && (
         <>
           {profile?.customer && (
@@ -1716,6 +1721,7 @@ export function AdminWorkspace({
                   Edit profile
                 </button>
               </div>
+              <RecordTags kind="customer" id={s(profile.customer.id)} tags={crmTagRows(profile.customer.tags)} catalog={crmTagRows(data.tags)}/>
               <div className="profile-details">
                 <div>
                   <div className="button-row">
@@ -1833,6 +1839,7 @@ export function AdminWorkspace({
               <>
                 {s(r.first_name)} {s(r.last_name)}
                 <small>Since {stamp(r.created_at)}</small>
+                <RecordTags kind="customer" id={s(r.id)} tags={crmTagRows(r.tags)} catalog={crmTagRows(data.tags)}/>
               </>,
               <>
                 {s(r.email)}
@@ -1862,13 +1869,15 @@ export function AdminWorkspace({
             <>
               {s(r.name)}
               {!!r.call_customer && <span className="status-pill call-customer-tag">Call Customer</span>}
+              <RecordTags kind="lead" id={s(r.id)} tags={crmTagRows(r.tags)} catalog={crmTagRows(data.tags)}/>
+              {rows(r.activity).length>0&&<details><summary>Activity</summary>{rows(r.activity).map((a,i)=><p key={i} className="small-note">{s(a.body)}<small>{new Date(s(a.created_at)).toLocaleString("en-US",{timeZone:"America/Chicago"})} CT</small></p>)}</details>}
               <details><summary>Form answers & notes</summary><p className="lead-answers">{s(r.notes)||"No notes"}</p></details>
             </>,
             <>
               {s(r.source)}
               <small>{marketingStreamLabel(s(r.lead_stream))}{s(r.campaign) && <> · <span className="compact-id" title={s(r.campaign)}>{s(r.campaign)}</span></>}</small>
             </>,
-            status(r.status),
+            <>{status(r.status==="won"?"sold":r.status)}<LeadOutcome id={s(r.id)}/></>,
             <>
               {!!r.phone && (
                 <a className="text-link" href={"tel:" + s(r.phone)}>

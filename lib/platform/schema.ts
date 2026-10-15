@@ -427,4 +427,15 @@ CREATE TABLE IF NOT EXISTS wl.meta_lead_events (
 ALTER TABLE wl.expenses ADD COLUMN IF NOT EXISTS funding_source text NOT NULL DEFAULT 'Unassigned';
 ALTER TABLE wl.expenses ADD COLUMN IF NOT EXISTS payment_account text NOT NULL DEFAULT '';
 ALTER TABLE wl.expenses ADD COLUMN IF NOT EXISTS marketing_stream text NOT NULL DEFAULT '';
+ALTER TABLE wl.users ADD COLUMN IF NOT EXISTS removed_at timestamptz;
+ALTER TABLE wl.crm_tags ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+CREATE TABLE IF NOT EXISTS wl.lead_tags (lead_id uuid NOT NULL REFERENCES wl.leads(id) ON DELETE CASCADE,tag_id uuid NOT NULL REFERENCES wl.crm_tags(id) ON DELETE CASCADE,created_by uuid REFERENCES wl.users(id),created_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(lead_id,tag_id));
+INSERT INTO wl.crm_tags(id,name,color) SELECT id::uuid,name,color FROM (VALUES
+('10000000-0000-4000-8000-000000000001','Call again','#926824'),
+('10000000-0000-4000-8000-000000000002','No answer','#8f514a'),
+('10000000-0000-4000-8000-000000000003','Sold','#28715d'),
+('10000000-0000-4000-8000-000000000004','Not interested','#8f514a'),
+('10000000-0000-4000-8000-000000000005','Needs quote','#426b60')) AS defaults(id,name,color)
+WHERE NOT EXISTS(SELECT 1 FROM wl.settings WHERE key='crm_tag_defaults_seeded') ON CONFLICT(name) DO NOTHING;
+INSERT INTO wl.settings(key,value) VALUES('crm_tag_defaults_seeded','true'::jsonb) ON CONFLICT DO NOTHING;
 `;

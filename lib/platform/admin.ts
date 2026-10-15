@@ -1,3 +1,5 @@
+import {crmTags,crmAction,recordTagsSql} from "./crm";
+import {removeTeamAccess} from "./team-access";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { query, transaction, type Query } from "./db";
@@ -185,11 +187,11 @@ export async function adminData(
   if (section === "team")
     return {
       rows: await query(
-        `SELECT u.id,u.name,u.email,u.role,u.active,u.created_at,
+        `SELECT u.id,u.name,u.email,u.role,u.active,u.created_at,u.removed_at,
           e.id employee_id,e.phone,e.position
          FROM wl.users u
          LEFT JOIN wl.employees e ON e.user_id=u.id
-         ORDER BY CASE u.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 WHEN 'manager' THEN 3 ELSE 4 END,u.name`,
+         WHERE ($1::boolean OR u.removed_at IS NULL) ORDER BY CASE u.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 WHEN 'manager' THEN 3 ELSE 4 END,u.name`, [p.get("removed")==="1"],
       ),
     };
   if (section === "services")
@@ -202,7 +204,7 @@ export async function adminData(
       rows: await query(
         `SELECT e.*,COALESCE(u.role,'staff') login_role,COALESCE((SELECT SUM(s.end_minute-s.start_minute-s.break_minutes) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text AND s.status='scheduled'),0)::int scheduled_minutes,
          (SELECT min(s.shift_date) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND s.status='scheduled') next_shift
-         FROM wl.employees e LEFT JOIN wl.users u ON u.id=e.user_id ORDER BY e.active DESC,e.name`, [week]),
+         FROM wl.employees e LEFT JOIN wl.users u ON u.id=e.user_id WHERE u.removed_at IS NULL ORDER BY e.active DESC,e.name`, [week]),
       availability: await query("SELECT * FROM wl.employee_availability ORDER BY employee_id,weekday"),
     };
   }
@@ -271,22 +273,23 @@ export async function adminData(
     };
   if (section === "customers") {
     const customers = await query<Customer>(
-      `SELECT c.*,
+      `SELECT c.*,${recordTagsSql("customer","c")},
   (SELECT count(*)::int FROM wl.bookings b WHERE b.customer_id=c.id) booking_count,
   COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::bigint FROM wl.revenue_payments p WHERE p.customer_id=c.id AND status IN ('paid','partially_refunded','refunded')),0) total_spent,
   (SELECT max(booking_date) FROM wl.bookings b WHERE b.customer_id=c.id AND booking_date<=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')) last_booking,
   (SELECT min(booking_date) FROM wl.bookings b WHERE b.customer_id=c.id AND booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND status IN ('new','confirmed')) upcoming_booking
-  FROM wl.customers c WHERE (first_name||' '||last_name||' '||email||' '||phone) ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-      ["%" + search + "%", limit, offset],
+  FROM wl.customers c WHERE ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM wl.customer_tags ct JOIN wl.crm_tags t ON t.id=ct.tag_id WHERE ct.customer_id=c.id AND t.id=$4 AND t.archived_at IS NULL)) AND (first_name||' '||last_name||' '||email||' '||phone) ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      ["%" + search + "%", limit, offset,p.get("tag")?uuid.parse(p.get("tag")):null],
     );
     const selected = p.get("id");
     return {
       rows: customers,
+      tags:await crmTags(),
       profile: selected
         ? {
             customer: (
               await query(
-                "SELECT c.*,a.source,a.campaign FROM wl.customers c LEFT JOIN wl.attributions a ON a.id=c.attribution_id WHERE c.id=$1",
+                `SELECT c.*,a.source,a.campaign,${recordTagsSql("customer","c")} FROM wl.customers c LEFT JOIN wl.attributions a ON a.id=c.attribution_id WHERE c.id=$1`,
                 [uuid.parse(selected)],
               )
             )[0],
@@ -313,9 +316,10 @@ export async function adminData(
   if (section === "leads")
     return {
       rows: await query(
-        "SELECT l.*,a.source,a.lead_stream,a.campaign FROM wl.leads l LEFT JOIN wl.attributions a ON a.id=l.attribution_id WHERE l.origin<>'booking' AND (l.name||' '||l.email||' '||l.phone) ILIKE $1 ORDER BY l.created_at DESC LIMIT $2 OFFSET $3",
-        ["%" + search + "%", limit, offset],
+        `SELECT l.*,a.source,a.lead_stream,a.campaign,${recordTagsSql("lead","l")},COALESCE((SELECT jsonb_agg(x) FROM (SELECT body,created_at FROM wl.timeline WHERE lead_id=l.id ORDER BY created_at DESC LIMIT 8) x),'[]'::jsonb) activity FROM wl.leads l LEFT JOIN wl.attributions a ON a.id=l.attribution_id WHERE l.origin<>'booking' AND ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM wl.lead_tags lt JOIN wl.crm_tags t ON t.id=lt.tag_id WHERE lt.lead_id=l.id AND t.id=$4 AND t.archived_at IS NULL)) AND (l.name||' '||l.email||' '||l.phone) ILIKE $1 ORDER BY l.created_at DESC LIMIT $2 OFFSET $3`,
+        ["%" + search + "%", limit, offset,p.get("tag")?uuid.parse(p.get("tag")):null],
       ),
+      tags:await crmTags(),
       team,
       services: await query(
         "SELECT * FROM wl.services WHERE active=true ORDER BY sort_order",
@@ -429,6 +433,8 @@ const actionSections: Record<string, string> = {
   save_settings: "settings",
   test_telegram: "settings",
   save_user: "team",
+  remove_user:"team",restore_user:"team",
+  save_crm_tag:"leads",archive_crm_tag:"leads",restore_crm_tag:"leads",tag_lead:"leads",tag_customer:"customers",lead_outcome:"leads",
   save_template: "messages",
   send_message: "messages",
   retry_message: "messages",
@@ -705,10 +711,11 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         userId = randomUUID();
         await q("INSERT INTO wl.users(id,name,email,password_hash,role,active) VALUES($1,$2,$3,$4,$5,$6)", [userId,e.name,e.email.toLowerCase(),passwordHash(e.password),e.login_role || "staff",e.active]);
       } else {
-        const account = (await q<{ role: Session["role"]; email: string; active: boolean }>(
-          "SELECT role,email,active FROM wl.users WHERE id=$1 FOR UPDATE", [userId],
+        const account = (await q<{ role: Session["role"]; email: string; active: boolean; removed_at:string|null }>(
+          "SELECT role,email,active,removed_at FROM wl.users WHERE id=$1 FOR UPDATE", [userId],
         )).rows[0];
         if (!account) throw new AppError("Employee account not found.", 404);
+        if(account.removed_at)throw new AppError("Restore this person in Team Access before editing their employee profile.");
         if ((user.role === "manager" && account.role !== "staff") || (user.role === "admin" && account.role === "owner"))
           throw new AppError("Your role cannot change this employee account.", 403);
         const nextRole = e.login_role || account.role;
@@ -898,6 +905,8 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         user.user_id,
       ],
     );
+  if(["save_crm_tag","archive_crm_tag","restore_crm_tag","tag_lead","tag_customer","lead_outcome"].includes(action))return crmAction(action,data,user);
+  if(action==="remove_user"||action==="restore_user")return removeTeamAccess(data,user,action==="restore_user");
   if (action === "save_lead") {
     const l = z
       .object({
@@ -922,6 +931,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       })
       .parse(data);
     await transaction(async (q) => {
+      const leadId=l.id||randomUUID();
       const attributionId = await saveAttribution(q, randomUUID(), {
         source: l.source,
         lead_stream: l.lead_stream,
@@ -930,7 +940,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       await q(
         "INSERT INTO wl.leads(id,name,email,phone,status,notes,assigned_to,attribution_id,origin) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'manual') ON CONFLICT(id) DO UPDATE SET name=$2,email=$3,phone=$4,status=$5,notes=$6,assigned_to=$7,attribution_id=$8,updated_at=now()",
         [
-          l.id || randomUUID(),
+          leadId,
           l.name,
           l.email.toLowerCase(),
           l.phone,
@@ -940,8 +950,8 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
           attributionId,
         ],
       );
-      if(l.id && (l.call_customer !== undefined || ["contacted","booked","won","lost"].includes(l.status)))
-        await q("UPDATE wl.leads SET call_customer=$2 WHERE id=$1",[l.id,["contacted","booked","won","lost"].includes(l.status)?false:l.call_customer]);
+      if((l.call_customer !== undefined || ["contacted","booked","won","lost"].includes(l.status)))
+        await q("UPDATE wl.leads SET call_customer=$2 WHERE id=$1",[leadId,["contacted","booked","won","lost"].includes(l.status)?false:l.call_customer]);
     });
   }
   if (action === "convert_lead") {
@@ -969,6 +979,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
             ],
           )
         ).rows[0].id;
+      await q("INSERT INTO wl.customer_tags(customer_id,tag_id,created_by) SELECT $1,tag_id,$3 FROM wl.lead_tags WHERE lead_id=$2 ON CONFLICT DO NOTHING",[cid,id,user.user_id]);
       await q(
         "UPDATE wl.leads SET customer_id=$1,updated_at=now() WHERE id=$2",
         [cid, id],
@@ -1029,8 +1040,9 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         if (!u.password) throw new AppError("Use a password of at least 12 characters.");
         await q("INSERT INTO wl.users(id,name,email,password_hash,role,active) VALUES($1,$2,$3,$4,$5,$6)", [savedId,u.name,u.email.toLowerCase(),passwordHash(u.password),u.role,u.active]);
       } else {
-        const account = (await q<{ role: Session["role"] }>("SELECT role FROM wl.users WHERE id=$1 FOR UPDATE", [u.id])).rows[0];
+        const account = (await q<{ role: Session["role"];removed_at:string|null }>("SELECT role,removed_at FROM wl.users WHERE id=$1 FOR UPDATE", [u.id])).rows[0];
         if (!account) throw new AppError("Team member not found.", 404);
+        if(account.removed_at)throw new AppError("Restore this person in Team Access before editing their login.");
         if (user.role === "admin" && account.role === "owner")
           throw new AppError("Only an owner can change an owner account.", 403);
         await q(

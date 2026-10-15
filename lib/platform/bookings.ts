@@ -372,11 +372,13 @@ export async function createBooking(value: unknown, admin = false) {
         );
     }
     const leadId = input.lead_id || null;
-    if (leadId)
+    if (leadId) {
+      await q("INSERT INTO wl.customer_tags(customer_id,tag_id,created_by) SELECT $1,tag_id,created_by FROM wl.lead_tags WHERE lead_id=$2 ON CONFLICT DO NOTHING",[customerId,leadId]);
       await q(
         "UPDATE wl.leads SET customer_id=$1,status='booked',call_customer=false,updated_at=now() WHERE id=$2",
         [customerId, leadId],
       );
+    }
     await q(
       "INSERT INTO wl.timeline(id,customer_id,booking_id,lead_id,type,body) VALUES($1,$2,$3,$4,'booking_created',$5)",
       [
