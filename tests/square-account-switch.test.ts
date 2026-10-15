@@ -17,9 +17,9 @@ test('switching accounts archives old Square history without mixing current reve
   assert.equal((await query("SELECT * FROM wl.square_payments")).length,2,'old records retained');
   assert.deepEqual((await query<{cursor:unknown}>("SELECT cursor FROM wl.square_sync WHERE environment='production'"))[0].cursor,{});
   const owner={id:'test',user_id:'10000000-0000-4000-8000-000000000001',name:'Owner',email:'test@example.test',role:'owner' as const};
-  const current=await adminData('payments',new URLSearchParams(),owner);
+  const current=await adminData('payments',new URLSearchParams(),owner) as {squarePayments:unknown[]};
   assert.equal((current.squarePayments as unknown[]).length,1);
-  const archive=await adminData('payments',new URLSearchParams({squareArchive:'1'}),owner);
+  const archive=await adminData('payments',new URLSearchParams({squareArchive:'1'}),owner) as {squarePayments:unknown[]};
   assert.equal((archive.squarePayments as unknown[]).length,2);
  }finally{globalThis.fetch=fetchOriginal;await closeDatabase();}
 });

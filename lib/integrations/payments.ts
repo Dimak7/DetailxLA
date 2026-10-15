@@ -81,7 +81,7 @@ async function preparePayment(
       ["cancelled", "no_show"].includes(current.status)
     )
       throw new AppError("This appointment cannot be paid online.");
-    const environment = squareEnvironment();
+    const environment = squareEnvironment(), activeLocation = await secret("square_location_id");
     if((await q("SELECT booking_id FROM wl.square_invoices WHERE booking_id=$1 AND environment=$2",[bookingId,environment])).rows.length)throw new AppError("Use this booking’s Square invoice to collect payment.");
     const unclassified = (await q(
       `SELECT id FROM wl.payments WHERE booking_id=$1 AND provider='square'
@@ -110,8 +110,8 @@ async function preparePayment(
     const old = (
       await q<PaymentRow>(
         `SELECT * FROM wl.payments WHERE booking_id=$1 AND provider=$2 AND status='pending'
-         AND ($2<>'square' OR (metadata->>'square_environment'=$3 AND amount_cents=$4)) ORDER BY created_at LIMIT 1`,
-        [bookingId, provider, environment, owed],
+         AND ($2<>'square' OR (metadata->>'square_environment'=$3 AND amount_cents=$4 AND (metadata->>'square_location_id'=$5 OR checkout_url=''))) ORDER BY created_at LIMIT 1`,
+        [bookingId, provider, environment, owed, activeLocation],
       )
     ).rows[0];
     if (old) return old;
