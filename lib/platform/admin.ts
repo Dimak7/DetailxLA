@@ -172,7 +172,8 @@ export async function adminData(
   }
   if (section === "reports") return { report: await report(p), square: await squareRevenueStatus(), inventory: await inventorySummary() };
   if (section === "expenses") {
-    const { start, end } = reportRange(p);
+    const expenseParams=new URLSearchParams(p);if(!expenseParams.get("range"))expenseParams.set("range","year");
+    const { start, end } = reportRange(expenseParams);
     return { start, end, summary: await expenseSummary(start, end), rows: await query("SELECT * FROM wl.expenses WHERE (expense_date BETWEEN $1 AND $2 OR (recurrence<>'one_time' AND COALESCE(recurring_start,expense_date)<=$2 AND COALESCE(recurring_end,$2)>=$1)) AND (vendor||' '||category||' '||description||' '||payment_account||' '||funding_source) ILIKE $3 ORDER BY expense_date DESC,created_at DESC LIMIT 200", [start,end,"%" + search + "%"]) };
   }
   if (section === "inventory") {
