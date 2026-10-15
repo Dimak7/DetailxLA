@@ -298,6 +298,7 @@ export function BookingWizard({
   }
   return (
     <div className={admin ? "booking-layout" : "booking-layout wrap"}>
+      {business.square_environment==="sandbox"&&<p className="notice" role="status" style={{gridColumn:"1 / -1"}}><strong>Test booking mode.</strong> Square payments are in sandbox. No real payment is collected. Use Square test card details.</p>}
       <form className="booking-main paper" onSubmit={submit}>
         <div className="booking-progress" aria-label="Booking progress">
           {["Services", "Vehicle", "Appointment", "Your details"].map((s, i) => (

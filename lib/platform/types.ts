@@ -47,6 +47,7 @@ export type BookingSnapshot = BookingServiceSnapshot & {
   requires_quote?: boolean;
 };
 export type BusinessSettings = {
+  square_environment?: "sandbox" | "production";
   name: string;
   phone: string;
   email: string;

@@ -125,7 +125,7 @@ export async function settings(): Promise<BusinessSettings> {
     day_hours: rows[0]?.value.day_hours ?? [],
   } as BusinessSettings;
   // Resolve the former default without modifying custom contact or integration fields.
-  return { ...business, name: resolveBusinessName(business.name) };
+  return { ...business, square_environment:process.env.SQUARE_ENVIRONMENT?.toLowerCase()==="sandbox"?"sandbox":"production", name: resolveBusinessName(business.name) };
 }
 export function publicSettings(business: BusinessSettings): BusinessSettings {
   return { ...business, email_from: "", telegram_chat_id: "", telegram_thread_id: "", sms_from: "" };
