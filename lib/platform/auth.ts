@@ -90,8 +90,8 @@ export async function requestSession(request: Request) {
 }
 export const access: Record<string, Role[]> = {
   dashboard: ["owner", "admin", "manager"],
-  bookings: ["owner", "admin", "manager", "staff"],
-  calendar: ["owner", "admin", "manager", "staff"],
+  bookings: ["owner", "admin", "manager"],
+  calendar: ["owner", "admin", "manager"],
   customers: ["owner", "admin", "manager"],
   leads: ["owner", "admin", "manager"],
   services: ["owner", "admin", "manager"],

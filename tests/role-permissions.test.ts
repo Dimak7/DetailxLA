@@ -5,7 +5,7 @@ import { workAsyncStorage, type WorkStore } from "next/dist/server/app-render/wo
 import { GET as manageGet, POST as managePost } from "../app/api/manage/route";
 import { GET as employeeMe } from "../app/api/employee/me/route";
 import { POST as employeeClock } from "../app/api/employee/clock/route";
-import { access, AppError, hash, sessionFromToken } from "../lib/platform/auth";
+import { access, AppError, hash, login, sessionFromToken } from "../lib/platform/auth";
 import { adminAction, adminData } from "../lib/platform/admin";
 import { updateBooking } from "../lib/platform/bookings";
 import { closeDatabase, query } from "../lib/platform/db";
@@ -30,7 +30,7 @@ test("section permissions match the owner, admin, manager and staff workspaces",
     "bookings", "calendar", "customers", "dashboard", "employees", "gallery", "hours", "leads", "messages",
     "my_schedule", "payments", "payroll", "performance", "reviews", "schedule", "services",
   ].sort());
-  assert.deepEqual(Object.keys(access).filter((section) => access[section].includes("staff")).sort(), ["bookings", "calendar", "my_schedule"]);
+  assert.deepEqual(Object.keys(access).filter((section) => access[section].includes("staff")).sort(), ["my_schedule"]);
 });
 
 test("role boundaries are enforced in API responses, employee accounts and assigned jobs", async (t) => {
@@ -129,9 +129,18 @@ test("role boundaries are enforced in API responses, employee accounts and assig
     const employeeData = await adminData("employees", new URLSearchParams(), admin.session);
     assert.equal(asRows(employeeData.rows).find((row) => row.id === createdId)?.login_role, "manager");
 
-    const teamInput = { name: "Team fixture", email: `${randomUUID()}@example.test`, password: "Fixture-team-password-4821", role: "staff", active: false };
+    const teamInput = { name: "Team fixture", email: `${randomUUID()}@example.test`, password: "Fixture-team-password-4821", role: "staff", phone: "+13125550999", position: "Detailer", active: false };
     assert.equal((await action(admin, "save_user", teamInput)).status, 200);
     assert.equal((await query<{ active: boolean }>("SELECT active FROM wl.users WHERE email=$1", [teamInput.email]))[0].active, false);
+    const teamUser = (await query<{ id: string }>("SELECT id FROM wl.users WHERE email=$1", [teamInput.email]))[0];
+    assert.equal((await query<{ user_id: string }>("SELECT user_id FROM wl.employees WHERE user_id=$1", [teamUser.id]))[0].user_id, teamUser.id);
+    const detailerEmail = `${randomUUID()}@example.test`, detailerPassword = "Detailer-login-password-4821";
+    assert.equal((await action(admin, "save_user", { ...teamInput, email: detailerEmail, password: detailerPassword, active: true })).status, 200);
+    const detailerToken = await login(detailerEmail, detailerPassword, "team-login-fixture");
+    const detailerSession = await sessionFromToken(detailerToken);
+    assert.equal(detailerSession?.role, "staff");
+    assert.equal((await manageGet(new Request("https://example.test/api/manage?section=my_schedule", { headers: { Cookie: `wl_session=${detailerToken}` } }))).status, 200);
+    assert.equal((await manageGet(new Request("https://example.test/api/manage?section=bookings", { headers: { Cookie: `wl_session=${detailerToken}` } }))).status, 403);
     assert.equal((await action(admin, "save_user", { ...teamInput, email: `${randomUUID()}@example.test`, role: "owner" })).status, 403);
     assert.equal((await action(admin, "save_user", { ...teamInput, id: owner.session.user_id, email: owner.session.email })).status, 403);
     assert.equal((await action(owner, "save_user", { ...teamInput, id: owner.session.user_id, email: owner.session.email, role: "owner", active: false })).status, 403);
@@ -156,19 +165,8 @@ test("role boundaries are enforced in API responses, employee accounts and assig
     for (const employeeId of [staffEmployee, otherEmployee])
       await query("INSERT INTO wl.time_entries(id,employee_id,clock_in,clock_out) VALUES($1,$2,now()-interval '2 hours',now()-interval '1 hour')", [randomUUID(), employeeId]);
 
-    for (const section of ["bookings", "calendar"]) {
-      const response = await manageGet(request(staff, section, { date: today }));
-      assert.equal(response.status, 200);
-      const data = await response.json();
-      assert.deepEqual(data.rows.map((row: Record<string, unknown>) => row.id), [ownJob]);
-      assert.deepEqual(data.team, []);
-      assert.deepEqual(data.employees, []);
-      assert.deepEqual(data.blocks, []);
-      assert.deepEqual(data.payments, []);
-      for (const key of ["price_cents", "tip_cents", "deposit_cents", "service_snapshot", "request_hash", "request_key", "internal_notes"])
-        assert.equal(key in data.rows[0], false, `${section} must not expose ${key}`);
-      assert.ok(data.services.every((service: Record<string, unknown>) => !("price_cents" in service)));
-    }
+    for (const section of ["bookings", "calendar"])
+      assert.equal((await manageGet(request(staff, section, { date: today }))).status, 403, `detailer cannot open ${section}`);
     const scheduleResponse = await manageGet(request(staff, "my_schedule", { employee_id: otherEmployee }));
     const schedule = await scheduleResponse.json();
     assert.equal(schedule.employee.id, staffEmployee);

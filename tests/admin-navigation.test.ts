@@ -20,8 +20,8 @@ test("each role can reach its permitted workspaces without forbidden default lin
       assert.equal(navigation.find((workspace) => workspace.label === "Growth"), undefined);
     }
     if (role === "staff") {
-      assert.deepEqual(navigation.map((workspace) => workspace.target), ["bookings", "my_schedule"]);
-      assert.equal(navigation[1].label, "My schedule");
+      assert.deepEqual(navigation.map((workspace) => workspace.target), ["my_schedule"]);
+      assert.equal(navigation[0].label, "My schedule");
     }
   }
 });

@@ -182,6 +182,16 @@ export async function adminData(
       ),
       templates: await query("SELECT * FROM wl.email_templates ORDER BY key"),
     };
+  if (section === "team")
+    return {
+      rows: await query(
+        `SELECT u.id,u.name,u.email,u.role,u.active,u.created_at,
+          e.id employee_id,e.phone,e.position
+         FROM wl.users u
+         LEFT JOIN wl.employees e ON e.user_id=u.id
+         ORDER BY CASE u.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 WHEN 'manager' THEN 3 ELSE 4 END,u.name`,
+      ),
+    };
   if (section === "services")
     return {
       rows: await query("SELECT * FROM wl.services ORDER BY sort_order,name"),
@@ -413,7 +423,7 @@ const actionSections: Record<string, string> = {
   save_lead: "leads",
   convert_lead: "leads",
   create_booking: "bookings",
-  update_booking: "bookings",
+  update_booking: "my_schedule",
   block_time: "calendar",
   remove_block: "calendar",
   save_settings: "settings",
@@ -1001,6 +1011,8 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         role: z.enum(["owner", "admin", "manager", "staff"]),
         password: z.string().max(128).default(""),
         active: z.boolean().default(true),
+        phone: z.string().trim().max(30).default(""),
+        position: z.string().trim().max(80).default("Detailer"),
       })
       .parse(data);
     if (user.role === "admin" && u.role === "owner")
@@ -1009,10 +1021,13 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       throw new AppError("Your current account must remain active with its current access.", 403);
     if (u.password && u.password.length < 12)
       throw new AppError("Use at least 12 characters.");
+    if (u.role === "staff" && u.phone.length < 7)
+      throw new AppError("Add a valid phone number for the detailer profile.");
+    const savedId = u.id || randomUUID();
     await transaction(async (q) => {
       if (!u.id) {
         if (!u.password) throw new AppError("Use a password of at least 12 characters.");
-        await q("INSERT INTO wl.users(id,name,email,password_hash,role,active) VALUES($1,$2,$3,$4,$5,$6)", [randomUUID(),u.name,u.email.toLowerCase(),passwordHash(u.password),u.role,u.active]);
+        await q("INSERT INTO wl.users(id,name,email,password_hash,role,active) VALUES($1,$2,$3,$4,$5,$6)", [savedId,u.name,u.email.toLowerCase(),passwordHash(u.password),u.role,u.active]);
       } else {
         const account = (await q<{ role: Session["role"] }>("SELECT role FROM wl.users WHERE id=$1 FOR UPDATE", [u.id])).rows[0];
         if (!account) throw new AppError("Team member not found.", 404);
@@ -1030,7 +1045,32 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         }
         await q("DELETE FROM wl.sessions WHERE user_id=$1", [u.id]);
       }
+      const employee = (await q<{ id: string }>(
+        "SELECT id FROM wl.employees WHERE user_id=$1 FOR UPDATE",
+        [savedId],
+      )).rows[0];
+      if (u.role === "staff") {
+        const employeeId = employee?.id || randomUUID();
+        await q(
+          `INSERT INTO wl.employees(id,user_id,name,email,phone,position,active)
+           VALUES($1,$2,$3,$4,$5,$6,$7)
+           ON CONFLICT(user_id) DO UPDATE SET name=$3,email=$4,phone=$5,position=$6,active=$7,updated_at=now()`,
+          [employeeId,savedId,u.name,u.email.toLowerCase(),u.phone,u.position || "Detailer",u.active],
+        );
+        if (!employee)
+          for (let weekday = 0; weekday < 7; weekday++)
+            await q(
+              "INSERT INTO wl.employee_availability(employee_id,weekday,available,start_minute,end_minute) VALUES($1,$2,false,480,1200) ON CONFLICT DO NOTHING",
+              [employeeId,weekday],
+            );
+      } else if (employee) {
+        await q(
+          "UPDATE wl.employees SET name=$2,email=$3,active=$4,updated_at=now() WHERE id=$1",
+          [employee.id,u.name,u.email.toLowerCase(),u.active],
+        );
+      }
     });
+    return { id: savedId };
   }
   if (action === "save_template")
     await query(

@@ -14,6 +14,7 @@ const sectionLabels: Record<string, string> = {
   services: "Services",
   customers: "Customers",
   leads: "Leads",
+  team: "Team access",
   employees: "Employees",
   schedule: "Schedule",
   my_schedule: "My schedule",
@@ -54,6 +55,8 @@ export function AdminShell({
   const path = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const roleLabel = user.role === "staff" ? "Detailer" : user.role[0].toUpperCase() + user.role.slice(1);
+  const canSearchBookings = sections.includes("bookings");
   const workspaces = adminNavigation(sections).map((workspace) => ({ ...workspace, label: user.role === "staff" && workspace.target === "bookings" ? "My jobs" : workspace.label }));
   const home = sections.includes("dashboard") ? "dashboard" : sections.includes("my_schedule") ? "my_schedule" : workspaces[0]?.target || "bookings";
   const quickLinks = [
@@ -77,13 +80,13 @@ export function AdminShell({
         <Link className="app-brand" href={`/admin/${home}`} aria-label={`${BRAND_NAME} home`}><Wordmark /></Link>
         <span className="app-business-name">{BRAND_NAME.toUpperCase()} <small>Business workspace</small></span>
         <div className="app-global-actions">
-          <button className="admin-mobile-search-toggle" aria-label={searchOpen ? "Close search" : "Search bookings"} aria-expanded={searchOpen} aria-controls="admin-mobile-search" onClick={() => setSearchOpen(!searchOpen)}><NavIcon name="search" /></button>
-          <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label={user.role === "staff" ? "Search my jobs" : "Search bookings"} placeholder={user.role === "staff" ? "Search my jobs" : "Search"} /><button>Search</button></form>
+          {canSearchBookings && <button className="admin-mobile-search-toggle" aria-label={searchOpen ? "Close search" : "Search bookings"} aria-expanded={searchOpen} aria-controls="admin-mobile-search" onClick={() => setSearchOpen(!searchOpen)}><NavIcon name="search" /></button>}
+          {canSearchBookings && <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label="Search bookings" placeholder="Search" /><button>Search</button></form>}
           {quickLinks.length > 0 && <details className="admin-quick-menu"><summary aria-label="Quick actions">+</summary><div>{quickLinks.map((item) => <Link key={item.section} href={item.href}>{item.label}</Link>)}</div></details>}
-          <details className="app-profile"><summary aria-label="Your account">{user.name.slice(0, 1).toUpperCase()}</summary><div><strong>{user.name}</strong><small>{user.role} · {user.email}</small>{sections.includes("settings") && <Link href="/admin/settings">Settings</Link>}<button onClick={async () => { await fetch("/api/admin/logout", { method: "POST" }); location.assign("/admin/login"); }}>Sign out</button></div></details>
+          <details className="app-profile"><summary aria-label="Your account">{user.name.slice(0, 1).toUpperCase()}</summary><div><strong>{user.name}</strong><small>{roleLabel} · {user.email}</small>{sections.includes("settings") && <Link href="/admin/settings">Settings</Link>}<button onClick={async () => { await fetch("/api/admin/logout", { method: "POST" }); location.assign("/admin/login"); }}>Sign out</button></div></details>
         </div>
       </header>
-      {searchOpen && <form id="admin-mobile-search" className="admin-mobile-search" action="/admin/bookings"><input type="search" name="search" aria-label="Search appointments" placeholder="Name or booking reference" autoFocus /><button type="submit">Search</button></form>}
+      {searchOpen && canSearchBookings && <form id="admin-mobile-search" className="admin-mobile-search" action="/admin/bookings"><input type="search" name="search" aria-label="Search appointments" placeholder="Name or booking reference" autoFocus /><button type="submit">Search</button></form>}
       <div className="app-body">
         <aside className="admin-sidebar"><nav aria-label="Business workspaces">{workspaces.map((workspace) => <Link key={workspace.target} href={`/admin/${workspace.target}`} className={activeWorkspace?.target === workspace.target ? "active" : ""}>{workspace.label}</Link>)}{sections.includes("settings") && <Link href="/admin/settings" className={currentSection === "settings" ? "active" : ""}>Settings</Link>}</nav></aside>
         <main id="main" className="admin-main"><div className="admin-topbar"><span>WORKSPACE</span><strong>{activeWorkspace?.label || "Dashboard"}{currentSection !== activeWorkspace?.target ? ` / ${sectionLabels[currentSection] || currentSection}` : ""}</strong></div>{children}</main>
@@ -96,7 +99,7 @@ export function AdminShell({
         <div className="admin-mobile-menu">
           <p className="admin-menu-intro">Everything you need to run the day.</p>
           <nav aria-label="All workspaces">{workspaces.map((workspace) => <Link key={workspace.target} href={`/admin/${workspace.target}`} className={activeWorkspace?.target === workspace.target ? "active" : ""} onClick={() => setMenuOpen(false)}>{workspace.label}<span>{workspace.sections.map((section) => sectionLabels[section]).join(" · ")}</span></Link>)}{sections.includes("settings") && <Link href="/admin/settings" onClick={() => setMenuOpen(false)}>Settings<span>Business preferences and integrations</span></Link>}</nav>
-          <div className="admin-menu-user"><strong>{user.name}</strong><span>{user.role} · {user.email}</span></div>
+          <div className="admin-menu-user"><strong>{user.name}</strong><span>{roleLabel} · {user.email}</span></div>
         </div>
       </Modal>}
     </div>

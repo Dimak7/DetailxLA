@@ -65,10 +65,12 @@ const stamp = (v: unknown) =>
         minute: "2-digit",
       })
     : "Not yet";
+const accessRoleLabel = (role: unknown) =>
+  s(role) === "staff" ? "Detailer" : title(s(role));
 const workspaceSections = [
   { name: "Bookings", items: ["calendar", "bookings", "schedule", "services"] },
   { name: "CRM", items: ["customers", "leads", "reviews"] },
-  { name: "Team", items: ["employees", "schedule", "hours", "payroll", "performance", "my_schedule"] },
+  { name: "Team", items: ["team", "employees", "schedule", "hours", "payroll", "performance", "my_schedule"] },
   { name: "Marketing", items: ["marketing"] },
   { name: "Operations", items: ["inventory", "expenses", "payments", "reports", "analytics"] },
 ];
@@ -460,15 +462,18 @@ export function AdminWorkspace({
   function teamEdit(r: R = {}) {
     if (!allowedSections.includes("team") || (user.role !== "owner" && r.role === "owner")) return;
     edit(
-      "Team member",
+      r.id ? "Edit team access" : "Create team login",
       "save_user",
-      { name: "", email: "", role: "staff", password: "", active: true, ...r },
+      { name: "", email: "", role: "staff", password: "", phone: "", position: "Detailer", active: true, ...r },
       [
         f("name", "Name", "text", { required: true }),
         f("email", "Email", "email", { required: true }),
         f("role", "Role", "select", {
-          options: user.role === "owner" ? ["owner", "admin", "manager", "staff"] : ["admin", "manager", "staff"],
-          hint: "Admins manage the business. Managers run daily operations, employees and payroll. Staff see their own assigned work.",
+          options: (user.role === "owner"
+            ? ["owner", "admin", "manager", "staff"]
+            : ["admin", "manager", "staff"]
+          ).map((role) => ({ value: role, label: role === "staff" ? "Detailer" : title(role) })),
+          hint: "Owners and admins have full access. Managers run operations. Detailers see only their own schedule workspace.",
         }),
         f(
           "password",
@@ -478,6 +483,15 @@ export function AdminWorkspace({
           "password",
           { required: !r.id },
         ),
+        f("phone", "Detailer phone", "tel", {
+          required: true,
+          hint: "Used for schedule notifications and the linked employee profile.",
+          visibleWhen: (values) => values.role === "staff",
+        }),
+        f("position", "Job title", "select", {
+          options: ["Lead Detailer", "Detailer", "Washer", "Reception", "Other"],
+          visibleWhen: (values) => values.role === "staff",
+        }),
         f("active", "Active", "checkbox"),
       ],
     );
@@ -487,7 +501,7 @@ export function AdminWorkspace({
     if (user.role !== "owner" && r.login_role === "owner") return;
     const availability = Array.isArray(r.availability) ? r.availability : Array.from({ length: 7 }, (_, weekday) => ({ weekday, available: weekday > 0 && weekday < 6, start_minute: 480, end_minute: 1020 }));
     const canSetRole = allowedSections.includes("team") && !["owner", "admin"].includes(s(r.login_role));
-    edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", login_role: "staff", hourly_rate_cents: 10, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : "Login password (12+ characters)", "password", { required: !r.user_id }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"], hint: "Job title. Dashboard permissions are set by the login access role." }), ...(canSetRole ? [f("login_role", "Login access role", "select", { options: [{ value: "staff", label: "Staff — own work and time clock" }, { value: "manager", label: "Manager — operations, employees and payroll" }], hint: "Admin accounts and other access changes are managed in Settings → Team & permissions." })] : []), f("hourly_rate_cents", "Starting hourly rate ($)", "money", { hint: "New Detailers start on an hourly + 30% plan. Use Pay settings after saving to customize the plan.", visibleWhen: (values) => !values.id }), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => { const { hourly_rate_cents, login_role, ...profile } = d; return { ...profile, ...(canSetRole ? { login_role } : {}), ...(!profile.id ? { hourly_rate_cents } : {}), hire_date: d.hire_date || null }; });
+    edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", login_role: "staff", hourly_rate_cents: 10, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : "Login password (12+ characters)", "password", { required: !r.user_id }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"], hint: "Job title. Dashboard permissions are set by the login access role." }), ...(canSetRole ? [f("login_role", "Login access role", "select", { options: [{ value: "staff", label: "Detailer — My Schedule and time clock only" }, { value: "manager", label: "Manager — operations, employees and payroll" }], hint: "Owner and admin accounts are managed in Team → Team Access." })] : []), f("hourly_rate_cents", "Starting hourly rate ($)", "money", { hint: "New Detailers start on an hourly + 30% plan. Use Pay settings after saving to customize the plan.", visibleWhen: (values) => !values.id }), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => { const { hourly_rate_cents, login_role, ...profile } = d; return { ...profile, ...(canSetRole ? { login_role } : {}), ...(!profile.id ? { hourly_rate_cents } : {}), hire_date: d.hire_date || null }; });
   }
   function expenseEdit(r: R = {}) {
     edit(r.id ? "Edit expense" : "Add expense", "save_expense", { expense_date: dateToday(), amount_cents: 0, category: "Supplies", vendor: "", description: "", payment_method: "Card", funding_source: "Business", payment_account: "", marketing_stream: "", recurrence: "one_time", recurring_start: "", recurring_end: "", receipt_url: "", notes: "", ...r, ...(r.amount_cents != null ? { amount_cents: n(r.amount_cents) / 100 } : {}) }, [f("expense_date", "Date", "date", { required: true }), f("amount_cents", "Amount ($)", "money", { required: true }), f("category", "Category", "select", { options: ["Rent", "Utilities", "Payroll", "Chemicals", "Equipment", "Supplies", "Insurance", "Advertising", "Software", "Vehicle", "Repairs", "Taxes / Fees", "Other"] }), f("vendor", "Vendor"), f("payment_method", "Payment method", "select", { options: ["Card", "Cash", "ACH", "Check", "Other"] }), f("funding_source", "Paid from", "select", { options: ["Business", "Partner", "Unassigned"] }), f("payment_account", "Payment account", "text", { hint: "A label such as Business checking or Card ending 1234. Do not enter full account numbers." }), f("marketing_stream", "Marketing source (optional)", "select", { options: [{value:"",label:"Not a marketing expense"},{value:"business-google",label:"Business Google"},{value:"business-meta",label:"Business Meta"},{value:"dima-google",label:"Partner Google"}] }), f("recurrence", "Frequency", "select", { options: [{ value: "one_time", label: "One-time" }, { value: "weekly", label: "Weekly" }, { value: "monthly", label: "Monthly" }, { value: "yearly", label: "Yearly" }] }), f("recurring_start", "Recurring start", "date"), f("recurring_end", "Recurring end (optional)", "date"), f("receipt_url", "Receipt", "upload"), f("description", "Description", "textarea", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, recurring_start: d.recurring_start || null, recurring_end: d.recurring_end || null }));
@@ -923,15 +937,45 @@ export function AdminWorkspace({
       {section === "employees" && (
         <section className="paper">
           <div className="section-heading"><div><p className="eyebrow">TEAM</p><h2>{list.filter((r) => r.active).length} active employees</h2></div><button className="button" onClick={() => employeeEdit()}>Add employee +</button></div>
-          <p className="small-note">Each employee gets a separate login. Staff see their own assigned jobs, schedule and time clock. Managers can add staff and manage payroll; admins set login access roles. Scheduled hours are separate from actual clocked hours.</p>
+          <p className="small-note">Each employee gets a separate login. Detailers see only their own assigned work, schedule and time clock. Managers can add detailers and manage payroll; admins set login access roles. Scheduled hours are separate from actual clocked hours.</p>
           {table(["Employee", "Position & access", "Phone", "Status", "Default pay plan", "Scheduled this week", "Actions"], list.map((r) => [
             <><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>,
-            <>{s(r.position)}<small>{title(s(r.login_role) || "staff")} access</small></>, s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
+            <>{s(r.position)}<small>{accessRoleLabel(s(r.login_role) || "staff")} access</small></>, s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
             compensationPlanLabel(r), (n(r.scheduled_minutes) / 60).toFixed(1) + "h",
             <>{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit profile</button>}
               {allowedSections.includes("payroll") && !staff && <button className="button" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button>}</>,
           ]))}
         </section>
+      )}
+      {section === "team" && (
+        <>
+          <section className="paper">
+            <div className="section-heading">
+              <div><p className="eyebrow">ACCESS CONTROL</p><h2>Team logins &amp; roles</h2></div>
+              <button className="button" onClick={() => teamEdit()}>Create login +</button>
+            </div>
+            <p className="small-note">Every person uses their own email and password. Detailer accounts are automatically linked to an employee profile so their published shifts, assigned work and time clock appear in My Schedule.</p>
+            <div className="role-permissions-grid">
+              <div><strong>Owner</strong><p>Full access to every workspace, settings, integrations, finances and team permissions. Only an owner can create or change another owner.</p></div>
+              <div><strong>Admin</strong><p>Full business access, including settings, finances and account management. Cannot grant or change owner access.</p></div>
+              <div><strong>Manager</strong><p>Runs bookings, customers, employees, schedules, hours, payroll and daily operations. No owner settings or marketing finances.</p></div>
+              <div><strong>Detailer</strong><p>My Schedule only: published shifts, assigned work and personal time clock. No customer lists, business calendar, payroll or reports.</p></div>
+            </div>
+          </section>
+          <section className="paper">
+            <div className="section-heading"><div><p className="eyebrow">AUTHORIZED USERS</p><h2>{list.filter((member) => member.active).length} active logins</h2></div></div>
+            {table(
+              ["Team member", "Role", "Employee profile", "Status", "Action"],
+              list.map((member) => [
+                <><strong>{s(member.name)}</strong><small>{s(member.email)}</small></>,
+                accessRoleLabel(member.role),
+                member.employee_id ? <><strong>{s(member.position) || "Employee"}</strong><small>{s(member.phone) || "Phone not set"}</small></> : s(member.role) === "staff" ? "Profile missing" : "Not required",
+                status(member.active ? "active" : "disabled"),
+                (user.role === "owner" || member.role !== "owner") ? <button onClick={() => teamEdit(member)}>Edit access</button> : "Owner only",
+              ]),
+            )}
+          </section>
+        </>
       )}
       {section === "schedule" && (
         <>
@@ -2115,34 +2159,11 @@ export function AdminWorkspace({
           </section>
           <section className="paper">
             <div className="section-heading">
-              <h2>Team & permissions</h2>
-              {allowedSections.includes("team") && (
-                <button className="button" onClick={() => teamEdit()}>
-                  Add team member +
-                </button>
-              )}
-            </div>
-            {table(
-              ["Name", "Email", "Role", "Status", "Action"],
-              rows(data.team).map((r) => [
-                s(r.name),
-                s(r.email),
-                s(r.role),
-                status(r.active ? "active" : "disabled"),
-                allowedSections.includes("team") && (user.role === "owner" || r.role !== "owner") && (
-                  <button onClick={() => teamEdit(r)}>Edit access</button>
-                ),
-              ]),
-            )}
-            <p className="small-note">
-              Staff see only their assigned appointments and cannot access
-              financial, customer database or marketing reports. Admins and owners manage
-              team access; only owners can change owner accounts. Password changes invalidate existing sessions.
-            </p>
-            <div className="role-permissions-grid">
-              <div><strong>Admin</strong><p>All business pages, settings, integrations and account access.</p></div>
-              <div><strong>Manager</strong><p>Daily operations, customers, bookings, payments, employees, schedules and payroll.</p></div>
-              <div><strong>Staff</strong><p>Assigned jobs, their own schedule and time clock. No business finances or team management.</p></div>
+              <div>
+                <h2>Team access</h2>
+                <p className="small-note">Create logins, reset passwords and manage roles from the dedicated Team workspace.</p>
+              </div>
+              <Link className="button outline" href="/admin/team">Manage team access</Link>
             </div>
           </section>
         </>

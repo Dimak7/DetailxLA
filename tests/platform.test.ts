@@ -336,7 +336,7 @@ test("Relational platform integration", async (t) => {
       },
     );
     await t.test(
-      "staff permissions exclude finance and non-assigned bookings",
+      "detailer permissions expose only the personal schedule workspace",
       async () => {
         await addUser({
           name: "Test Staff",
@@ -373,9 +373,11 @@ test("Relational platform integration", async (t) => {
           () => updateBooking(booking.booking.id, { assigned_to: staff.user_id }, owner!.user_id),
           /active detailer/,
         );
-        const d = await adminData("bookings", new URLSearchParams(), staff);
-        assert.ok("rows" in d);
-        assert.equal((d.rows as Record<string, unknown>[]).length, 0);
+        await assert.rejects(
+          () => adminData("bookings", new URLSearchParams(), staff),
+          /access/,
+        );
+        assert.ok(await adminData("my_schedule", new URLSearchParams(), staff));
       },
     );
     await t.test("all admin sections query real relational data", async () => {
@@ -392,6 +394,7 @@ test("Relational platform integration", async (t) => {
         "gallery",
         "analytics",
         "settings",
+        "team",
         "payments",
         "employees",
         "schedule",

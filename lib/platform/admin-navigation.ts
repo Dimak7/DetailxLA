@@ -8,7 +8,7 @@ const workspaces = [
   { label: "Dashboard", target: "dashboard", sections: ["dashboard"] },
   { label: "Bookings", target: "bookings", sections: ["bookings", "calendar", "services"] },
   { label: "Customers", target: "customers", sections: ["customers", "leads", "reviews"] },
-  { label: "Team", target: "employees", sections: ["employees", "schedule", "hours", "payroll", "performance", "my_schedule"] },
+  { label: "Team", target: "employees", sections: ["team", "employees", "schedule", "hours", "payroll", "performance", "my_schedule"] },
   { label: "Growth", target: "marketing", sections: ["marketing"] },
   { label: "Operations", target: "inventory", sections: ["inventory", "expenses", "payments"] },
   { label: "Reports", target: "reports", sections: ["reports", "analytics"] },
