@@ -55,6 +55,8 @@ test("Relational platform integration", async (t) => {
     const services = await query<Service>(
       "SELECT * FROM wl.services ORDER BY sort_order",
     );
+    // These legacy overlap cases explicitly exercise a single-bay studio.
+    await query("UPDATE wl.settings SET value=jsonb_set(value,'{booking_capacity}','1'::jsonb) WHERE key='business'");
     assert.equal(services.length, 8);
     const owner = await sessionFromToken(
       await login(

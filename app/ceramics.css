@@ -325,3 +325,14 @@
 }
 .call-customer-tag { margin: 6px 0; background: #fff0cb; color: #6a4c09; }
 .lead-answers { white-space: pre-wrap; max-width: 420px; overflow-wrap: anywhere; }
+/* Booking actions stay prominent across the public site. */
+.ceramics-site .button{border-radius:999px;letter-spacing:.025em;box-shadow:0 6px 20px #1017190b;transition:transform .2s,background .2s,box-shadow .2s}
+.ceramics-site .button:hover{box-shadow:0 10px 25px #1017191c}
+.ceramics-site .ceramics-header .button{background:#d8ba90;color:#151719;border-color:#d8ba90}
+.ceramics-site .ceramics-header[data-home="true"]{background:#111619f5;border-color:#ffffff20;color:#f4f0e8}
+.ceramics-site .ceramics-header[data-home="true"] .ceramics-wordmark{color:#f4f0e8}
+.ceramics-site .ceramics-header[data-home="true"] .ceramics-nav-feature,.ceramics-site .ceramics-header[data-home="true"] .ceramics-nav>a:hover{color:#d8ba90}
+.ceramics-site .ceramics-header[data-home="true"] .ceramics-menu-toggle{color:#f4f0e8;border-color:#ffffff44}
+@media(max-width:1100px){.ceramics-site .ceramics-header[data-home="true"] .ceramics-nav{background:#111619;border-color:#ffffff30;color:#f4f0e8}}
+.ceramics-site .button,.ceramics-site .button:is(.outline,.light,.gold){border-radius:999px}
+.ceramics-site .ceramics-header[data-home="true"] .ceramics-menu-icon i{background:#f4f0e8}

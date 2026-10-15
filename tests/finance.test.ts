@@ -15,15 +15,22 @@ test("financial and inventory operations", async () => {
   try {
     const owner = await sessionFromToken(await login(process.env.ADMIN_EMAIL!, process.env.ADMIN_PASSWORD!, "finance-test"));
     assert.ok(owner);
-    const expense = await adminAction("save_expense", { expense_date: "2026-09-01", amount_cents: 300000, category: "Rent", vendor: "Landlord", description: "September rent", payment_method: "ACH", recurrence: "monthly", recurring_start: "2026-09-01", recurring_end: null, receipt_url: "", notes: "" }, owner) as { id: string };
+    const expense = await adminAction("save_expense", { expense_date: "2026-09-01", amount_cents: 300000, category: "Rent", vendor: "Landlord", description: "September rent", payment_method: "ACH", funding_source: "Business", payment_account: "Business checking", marketing_stream: "", recurrence: "monthly", recurring_start: "2026-09-01", recurring_end: null, receipt_url: "", notes: "" }, owner) as { id: string };
     assert.ok(expense.id);
     const september = await expenseSummary("2026-09-01", "2026-09-30");
     const october = await expenseSummary("2026-10-01", "2026-10-31");
     assert.equal(september.total_cents, 300000);
     assert.equal(october.total_cents, 300000);
-    await adminAction("save_expense", { id: expense.id, expense_date: "2026-09-01", amount_cents: 325000, category: "Rent", vendor: "Landlord", description: "Updated rent", payment_method: "ACH", recurrence: "monthly", recurring_start: "2026-09-01", recurring_end: null, receipt_url: "", notes: "" }, owner);
+    assert.deepEqual(october.byFunding,[{label:"Business",amount_cents:300000}]);
+    assert.deepEqual(october.byAccount,[{label:"Business checking",amount_cents:300000}]);
+    assert.deepEqual(october.byVendor,[{label:"Landlord",amount_cents:300000}]);
+    await adminAction("save_expense", { id: expense.id, expense_date: "2026-09-01", amount_cents: 325000, category: "Rent", vendor: "Landlord", description: "Updated rent", payment_method: "ACH", funding_source: "Business", payment_account: "Business checking", marketing_stream: "", recurrence: "monthly", recurring_start: "2026-09-01", recurring_end: null, receipt_url: "", notes: "" }, owner);
     assert.equal((await expenseSummary("2026-09-01", "2026-09-30")).total_cents, 325000);
 
+    await adminAction("save_expense",{expense_date:"2026-09-05",amount_cents:21000,category:"Advertising",vendor:"Meta",funding_source:"Partner",payment_account:"Partner card",marketing_stream:"dima-google",recurrence:"one_time"},owner);
+    const costs=await expenseSummary("2026-09-01","2026-09-30");
+    assert.equal(costs.byFunding.find(r=>r.label==="Partner")?.amount_cents,21000);
+    assert.equal(costs.byMarketing.find(r=>r.label==="dima-google")?.amount_cents,21000);
     const item = await adminAction("save_inventory_item", { name: "Interior Cleaner", sku: "IC-1", category: "Chemicals", opening_quantity: 5, unit: "gallons", unit_cost_cents: 2500, supplier: "Chemical Supplier", minimum_stock: 3, reorder_quantity: 8, last_purchase_date: "2026-09-01", notes: "", active: true }, owner) as { id: string };
     await adminAction("record_inventory_movement", { item_id: item.id, movement_type: "usage", direction: "out", quantity: 3, occurred_on: "2026-09-02", unit_cost_cents: 2500, supplier: "", notes: "Two jobs", create_expense: false, expense_amount_cents: 0 }, owner);
     let inventory = await query<{ quantity: number; minimum_stock: number; unit_cost_cents: number }>("SELECT quantity,minimum_stock,unit_cost_cents FROM wl.inventory_items WHERE id=$1", [item.id]);

@@ -110,24 +110,18 @@ export function validDate(value: string) {
 }
 const minute = (value: string) =>
   Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
-async function free(
-  q: Query,
-  date: string,
-  start: number,
-  duration: number,
-  buffer: number,
-  exclude?: string,
-) {
-  const end = start + duration + buffer;
-  const overlap = (
-    await q(
-      `SELECT id FROM wl.bookings WHERE booking_date=$1 AND status NOT IN ('cancelled','no_show')
- AND start_minute<$3 AND start_minute+duration_minutes+buffer_minutes>$2 AND ($4::uuid IS NULL OR id<>$4)
- UNION ALL SELECT id FROM wl.blocks WHERE booking_date=$1 AND start_minute<$3 AND end_minute>$2`,
-      [date, start, end, exclude || null],
-    )
-  ).rows;
-  return overlap.length === 0;
+export function capacityAvailable(start:number,end:number,intervals:Array<{start:number;end:number}>,capacity:number) {
+  const events=intervals.filter(item=>item.start<end&&item.end>start).flatMap(item=>[{minute:Math.max(start,item.start),delta:1},{minute:Math.min(end,item.end),delta:-1}]).filter(e=>e.minute>=start&&e.minute<=end).sort((a,b)=>a.minute-b.minute||a.delta-b.delta);
+  let occupied=0;
+  for(const event of events){occupied+=event.delta;if(occupied>=capacity)return false;}
+  return true;
+}
+async function free(q:Query,date:string,start:number,duration:number,buffer:number,capacity:number,exclude?:string) {
+  const end=start+duration+buffer;
+  const blocks=await q("SELECT id FROM wl.blocks WHERE booking_date=$1 AND start_minute<$3 AND end_minute>$2",[date,start,end]);
+  if(blocks.rows.length)return false;
+  const bookings=await q<{start:number;end:number}>("SELECT start_minute AS start,start_minute+duration_minutes+buffer_minutes AS end FROM wl.bookings WHERE booking_date=$1 AND status NOT IN ('cancelled','no_show') AND start_minute<$3 AND start_minute+duration_minutes+buffer_minutes>$2 AND ($4::uuid IS NULL OR id<>$4)",[date,start,end,exclude||null]);
+  return capacityAvailable(start,end,bookings.rows,capacity);
 }
 async function validateSlot(
   q: Query,
@@ -163,6 +157,7 @@ async function validateSlot(
       start,
       service.duration_minutes,
       s.buffer_minutes,
+      s.booking_capacity,
       exclude,
     ))
   )

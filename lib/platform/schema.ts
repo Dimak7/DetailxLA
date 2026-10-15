@@ -424,4 +424,7 @@ CREATE TABLE IF NOT EXISTS wl.meta_lead_events (
  lead_id uuid REFERENCES wl.leads(id),attempts integer NOT NULL DEFAULT 0,
  next_attempt_at timestamptz NOT NULL DEFAULT now(),locked_at timestamptz,error text NOT NULL DEFAULT '',
  received_at timestamptz NOT NULL DEFAULT now(),imported_at timestamptz);
+ALTER TABLE wl.expenses ADD COLUMN IF NOT EXISTS funding_source text NOT NULL DEFAULT 'Unassigned';
+ALTER TABLE wl.expenses ADD COLUMN IF NOT EXISTS payment_account text NOT NULL DEFAULT '';
+ALTER TABLE wl.expenses ADD COLUMN IF NOT EXISTS marketing_stream text NOT NULL DEFAULT '';
 `;

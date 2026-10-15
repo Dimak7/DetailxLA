@@ -1,7 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { headers } from "next/headers";
-import { heroVideoMedia, mobileHeroMediaQuery } from "@/components/westloop/hero-media";
 import { publicData } from "@/lib/platform/public";
 import { servicePrice } from "@/lib/service-content";
 import { siteUrl } from "@/lib/platform/settings";
@@ -27,8 +25,7 @@ const questions = [
 ];
 
 export default async function Home() {
-  const [{ business, services, reviews }, requestHeaders] = await Promise.all([publicData(), headers()]);
-  const mobileAnimation = heroVideoMedia?.mobileAnimation ?? heroVideoMedia?.animation;
+  const { business, services, reviews } = await publicData();
   const coating = services.find((s) => s.slug === "ceramic-coating");
   const fullDetail = services.find((s) => s.slug === "full-detail");
   const detailing = ["interior-detail", "exterior-detail"].flatMap((slug) => services.filter((s) => s.slug === slug));
@@ -51,9 +48,6 @@ export default async function Home() {
   };
   return (
     <PageShell business={business}>
-      {mobileAnimation && requestHeaders.get("save-data") !== "on" && (
-        <link rel="preload" as="image" href={mobileAnimation.src} media={mobileHeroMediaQuery} fetchPriority="high" />
-      )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
       <CinematicHero />
       <section className={styles.quickServices} id="detailing" aria-labelledby="choose-care-heading"><div className="wrap" id="services">

@@ -38,6 +38,7 @@ export const settingsSchema = z
     open_time: businessTime,
     close_time: businessTime,
     day_hours: z.array(dayHoursSchema).max(7).default([]),
+    booking_capacity: z.number().int().min(1).max(3).default(3),
     buffer_minutes: z.number().int().min(0).max(180),
     deposit_percent: z.number().min(0).max(100),
     cancellation_policy: z.string().max(2000),

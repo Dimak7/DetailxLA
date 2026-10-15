@@ -62,7 +62,7 @@ export function PublicHeader({ business }: { business: BusinessSettings }) {
 
   return (
     <>
-      <header ref={header} className="ceramics-header" data-menu-open={open}>
+      <header ref={header} className="ceramics-header" data-home={pathname === "/"} data-menu-open={open}>
         <Link href="/" className="ceramics-home" aria-label={`${business.name} home`} onClick={() => setOpen(false)}>
           {business.logo_url && business.name !== BRAND_NAME ? (
             <Image className="custom-logo" src={business.logo_url} alt={business.name} width={210} height={54} unoptimized />

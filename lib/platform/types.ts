@@ -58,6 +58,7 @@ export type BusinessSettings = {
   open_time: string;
   close_time: string;
   day_hours: Array<{ weekday: number; open_time: string; close_time: string }>;
+  booking_capacity: number;
   buffer_minutes: number;
   deposit_percent: number;
   cancellation_policy: string;

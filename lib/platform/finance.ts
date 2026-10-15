@@ -5,6 +5,10 @@ export type Expense = {
   expense_date: string;
   amount_cents: number;
   category: string;
+  funding_source?: string;
+  payment_account?: string;
+  vendor?: string;
+  marketing_stream?: string;
   recurrence: "one_time" | "weekly" | "monthly" | "yearly";
   recurring_start: string | null;
   recurring_end: string | null;
@@ -30,15 +34,15 @@ function advance(value: Date, recurrence: Expense["recurrence"], anchor: Date) {
 export function expenseOccurrences(expense: Expense, start: string, end: string) {
   if (expense.recurrence === "one_time")
     return expense.expense_date >= start && expense.expense_date <= end
-      ? [{ date: expense.expense_date, amount_cents: Number(expense.amount_cents), category: expense.category, recurring: false }]
+      ? [{ date: expense.expense_date, amount_cents: Number(expense.amount_cents), category: expense.category, funding_source: expense.funding_source || "Unassigned", payment_account: expense.payment_account || "Unassigned", vendor: expense.vendor || "Unassigned", marketing_stream: expense.marketing_stream || "Unassigned", recurring: false }]
       : [];
-  const result: Array<{ date: string; amount_cents: number; category: string; recurring: boolean }> = [];
+  const result: Array<{ date: string; amount_cents: number; category: string; funding_source:string; payment_account:string; vendor:string; marketing_stream:string; recurring: boolean }> = [];
   const anchor = day(expense.recurring_start || expense.expense_date);
   let current = new Date(anchor);
   const last = expense.recurring_end || end;
   while (iso(current) <= end && iso(current) <= last) {
     if (iso(current) >= start)
-      result.push({ date: iso(current), amount_cents: Number(expense.amount_cents), category: expense.category, recurring: true });
+      result.push({ date: iso(current), amount_cents: Number(expense.amount_cents), category: expense.category, funding_source: expense.funding_source || "Unassigned", payment_account: expense.payment_account || "Unassigned", vendor: expense.vendor || "Unassigned", marketing_stream: expense.marketing_stream || "Unassigned", recurring: true });
     current = advance(current, expense.recurrence, anchor);
   }
   return result;
@@ -46,7 +50,7 @@ export function expenseOccurrences(expense: Expense, start: string, end: string)
 
 export async function expensesForRange(start: string, end: string) {
   const expenses = await query<Expense>(
-    "SELECT id,expense_date,amount_cents,category,recurrence,recurring_start,recurring_end FROM wl.expenses WHERE (recurrence='one_time' AND expense_date BETWEEN $1 AND $2) OR (recurrence<>'one_time' AND COALESCE(recurring_start,expense_date)<=$2 AND COALESCE(recurring_end,$2)>=$1)",
+    "SELECT id,expense_date,amount_cents,category,funding_source,payment_account,vendor,marketing_stream,recurrence,recurring_start,recurring_end FROM wl.expenses WHERE (recurrence='one_time' AND expense_date BETWEEN $1 AND $2) OR (recurrence<>'one_time' AND COALESCE(recurring_start,expense_date)<=$2 AND COALESCE(recurring_end,$2)>=$1)",
     [start, end],
   );
   return expenses.flatMap((expense) => expenseOccurrences(expense, start, end));
@@ -65,7 +69,12 @@ export async function expenseSummary(start: string, end: string) {
     byDay.set(occurrence.date, (byDay.get(occurrence.date) || 0) + occurrence.amount_cents);
     if (occurrence.recurring) recurring_cents += occurrence.amount_cents;
   }
+  const group = (field:"funding_source"|"payment_account"|"vendor"|"marketing_stream") => {
+    const totals=new Map<string,number>();for(const row of occurrences)totals.set(row[field],(totals.get(row[field])||0)+row.amount_cents);
+    return [...totals].map(([label,amount_cents])=>({label,amount_cents})).sort((a,b)=>b.amount_cents-a.amount_cents);
+  };
   return {
+    byFunding:group("funding_source"),byAccount:group("payment_account"),byVendor:group("vendor"),byMarketing:group("marketing_stream"),
     total_cents: occurrences.reduce((total, expense) => total + expense.amount_cents, 0),
     recurring_cents,
     one_time_cents: occurrences.reduce((total, expense) => total + (expense.recurring ? 0 : expense.amount_cents), 0),

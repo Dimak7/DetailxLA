@@ -15,6 +15,7 @@ export const defaultSettings: BusinessSettings = {
   open_time: "08:00",
   close_time: "20:00",
   day_hours: [{ weekday: 0, open_time: "08:00", close_time: "17:00" }],
+  booking_capacity: 3,
   buffer_minutes: 30,
   deposit_percent: 0,
   cancellation_policy:

@@ -10,13 +10,14 @@ test("each role can reach its permitted workspaces without forbidden default lin
     assert.ok(allowed.includes(landing), `${role} lands in an allowed workspace`);
     assert.equal(landing, role === "staff" ? "my_schedule" : "dashboard");
     const navigation = adminNavigation(allowed);
+    assert.ok(navigation.every(w=>!w.sections.includes("messages")&&!w.sections.includes("gallery")));
     for (const workspace of navigation) {
       assert.ok(allowed.includes(workspace.target));
       assert.ok(workspace.sections.every((section) => allowed.includes(section)));
     }
     if (role === "manager") {
       assert.equal(navigation.find((workspace) => workspace.label === "Operations")?.target, "payments");
-      assert.equal(navigation.find((workspace) => workspace.label === "Growth")?.target, "messages");
+      assert.equal(navigation.find((workspace) => workspace.label === "Growth"), undefined);
     }
     if (role === "staff") {
       assert.deepEqual(navigation.map((workspace) => workspace.target), ["bookings", "my_schedule"]);

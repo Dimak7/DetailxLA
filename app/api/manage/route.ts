@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     }
     if (["expenses", "inventory"].includes(section) && p.get("export") === "csv") {
       const rows = Array.isArray((data as { rows?: unknown[] }).rows) ? (data as { rows: Array<Record<string, unknown>> }).rows : [];
-      const columns = section === "expenses" ? ["expense_date", "vendor", "category", "amount_cents", "payment_method", "recurrence", "description", "notes"] : ["name", "sku", "category", "quantity", "unit", "unit_cost_cents", "supplier", "minimum_stock", "reorder_quantity", "active"];
+      const columns = section === "expenses" ? ["expense_date", "vendor", "category", "amount_cents", "funding_source", "payment_account", "payment_method", "marketing_stream", "recurrence", "description", "notes"] : ["name", "sku", "category", "quantity", "unit", "unit_cost_cents", "supplier", "minimum_stock", "reorder_quantity", "active"];
       const value = (input: unknown) => `"${String(input ?? "").replaceAll('"', '""')}"`;
       const csv = [columns, ...rows.map((row) => columns.map((column) => column.endsWith("_cents") ? (Number(row[column] || 0) / 100).toFixed(2) : row[column]))].map((row) => row.map(value).join(",")).join("\r\n");
       return new NextResponse(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="west-loop-${section}-${p.get("from") || "export"}.csv"`, "Cache-Control": "no-store" } });
