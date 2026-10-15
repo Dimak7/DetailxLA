@@ -39,6 +39,7 @@ export function JobPayments({ booking }: { booking: RecordData }) {
           title={`Payments · ${booking.reference}`}
           onClose={() => setOpen(false)}
         >
+          {booking.square_environment==="sandbox"&&<p role="status"><strong>Sandbox invoice — test payments only.</strong></p>}
           <p>
             Book by phone → collect 50% deposit → detail the vehicle → collect
             the remaining balance → hand over the car.

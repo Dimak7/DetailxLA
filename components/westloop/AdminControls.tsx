@@ -31,6 +31,7 @@ export type EditorSpec = {
   selectChanges?: (key: string, value: string) => RecordData | undefined;
   description?: React.ReactNode;
   preview?: (values: RecordData) => React.ReactNode;
+  onSaved?: (values:RecordData,result:RecordData|undefined)=>void;
   removeAction?: { action: string; data: RecordData; description: string };
 };
 export async function action(name: string, data: RecordData) {
@@ -172,7 +173,8 @@ export function Editor({
                   ? new Date(String(v[f.key])).toISOString()
                   : null;
             }
-            await action(spec.action, spec.transform ? spec.transform(d) : d);
+            const result=await action(spec.action, spec.transform ? spec.transform(d) : d);
+            spec.onSaved?.(d,result);
             router.refresh();
             onClose();
           } catch (e) {

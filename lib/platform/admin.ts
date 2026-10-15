@@ -384,7 +384,7 @@ export async function adminData(
     )[0].total;
     const fields = staff
       ? "b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.customer_id,b.notes,b.location,b.assigned_to"
-      : `b.*,EXISTS(SELECT 1 FROM wl.payments pc WHERE pc.booking_id=b.id AND pc.status IN ('pending','paid','partially_refunded','refunded')) has_checkout,(SELECT row_to_json(si) FROM wl.square_invoices si WHERE si.booking_id=b.id AND si.environment='${squareEnvironment()}') square_invoice,COALESCE((SELECT SUM(p.amount_cents-p.tip_cents-p.refunded_cents) FROM wl.revenue_payments p WHERE p.booking_id=b.id),0) collected_cents,COALESCE((SELECT jsonb_agg(jsonb_build_object('employee_id',a.employee_id,'name',e.name,'pool_share_bps',a.pool_share_bps,'tip_override_cents',a.tip_override_cents)) FROM wl.employee_job_assignments a JOIN wl.employees e ON e.id=a.employee_id WHERE a.booking_id=b.id),'[]'::jsonb) job_assignments,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',li.id,'service_id',li.service_id,'kind',li.kind,'name',li.name,'quantity',li.quantity,'unit_price_cents',li.unit_price_cents) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items`;
+      : `b.*,EXISTS(SELECT 1 FROM wl.payments pc WHERE pc.booking_id=b.id AND pc.status IN ('pending','paid','partially_refunded','refunded') AND ((pc.provider='square' AND COALESCE(pc.metadata->>'square_environment','production')='${squareEnvironment()}') OR (pc.provider<>'square' AND '${squareEnvironment()}'='production'))) has_checkout,(SELECT row_to_json(si) FROM wl.square_invoices si WHERE si.booking_id=b.id AND si.environment='${squareEnvironment()}') square_invoice,${squareEnvironment()==='sandbox'?"COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.provider='square' AND p.metadata->>'square_environment'='sandbox' AND p.status IN ('paid','partially_refunded','refunded')),0)":"COALESCE((SELECT SUM(p.amount_cents-p.tip_cents-p.refunded_cents) FROM wl.revenue_payments p WHERE p.booking_id=b.id),0)"} collected_cents,COALESCE((SELECT jsonb_agg(jsonb_build_object('employee_id',a.employee_id,'name',e.name,'pool_share_bps',a.pool_share_bps,'tip_override_cents',a.tip_override_cents)) FROM wl.employee_job_assignments a JOIN wl.employees e ON e.id=a.employee_id WHERE a.booking_id=b.id),'[]'::jsonb) job_assignments,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',li.id,'service_id',li.service_id,'kind',li.kind,'name',li.name,'quantity',li.quantity,'unit_price_cents',li.unit_price_cents) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items`;
     args.push(
       section === "calendar" ? 2000 : limit,
       section === "calendar" ? 0 : offset,
@@ -395,6 +395,7 @@ export async function adminData(
     );
     return {
       rows,
+      squareEnvironment: squareEnvironment(),
       total: count,
       ...(section === "payments" ? {
         square: await squareRevenueStatus(),
@@ -680,7 +681,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     if (expense.recurring_end && (expense.recurring_start || expense.expense_date) > expense.recurring_end) throw new AppError("Recurring end date must follow its start.");
     const id = expense.id || randomUUID();
     await transaction(async (q) => { const before = expense.id ? (await q<Row>("SELECT * FROM wl.expenses WHERE id=$1 FOR UPDATE", [id])).rows[0] || {} : {}; await q("INSERT INTO wl.expenses(id,expense_date,amount_cents,category,vendor,description,payment_method,recurrence,recurring_start,recurring_end,receipt_url,notes,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13) ON CONFLICT(id) DO UPDATE SET expense_date=$2,amount_cents=$3,category=$4,vendor=$5,description=$6,payment_method=$7,recurrence=$8,recurring_start=$9,recurring_end=$10,receipt_url=$11,notes=$12,updated_by=$13,updated_at=now()", [id,expense.expense_date,expense.amount_cents,expense.category,expense.vendor,expense.description,expense.payment_method,expense.recurrence,expense.recurrence === "one_time" ? null : expense.recurring_start || expense.expense_date,expense.recurrence === "one_time" ? null : expense.recurring_end,expense.receipt_url,expense.notes,user.user_id]); await q("UPDATE wl.expenses SET funding_source=$2,payment_account=$3,marketing_stream=$4 WHERE id=$1",[id,expense.funding_source,expense.payment_account,expense.marketing_stream]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'expense',$3,$4,$5::jsonb,$6::jsonb)",[randomUUID(),user.user_id,id,expense.id ? "updated" : "created",JSON.stringify(before),JSON.stringify(expense)]); });
-    return { id };
+    return {id,expense_date:expense.expense_date};
   }
   if (action === "delete_expense") {
     const id = uuid.parse(data.id);
