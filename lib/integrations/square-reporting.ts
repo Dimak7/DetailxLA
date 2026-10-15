@@ -200,12 +200,25 @@ export async function retrieveSquarePayment(paymentId: string, environment = squ
   return result.payment;
 }
 
+/** A connection change keeps old ledgers, but the active account owns current totals. */
+export function squareAccountScope(alias:string){return `(NOT EXISTS(SELECT 1 FROM wl.settings cfg WHERE cfg.key='square_account_locations' AND cfg.value ? ${alias}.environment) OR ${alias}.location_id IN (SELECT jsonb_array_elements_text(cfg.value->${alias}.environment) FROM wl.settings cfg WHERE cfg.key='square_account_locations'))`;}
+export async function connectSquareAccount(){
+ const environment=squareEnvironment(),token=await secret("square_access_token");if(!token)throw new AppError("Connect Square first.",503);
+ const result=await squareGet<{locations?:Array<{id:string}>}>("/v2/locations",token,environment);
+ const ids=(result.locations||[]).map(location=>location.id);if(!ids.length)throw new AppError("Square returned no locations.");
+ await transaction(async q=>{
+  await q("INSERT INTO wl.settings(key,value) VALUES('square_account_locations',jsonb_build_object($1::text,$2::jsonb)) ON CONFLICT(key) DO UPDATE SET value=wl.settings.value||EXCLUDED.value,updated_at=now()",[environment,JSON.stringify(ids)]);
+  await q("INSERT INTO wl.square_sync(environment) VALUES($1) ON CONFLICT(environment) DO UPDATE SET cursor='{}'::jsonb,status='idle',last_synced_at=NULL,last_error='',updated_at=now()",[environment]);
+ });
+ return {environment,locations:ids.length};
+}
+
 export async function squareRevenueStatus(): Promise<SquareRevenueStatus> {
   const environment = squareEnvironment();
   const [token, rows, counts] = await Promise.all([
     secret("square_access_token"),
     query<SyncRow>("SELECT cursor,status,last_synced_at,last_error FROM wl.square_sync WHERE environment=$1", [environment]),
-    query<{ count: string }>("SELECT COUNT(*)::text count FROM wl.square_payments WHERE environment=$1", [environment]),
+    query<{ count: string }>(`SELECT COUNT(*)::text count FROM wl.square_payments s WHERE environment=$1 AND ${squareAccountScope("s")}`, [environment]),
   ]);
   const row = rows[0];
   return {

@@ -1,3 +1,4 @@
+import {connectSquareAccount,squareAccountScope} from "../integrations/square-reporting";
 import {preserveCompletedJobPay} from "./payroll";
 import {createSquareInvoice,refreshDetailInvoice} from "../integrations/square-invoices";
 import {squareEnvironment} from "../integrations/square-reporting";
@@ -401,7 +402,7 @@ export async function adminData(
       ...(section === "payments" ? {
         square: await squareRevenueStatus(),
         squarePayments: await query(
-          "SELECT * FROM wl.square_payments ORDER BY COALESCE(paid_at,created_at) DESC NULLS LAST,payment_id,environment LIMIT 100 OFFSET $1",
+          `SELECT * FROM wl.square_payments s WHERE ${p.get("squareArchive")==="1"?"true":`s.environment='${squareEnvironment()}' AND ${squareAccountScope("s")}`} ORDER BY COALESCE(paid_at,created_at) DESC NULLS LAST,payment_id,environment LIMIT 100 OFFSET $1`,
           [(squarePage - 1) * 100],
         ),
       } : {}),
@@ -455,6 +456,7 @@ const actionSections: Record<string, string> = {
   create_payment: "payments",
   create_square_invoice:"payments",refresh_detail_invoice:"payments",
   sync_square_payments: "payments",
+  connect_square_account:"settings",
   save_employee: "employees",
   save_shift: "schedule",
   delete_shift: "schedule",
@@ -484,6 +486,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   const data = z.record(z.string(), z.unknown()).parse(raw);
   if(action==="create_square_invoice")return createSquareInvoice(uuid.parse(data.booking_id));
   if(action==="refresh_detail_invoice")return refreshDetailInvoice(uuid.parse(data.booking_id));
+  if(action==="connect_square_account")return connectSquareAccount();
   if (action === "sync_square_payments") return syncSquarePayments();
   if (action === "save_booking_line_item") {
     if (user.role === "staff")

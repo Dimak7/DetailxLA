@@ -1932,8 +1932,8 @@ export function AdminWorkspace({
       {section === "payments" && (
         <>
           {data.square != null && <SquareRevenue connection={data.square as Awaited<ReturnType<typeof squareRevenueStatus>>} />}
-          <h2>Square transactions</h2>
-          <p className="small-note">All imported Square payments, including transactions without a website appointment. Only completed production payments in USD count toward revenue. Amounts include tips; processing fees are listed separately.</p>
+          <h2>{params.get("squareArchive")==="1"?"All imported Square accounts":"Current Square account transactions"}</h2><p><Link className="text-link" href={params.get("squareArchive")==="1"?"/admin/payments":"/admin/payments?squareArchive=1"}>{params.get("squareArchive")==="1"?"Back to current account":"View previous accounts / imported history"}</Link></p>
+          <p className="small-note">Previous-account history is retained in the archive. Only the connected account’s completed production payments in USD count toward current Square revenue. Amounts include tips; processing fees are listed separately.</p>
           {table(
             ["Payment date", "Amount", "Refunded", "Tips", "Fees", "Status", "Source / location", "Transaction"],
             rows(data.squarePayments).map((payment) => [
@@ -1948,9 +1948,9 @@ export function AdminWorkspace({
             ]),
           )}
           <nav className="toolbar" aria-label="Square transaction pages">
-            {Number(params.get("squarePage") || 1) > 1 && <Link className="text-link" href={`/admin/payments?squarePage=${Math.max(1, Number(params.get("squarePage") || 1) - 1)}`}>Newer payments</Link>}
+            {Number(params.get("squarePage") || 1) > 1 && <Link className="text-link" href={`/admin/payments?${params.get("squareArchive")==="1"?"squareArchive=1&":""}squarePage=${Math.max(1, Number(params.get("squarePage") || 1) - 1)}`}>Newer payments</Link>}
             <span className="small-note">Page {Math.max(1, Number(params.get("squarePage")) || 1)} · up to 100 payments per page</span>
-            {rows(data.squarePayments).length === 100 && <Link className="text-link" href={`/admin/payments?squarePage=${Math.max(1, Number(params.get("squarePage")) || 1) + 1}`}>Older payments</Link>}
+            {rows(data.squarePayments).length === 100 && <Link className="text-link" href={`/admin/payments?${params.get("squareArchive")==="1"?"squareArchive=1&":""}squarePage=${Math.max(1, Number(params.get("squarePage")) || 1) + 1}`}>Older payments</Link>}
           </nav>
           <h2>Website payment records</h2>
           <p className="small-note">

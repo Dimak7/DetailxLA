@@ -235,6 +235,7 @@ LEFT JOIN LATERAL (
  LIMIT 1
 ) linked ON true
 WHERE s.environment='production' AND s.currency='USD' AND s.status='COMPLETED'
+AND (NOT EXISTS(SELECT 1 FROM wl.settings cfg WHERE cfg.key='square_account_locations' AND cfg.value ? s.environment) OR s.location_id IN (SELECT jsonb_array_elements_text(cfg.value->s.environment) FROM wl.settings cfg WHERE cfg.key='square_account_locations'))
 UNION ALL
 SELECT p.id::text,p.booking_id,p.customer_id,p.amount_cents::bigint,p.refunded_cents::bigint,
  p.processor_fee_cents::bigint,p.status,p.provider,p.paid_at,p.created_at,p.checkout_url,p.external_id,
