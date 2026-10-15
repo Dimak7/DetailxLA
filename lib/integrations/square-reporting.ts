@@ -1,3 +1,4 @@
+import {reconcileDetailInvoice} from "./square-invoice-ledger";
 import { randomUUID } from "node:crypto";
 import { AppError } from "../platform/auth";
 import { query, transaction, type Query } from "../platform/db";
@@ -143,6 +144,7 @@ export async function upsertSquarePayment(q: Query, payment: SquarePayment, envi
        paid_at=${payment.card_details?.card_payment_timeline?.captured_at ? "COALESCE(EXCLUDED.paid_at,current.paid_at)" : "COALESCE(current.paid_at,EXCLUDED.paid_at)"},synced_at=now()
      RETURNING *`, columns.map((column) => row[column]),
   )).rows[0];
+  await reconcileDetailInvoice(q,saved);
   // Only a unique trustworthy ID/order match earns website attribution. No POS
   // customer or appointment is created. Old untagged checkout rows can be linked.
   const matches = (await q<{ id: string }>(

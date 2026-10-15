@@ -82,6 +82,7 @@ async function preparePayment(
     )
       throw new AppError("This appointment cannot be paid online.");
     const environment = squareEnvironment();
+    if((await q("SELECT booking_id FROM wl.square_invoices WHERE booking_id=$1 AND environment=$2",[bookingId,environment])).rows.length)throw new AppError("Use this booking’s Square invoice to collect payment.");
     const unclassified = (await q(
       `SELECT id FROM wl.payments WHERE booking_id=$1 AND provider='square'
        AND status IN ('paid','partially_refunded','refunded')
@@ -135,6 +136,8 @@ export async function createCheckout(
       "Payments are not connected. Please contact the studio.",
       503,
     );
+  const invoice=(await query<{url:string}>("SELECT url FROM wl.square_invoices WHERE booking_id=$1 AND environment=$2",[bookingId,squareEnvironment()]))[0];
+  if(invoice){if(invoice.url)return invoice.url;throw new AppError("Finish creating this booking's Square invoice from the admin panel.");}
   const prepared = await preparePayment(bookingId, kind, provider);
   if (prepared.payment.checkout_url) return prepared.payment.checkout_url;
   return provider === "square"

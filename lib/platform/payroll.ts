@@ -1,7 +1,7 @@
 import { database, type Query } from "./db";
 import type { Row } from "./types";
 
-export async function payrollSummary(start: string, end: string, transactionQuery?: Query) {
+export async function payrollSummary(start: string, end: string, transactionQuery?: Query, bookingId?: string) {
   // Job pay: final assignment override > service rule > all-services rule > employee default.
   // Percentage and flat rates are for a 100% job share; apply the share once. An
   // assignment override is already the employee's final amount. Tips stay separate.
@@ -24,12 +24,12 @@ export async function payrollSummary(start: string, end: string, transactionQuer
      ), job_value AS (
        SELECT b.id,b.service_id,b.price_cents,b.tip_cents,COALESCE(SUM(p.amount_cents-p.refunded_cents),0)::int paid,COUNT(p.id)::int payment_count
        FROM wl.bookings b LEFT JOIN wl.payments p ON p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded')
-       WHERE b.status='completed' AND b.booking_date BETWEEN $1::text AND $2::text GROUP BY b.id
+       WHERE b.status='completed' AND b.booking_date BETWEEN $1::text AND $2::text AND ($3::uuid IS NULL OR b.id=$3) GROUP BY b.id
      ), assigned AS (
        SELECT a.booking_id,a.employee_id,a.pool_share_bps,a.commission_override_cents,a.tip_override_cents FROM wl.employee_job_assignments a
        UNION ALL
        SELECT b.id,e.id,10000,NULL,NULL FROM wl.bookings b JOIN wl.employees e ON e.user_id=b.assigned_to
-       WHERE b.status='completed' AND b.booking_date BETWEEN $1::text AND $2::text AND NOT EXISTS(SELECT 1 FROM wl.employee_job_assignments a WHERE a.booking_id=b.id)
+       WHERE b.status='completed' AND b.booking_date BETWEEN $1::text AND $2::text AND ($3::uuid IS NULL OR b.id=$3) AND NOT EXISTS(SELECT 1 FROM wl.employee_job_assignments a WHERE a.booking_id=b.id)
      ), service_weights AS (
        SELECT j.id booking_id,COALESCE(li.service_id,j.service_id) service_id,
          SUM(li.quantity::bigint*li.unit_price_cents)::bigint weight
@@ -88,7 +88,22 @@ export async function payrollSummary(start: string, end: string, transactionQuer
        h.minutes::int regular_minutes,0::int overtime_minutes,
        (CASE WHEN e.compensation_model IN ('hourly','hourly_commission') THEN (h.minutes::bigint*e.hourly_rate_cents/60)::int ELSE 0 END + COALESCE(c.commission_cents,0) + COALESCE(c.tips_cents,0) + COALESCE(a.adjustment_cents,0))::int estimated_gross_cents
      FROM wl.employees e JOIN hours h ON h.id=e.id LEFT JOIN commission c ON c.employee_id=e.id LEFT JOIN adjustments a ON a.employee_id=e.id WHERE e.active=true OR h.minutes>0 OR c.employee_id IS NOT NULL ORDER BY e.name`,
-    [start, end],
+    [start, end, bookingId || null],
   );
   return rows;
+}
+
+/** Keep completed job earnings stable when an employee earns a new rate. */
+export async function preserveCompletedJobPay(q:Query,employeeId:string){
+ const jobs=(await q<{id:string;booking_date:string;assignment_id:string|null}>(`SELECT b.id,b.booking_date,a.id assignment_id FROM wl.bookings b
+ JOIN wl.employees e ON e.id=$1 LEFT JOIN wl.employee_job_assignments a ON a.booking_id=b.id AND a.employee_id=e.id
+ WHERE b.status='completed' AND ((a.id IS NOT NULL AND a.commission_override_cents IS NULL)
+ OR (b.assigned_to=e.user_id AND NOT EXISTS(SELECT 1 FROM wl.employee_job_assignments other WHERE other.booking_id=b.id))) ORDER BY b.id`,[employeeId])).rows;
+ for(const job of jobs){
+  await q("SELECT id FROM wl.bookings WHERE id=$1 FOR UPDATE",[job.id]);
+  const earnings=(await payrollSummary(job.booking_date,job.booking_date,q,job.id)).find(row=>row.id===employeeId);
+  if(!earnings)continue;
+  if(job.assignment_id)await q("UPDATE wl.employee_job_assignments SET commission_override_cents=$2 WHERE id=$1 AND commission_override_cents IS NULL",[job.assignment_id,Number(earnings.commission_cents)]);
+  else await q("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps,commission_override_cents) VALUES($1,$2,$3,10000,$4) ON CONFLICT(booking_id,employee_id) DO NOTHING",[(await import("node:crypto")).randomUUID(),job.id,employeeId,Number(earnings.commission_cents)]);
+ }
 }

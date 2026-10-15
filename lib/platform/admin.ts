@@ -1,3 +1,6 @@
+import {preserveCompletedJobPay} from "./payroll";
+import {createSquareInvoice,refreshDetailInvoice} from "../integrations/square-invoices";
+import {squareEnvironment} from "../integrations/square-reporting";
 import {crmTags,crmAction,recordTagsSql} from "./crm";
 import {removeTeamAccess} from "./team-access";
 import { randomUUID } from "node:crypto";
@@ -58,6 +61,7 @@ export const serviceSchema = z.object({
 
 /** Keep the booking amount, payroll basis, and customer-facing total in sync with job adjustments. */
 async function syncBookingFinancialTotal(q: Query, bookingId: string) {
+  if((await q("SELECT booking_id FROM wl.square_invoices WHERE booking_id=$1",[bookingId])).rows.length)throw new AppError("This job has a Square invoice. Adjust the invoice in Square before changing the agreed price here.");
   const booking = (await q<Row>(
     "SELECT id,service_id,service_name,price_cents FROM wl.bookings WHERE id=$1 FOR UPDATE",
     [bookingId],
@@ -380,7 +384,7 @@ export async function adminData(
     )[0].total;
     const fields = staff
       ? "b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.customer_id,b.notes,b.location,b.assigned_to"
-      : `b.*,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',li.id,'service_id',li.service_id,'kind',li.kind,'name',li.name,'quantity',li.quantity,'unit_price_cents',li.unit_price_cents) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items`;
+      : `b.*,EXISTS(SELECT 1 FROM wl.payments pc WHERE pc.booking_id=b.id AND pc.status IN ('pending','paid','partially_refunded','refunded')) has_checkout,(SELECT row_to_json(si) FROM wl.square_invoices si WHERE si.booking_id=b.id AND si.environment='${squareEnvironment()}') square_invoice,COALESCE((SELECT SUM(p.amount_cents-p.tip_cents-p.refunded_cents) FROM wl.revenue_payments p WHERE p.booking_id=b.id),0) collected_cents,COALESCE((SELECT jsonb_agg(jsonb_build_object('employee_id',a.employee_id,'name',e.name,'pool_share_bps',a.pool_share_bps,'tip_override_cents',a.tip_override_cents)) FROM wl.employee_job_assignments a JOIN wl.employees e ON e.id=a.employee_id WHERE a.booking_id=b.id),'[]'::jsonb) job_assignments,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',li.id,'service_id',li.service_id,'kind',li.kind,'name',li.name,'quantity',li.quantity,'unit_price_cents',li.unit_price_cents) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items`;
     args.push(
       section === "calendar" ? 2000 : limit,
       section === "calendar" ? 0 : offset,
@@ -447,6 +451,7 @@ const actionSections: Record<string, string> = {
   publish_review: "reviews",
   request_review: "reviews",
   create_payment: "payments",
+  create_square_invoice:"payments",refresh_detail_invoice:"payments",
   sync_square_payments: "payments",
   save_employee: "employees",
   save_shift: "schedule",
@@ -475,6 +480,8 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   if (!section || !access[section]?.includes(user.role))
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
+  if(action==="create_square_invoice")return createSquareInvoice(uuid.parse(data.booking_id));
+  if(action==="refresh_detail_invoice")return refreshDetailInvoice(uuid.parse(data.booking_id));
   if (action === "sync_square_payments") return syncSquarePayments();
   if (action === "save_booking_line_item") {
     if (user.role === "staff")
@@ -584,10 +591,11 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     });
   }
   if (action === "save_employee_compensation") {
-    const compensation = z.object({ employee_id: uuid, compensation_model: z.enum(["hourly","commission","hourly_commission","flat_job"]), hourly_rate_cents: z.number().int().min(0).max(100000000), default_commission_bps: z.number().int().min(0).max(10000), flat_job_pay_cents: z.number().int().min(0).max(100000000) }).parse(data);
+    const compensation = z.object({ employee_id: uuid, compensation_model: z.enum(["hourly","commission","hourly_commission","flat_job"]), hourly_rate_cents: z.number().int().min(0).max(100000000), default_commission_bps: z.number().int().min(0).max(10000), flat_job_pay_cents: z.number().int().min(0).max(100000000), preserve_completed: z.boolean().default(false) }).parse(data);
     await transaction(async (q) => {
       const employee = (await q<Row>("SELECT hourly_rate_cents,compensation_model,default_commission_bps,flat_job_pay_cents FROM wl.employees WHERE id=$1 FOR UPDATE", [compensation.employee_id])).rows[0];
       if (!employee) throw new AppError("Employee not found.", 404);
+      if(compensation.preserve_completed)await preserveCompletedJobPay(q,compensation.employee_id);
       await q("UPDATE wl.employees SET compensation_model=$2,default_commission_bps=$3,flat_job_pay_cents=$4,hourly_rate_cents=$5,updated_at=now() WHERE id=$1",[compensation.employee_id,compensation.compensation_model,compensation.default_commission_bps,compensation.flat_job_pay_cents,compensation.hourly_rate_cents]);
       await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'employee_compensation',$3,'saved',$4::jsonb,$5::jsonb)",[randomUUID(),user.user_id,compensation.employee_id,JSON.stringify(employee),JSON.stringify(compensation)]);
     });
@@ -623,7 +631,13 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     });
   }
   if (action === "record_job_tip") {
-    const tip=z.object({ booking_id: uuid, tip_cents: z.number().int().min(0).max(100000000) }).parse(data); await query("UPDATE wl.bookings SET tip_cents=$2,updated_at=now() WHERE id=$1",[tip.booking_id,tip.tip_cents]); await query("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_tip',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,tip.booking_id,JSON.stringify(tip)]);
+    const tip=z.object({booking_id:uuid,tip_cents:z.number().int().min(0).max(100000000)}).parse(data);
+    await transaction(async q=>{
+      const b=(await q<Row>("SELECT * FROM wl.bookings WHERE id=$1 FOR UPDATE",[tip.booking_id])).rows[0];if(!b)throw new AppError("Booking not found.",404);
+      await q("UPDATE wl.bookings SET manual_tip_cents=$2,tip_cents=$2+square_tip_cents,updated_at=now() WHERE id=$1",[tip.booking_id,tip.tip_cents]);
+      if(Number(b.manual_tip_cents)!==tip.tip_cents)await q("UPDATE wl.employee_job_assignments SET tip_override_cents=NULL WHERE booking_id=$1",[tip.booking_id]);
+      await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'booking_tip',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,tip.booking_id,JSON.stringify(tip)]);
+    });
   }
   if (action === "save_pay_period") {
     const period = z.object({ id: uuid.optional(), start_date: z.string(), end_date: z.string(), frequency: z.enum(["weekly","biweekly","semi_monthly"]).default("weekly") }).parse(data);

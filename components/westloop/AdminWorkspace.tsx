@@ -1,4 +1,5 @@
 "use client";
+import {JobPayments,JobTipAllocation} from "./JobPayments";
 import {CrmTagLibrary,RecordTags,LeadOutcome} from "./CrmTags";
 import {RemoveTeamMember} from "./RemoveTeamMember";
 import type {CrmTag} from "@/lib/platform/crm";
@@ -340,8 +341,8 @@ export function AdminWorkspace({
     ], (d) => ({ ...d, value: Math.round(Number(d.value || 0) * 100) }));
   }
   function tipEdit(r: R) {
-    edit("Record tip for " + s(r.reference), "record_job_tip", { booking_id: r.id, tip_cents: n(r.tip_cents) / 100 }, [
-      f("tip_cents", "Customer tip ($)", "money", { min: 0, hint: "Tips are included in the assigned detailers' payroll." }),
+    edit("Record tip for " + s(r.reference), "record_job_tip", { booking_id: r.id, tip_cents: n(r.manual_tip_cents ?? r.tip_cents) / 100 }, [
+      f("tip_cents", "Cash / other tip ($)", "money", { min: 0, hint: "Additional tips collected outside the Square invoice. Square invoice tips sync automatically; do not enter them again. Updating this amount resets individual tip splits." }),
     ]);
   }
   function customerEdit(r: R) {
@@ -524,16 +525,17 @@ export function AdminWorkspace({
     setEditor({
       title: "Employee pay settings",
       action: "save_employee_compensation",
-      initial: compensationEditorValues(employee),
-      description: <p className="small-note">Set this employee’s default plan. Percentage pay uses the final agreed service price, excluding tips. On shared jobs, percentage and flat job pay follow the employee’s allocation. Service rules can replace the default job pay; tips are allocated separately.</p>,
+      initial: {...compensationEditorValues(employee),preserve_completed:true},
+      description: <p className="small-note">Set this employee’s default plan. Percentage pay uses the final agreed service price, excluding tips. On shared jobs, percentage and flat job pay follow the employee’s allocation. Service rules can replace the default job pay; tips are allocated separately. Keep completed-job commissions checked when giving a raise. Paid payroll records always stay unchanged.</p>,
       fields: [
         f("employee_id", "Employee", "select", { options: employees.map((item) => ({ value: s(item.id), label: s(item.name) })) }),
+        f("preserve_completed", "Keep completed-job commissions at their earned amounts", "checkbox", {hint:"Recommended for raises. Applies the new commission to work completed after this change; existing completed-job commission is saved."}),
         f("compensation_model", "Pay model", "select", { options: compensationModels }),
         f("hourly_rate_cents", "Hourly rate ($)", "number", { required: true, min: 0, max: 1_000_000, step: 0.01, visibleWhen: (values) => ["hourly", "hourly_commission"].includes(s(values.compensation_model)) }),
         f("default_commission_bps", "Percentage per completed job (%)", "number", { required: true, min: 0, max: 100, step: 0.01, visibleWhen: (values) => ["commission", "hourly_commission"].includes(s(values.compensation_model)) }),
         f("flat_job_pay_cents", "Flat amount per completed job ($)", "number", { required: true, min: 0, max: 1_000_000, step: 0.01, visibleWhen: (values) => values.compensation_model === "flat_job" }),
       ],
-      transform: compensationEditorPayload,
+      transform: values=>({...compensationEditorPayload(values),preserve_completed:values.preserve_completed!==false}),
       selectChanges: (key, value) => {
         if (key !== "employee_id") return;
         const selected = employees.find((item) => s(item.id) === value);
@@ -842,14 +844,16 @@ export function AdminWorkspace({
         ) : null,
         status(r.status),
         ...(!staff
-          ? [<><strong>{money(r.price_cents == null ? null : n(r.price_cents))}</strong><small>{n(r.tip_cents) ? "Tip " + money(n(r.tip_cents)) : "No tip recorded"}</small></>]
+          ? [<><strong>{money(r.price_cents == null ? null : n(r.price_cents))}</strong><small>{n(r.tip_cents) ? "Tip " + money(n(r.tip_cents)) : "No tip recorded"}</small><small>Collected {money(n(r.collected_cents))} · Due {money(r.price_cents==null?null:Math.max(0,n(r.price_cents)-n(r.collected_cents)))}</small></>]
           : []),
         <>
           <button onClick={() => bookingEdit(r)}>Manage</button>
           {!staff && rows(r.line_items).filter((item) => item.kind === "base_service").length > 1 && <button onClick={() => servicePricesEdit(r)}>Service prices</button>}
           {!staff && <button onClick={() => upsellEdit(r)}>Add upsell</button>}
           {!staff && <button onClick={() => discountEdit(r)}>Discount</button>}
-          {!staff && <button onClick={() => tipEdit(r)}>Tip</button>}
+          {!staff && <button onClick={() => tipEdit(r)}>Record cash tip</button>}
+          {!staff && allowedSections.includes("payments") && <JobPayments booking={r}/>}
+          {!staff && allowedSections.includes("payroll") && <JobTipAllocation booking={r} employees={rows(data.employees)}/>}
           {!staff && r.status === "completed" && (
             <button
               disabled={busy}
@@ -947,7 +951,7 @@ export function AdminWorkspace({
             <>{s(r.position)}<small>{accessRoleLabel(s(r.login_role) || "staff")} access</small></>, s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
             compensationPlanLabel(r), (n(r.scheduled_minutes) / 60).toFixed(1) + "h",
             <>{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit profile</button>}
-              {allowedSections.includes("payroll") && !staff && <button className="button" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button>}</>,
+              {allowedSections.includes("payroll") && !staff && <button className="button" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Commission & pay</button>}</>,
           ]))}
         </section>
       )}
@@ -1020,7 +1024,7 @@ export function AdminWorkspace({
               <small className="payroll-employee-role">{s(r.position)}</small>
               <small>{s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small>
               <small className="payroll-employee-plan">Default plan: {compensationPlanLabel(rows(data.employees).find((employee) => employee.id === r.id) || r)}</small>
-              {allowedSections.includes("payroll") && !staff && <button className="link-button employee-pay-action" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button>}
+              {allowedSections.includes("payroll") && !staff && <button className="link-button employee-pay-action" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Commission & pay</button>}
             </div>,
             (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents)),
           ]), { comparison: true, label: "Employee payroll", className: "admin-payroll-table" })}

@@ -197,6 +197,17 @@ CREATE TABLE IF NOT EXISTS wl.square_sync (
  environment text PRIMARY KEY CHECK(environment IN ('production','sandbox')), cursor jsonb NOT NULL DEFAULT '{}',
  status text NOT NULL DEFAULT 'idle', last_synced_at timestamptz, last_error text NOT NULL DEFAULT '', updated_at timestamptz NOT NULL DEFAULT now());
 -- Square is authoritative for its own payments. Linking is optional and never creates a booking or customer.
+CREATE TABLE IF NOT EXISTS wl.square_invoices (
+ booking_id uuid NOT NULL REFERENCES wl.bookings(id), environment text NOT NULL CHECK(environment IN ('production','sandbox')),
+ request_id text NOT NULL, customer_id text NOT NULL DEFAULT '',order_id text NOT NULL DEFAULT '',invoice_id text NOT NULL DEFAULT '',
+ url text NOT NULL DEFAULT '',amount_cents integer NOT NULL CHECK(amount_cents>0),status text NOT NULL DEFAULT 'CREATING',
+ updated_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(booking_id,environment));
+CREATE UNIQUE INDEX IF NOT EXISTS wl_square_invoice_order ON wl.square_invoices(environment,order_id) WHERE order_id<>'';
+ALTER TABLE wl.bookings ADD COLUMN IF NOT EXISTS manual_tip_cents integer;
+ALTER TABLE wl.bookings ADD COLUMN IF NOT EXISTS square_tip_cents integer NOT NULL DEFAULT 0;
+UPDATE wl.bookings SET manual_tip_cents=tip_cents WHERE manual_tip_cents IS NULL;
+ALTER TABLE wl.bookings ALTER COLUMN manual_tip_cents SET DEFAULT 0;
+ALTER TABLE wl.bookings ALTER COLUMN manual_tip_cents SET NOT NULL;
 CREATE OR REPLACE VIEW wl.revenue_payments AS
 SELECT
  'square:' || s.environment || ':' || s.payment_id AS id,

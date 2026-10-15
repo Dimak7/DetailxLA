@@ -548,6 +548,7 @@ export async function updateBooking(
           [randomUUID(), actor, id, JSON.stringify({ assigned_to: assignedTo, warnings, date, start })],
         );
     }
+    if(data.price_cents!==undefined&&data.price_cents!==b.price_cents&&(await q("SELECT booking_id FROM wl.square_invoices WHERE booking_id=$1",[id])).rows.length)throw new AppError("This job has a Square invoice. Keep its agreed price consistent with Square.");
     if (data.price_cents !== undefined && data.price_cents !== b.price_cents) {
       const lines = (await q<{ id: string; service_id: string | null; kind: string; quantity: number; unit_price_cents: number }>(
         "SELECT id,service_id,kind,quantity,unit_price_cents FROM wl.booking_line_items WHERE booking_id=$1 ORDER BY created_at,id FOR UPDATE", [id],
