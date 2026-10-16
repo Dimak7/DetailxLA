@@ -30,6 +30,12 @@ type Saved = {
   amount_cents: number;
   status: string;
 };
+export function squareCustomerPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 10) return "+1" + digits;
+  if (digits.length === 11 && digits.startsWith("1")) return "+" + digits;
+  return undefined;
+}
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const token = await secret("square_access_token");
   if (!token)
@@ -125,12 +131,15 @@ export async function createSquareInvoice(bookingId: string) {
     )
   )[0];
   if (!saved.customer_id) {
+    const phone = squareCustomerPhone(b.phone);
     const result = await api<{ customer: { id: string } }>("/v2/customers", {
       idempotency_key: saved.request_id + "-c",
       given_name: b.first_name,
       family_name: b.last_name,
       email_address: b.email || undefined,
-      phone_number: b.phone || undefined,
+      // A malformed manually-entered phone must not block a valid payment link.
+      // Square accepts E.164; the original value remains safely stored in CRM.
+      phone_number: phone,
       reference_id: bookingId,
     });
     saved.customer_id = result.customer.id;

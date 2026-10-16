@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { query, transaction, closeDatabase } from "../lib/platform/db";
-import { createSquareInvoice } from "../lib/integrations/square-invoices";
+import { createSquareInvoice, squareCustomerPhone } from "../lib/integrations/square-invoices";
 import { upsertSquarePayment } from "../lib/integrations/square-reporting";
 import { payrollSummary } from "../lib/platform/payroll";
 import { adminAction } from "../lib/platform/admin";
@@ -13,6 +13,12 @@ process.env.ADMIN_PASSWORD = "test-invoice-owner-password";
 process.env.SQUARE_ENVIRONMENT = "production";
 process.env.SQUARE_ACCESS_TOKEN = "test-token";
 process.env.SQUARE_LOCATION_ID = "test-location";
+test("Square customer phones are normalized without blocking invoices on invalid manual data", () => {
+  assert.equal(squareCustomerPhone("(331) 213-8257"), "+13312138257");
+  assert.equal(squareCustomerPhone("+1 331 213 8257"), "+13312138257");
+  assert.equal(squareCustomerPhone("incorrect number"), undefined);
+  assert.equal(squareCustomerPhone("12345"), undefined);
+});
 test("one full Square invoice collects a deposit and balance, syncs tips/refunds without duplication, and preserves earned commissions", async () => {
   const fetchOriginal = globalThis.fetch;
   try {

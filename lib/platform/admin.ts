@@ -160,14 +160,14 @@ export async function adminData(
         `SELECT
           (SELECT count(*)::int FROM wl.employees WHERE active=true AND lower(trim(position))='detailer') active_detailers,
           (SELECT count(*)::int FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE c.archived_at IS NULL AND booking_date=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND status NOT IN ('cancelled','no_show')) today_jobs,
-          (SELECT count(*)::int FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE c.archived_at IS NULL AND booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND assigned_to IS NULL AND status IN ('new','confirmed','in_progress')) unassigned_jobs`,
+          (SELECT count(*)::int FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE c.archived_at IS NULL AND booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND assigned_to IS NULL AND NOT EXISTS(SELECT 1 FROM wl.employee_job_assignments a WHERE a.booking_id=b.id) AND status IN ('new','confirmed','in_progress')) unassigned_jobs`,
       ))[0],
       unassigned: await query(
         `SELECT b.id,b.reference,b.booking_date,b.start_minute,b.service_name,c.first_name||' '||c.last_name customer_name
          FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id
          WHERE b.booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')
            AND c.archived_at IS NULL
-           AND b.assigned_to IS NULL AND b.status IN ('new','confirmed','in_progress')
+           AND b.assigned_to IS NULL AND NOT EXISTS(SELECT 1 FROM wl.employee_job_assignments a WHERE a.booking_id=b.id) AND b.status IN ('new','confirmed','in_progress')
          ORDER BY b.booking_date,b.start_minute LIMIT 12`,
       ),
       ...(user.role === "manager" ? {} : { inventory: await inventorySummary() }),
@@ -250,7 +250,11 @@ export async function adminData(
          FROM wl.bookings b
          JOIN wl.customers c ON c.id=b.customer_id
          JOIN wl.vehicles v ON v.id=b.vehicle_id
-         WHERE b.assigned_to=$1
+         WHERE (b.assigned_to=$1 OR EXISTS(
+           SELECT 1 FROM wl.employee_job_assignments assignment
+           JOIN wl.employees assigned_employee ON assigned_employee.id=assignment.employee_id
+           WHERE assignment.booking_id=b.id AND assigned_employee.user_id=$1
+         ))
            AND c.archived_at IS NULL
            AND b.booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')
            AND b.status NOT IN ('cancelled','no_show')
@@ -360,7 +364,7 @@ export async function adminData(
     }
     if (staff) {
       args.push(user.user_id);
-      filters += " AND b.assigned_to=$" + args.length;
+      filters += " AND (b.assigned_to=$" + args.length + " OR EXISTS(SELECT 1 FROM wl.employee_job_assignments assignment JOIN wl.employees assigned_employee ON assigned_employee.id=assignment.employee_id WHERE assignment.booking_id=b.id AND assigned_employee.user_id=$" + args.length + "))";
     }
     if (date && section !== "calendar") {
       args.push(date);
@@ -625,19 +629,39 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     await transaction(async q => { const booking = (await q<Row>("SELECT id,status FROM wl.bookings WHERE id=$1 FOR UPDATE",[assignment.booking_id])).rows[0]; if (!booking) throw new AppError("Booking not found.",404); await q("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps,commission_override_cents,notes,assigned_by) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(booking_id,employee_id) DO UPDATE SET pool_share_bps=$4,commission_override_cents=$5,notes=$6,assigned_by=$7",[randomUUID(),assignment.booking_id,assignment.employee_id,assignment.pool_share_bps,assignment.commission_override_cents,assignment.notes,user.user_id]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'job_assignment',$3,'saved',$4::jsonb)",[randomUUID(),user.user_id,assignment.booking_id,JSON.stringify(assignment)]); });
   }
   if (action === "save_job_assignments") {
-    const input = z.object({ booking_id: uuid, assignments: z.array(z.object({ employee_id: uuid, pool_share_bps: z.number().int().min(0).max(10000), commission_override_cents: z.number().int().min(0).max(100000000).nullable().optional(), tip_override_cents: z.number().int().min(0).max(100000000).nullable().default(null), notes: txt.default("") })).min(1).max(20) }).parse(data);
-    if (input.assignments.reduce((total, assignment) => total + assignment.pool_share_bps, 0) !== 10000) throw new AppError("Employee job splits must total exactly 100%.");
-    if (new Set(input.assignments.map((assignment) => assignment.employee_id)).size !== input.assignments.length) throw new AppError("Each employee can appear only once on a job.");
+    const input = z.object({
+      booking_id: uuid,
+      employee_ids: z.array(uuid).min(1).max(20).optional(),
+      assignments: z.array(z.object({ employee_id: uuid, pool_share_bps: z.number().int().min(0).max(10000), commission_override_cents: z.number().int().min(0).max(100000000).nullable().optional(), tip_override_cents: z.number().int().min(0).max(100000000).nullable().default(null), notes: txt.default("") })).min(1).max(20).optional(),
+    }).refine((value) => Boolean(value.employee_ids?.length || value.assignments?.length), {
+      message: "Choose at least one detailer.",
+    }).parse(data);
+    const automatic = input.employee_ids?.map((employee_id, index, all) => ({
+      employee_id,
+      pool_share_bps: Math.floor(10000 / all.length) + (index < 10000 % all.length ? 1 : 0),
+      commission_override_cents: undefined,
+      tip_override_cents: null,
+      notes: "",
+    }));
+    const requestedAssignments = automatic || input.assignments!;
+    if (requestedAssignments.reduce((total, assignment) => total + assignment.pool_share_bps, 0) !== 10000) throw new AppError("Employee job splits must total exactly 100%.");
+    if (new Set(requestedAssignments.map((assignment) => assignment.employee_id)).size !== requestedAssignments.length) throw new AppError("Each employee can appear only once on a job.");
     await transaction(async q => {
       const booking=(await q<Row>("SELECT tip_cents FROM wl.bookings WHERE id=$1 FOR UPDATE",[input.booking_id])).rows[0];
       if (!booking) throw new AppError("Booking not found.",404);
-      const hasExplicit=input.assignments.some((assignment) => assignment.tip_override_cents !== null);
-      const explicit=input.assignments.reduce((total, assignment) => total + (assignment.tip_override_cents || 0),0);
+      const employees = (await q<{ id: string; user_id: string | null; active: boolean }>(
+        "SELECT id,user_id,active FROM wl.employees WHERE id=ANY($1::uuid[]) FOR UPDATE",
+        [requestedAssignments.map((assignment) => assignment.employee_id)],
+      )).rows;
+      if (employees.length !== requestedAssignments.length || employees.some((employee) => !employee.active))
+        throw new AppError("Choose active team members only.");
+      const hasExplicit=requestedAssignments.some((assignment) => assignment.tip_override_cents !== null);
+      const explicit=requestedAssignments.reduce((total, assignment) => total + (assignment.tip_override_cents || 0),0);
       if (hasExplicit && explicit !== Number(booking.tip_cents)) throw new AppError("Explicit tip allocations must total the job tip.");
       const previous = (await q<{ employee_id: string; commission_override_cents: number | null }>(
         "SELECT employee_id,commission_override_cents FROM wl.employee_job_assignments WHERE booking_id=$1", [input.booking_id],
       )).rows;
-      const assignments = input.assignments.map((assignment) => ({
+      const assignments = requestedAssignments.map((assignment) => ({
         ...assignment,
         // Split-only editors omit this field. An explicit null removes an override.
         commission_override_cents: assignment.commission_override_cents === undefined
@@ -647,6 +671,8 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       await q("DELETE FROM wl.employee_job_assignments WHERE booking_id=$1",[input.booking_id]);
       for (const assignment of assignments)
         await q("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps,commission_override_cents,tip_override_cents,notes,assigned_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",[randomUUID(),input.booking_id,assignment.employee_id,assignment.pool_share_bps,assignment.commission_override_cents,assignment.tip_override_cents,assignment.notes,user.user_id]);
+      const primaryUserId = employees.find((employee) => employee.id === assignments[0].employee_id)?.user_id || null;
+      await q("UPDATE wl.bookings SET assigned_to=$2,updated_at=now() WHERE id=$1", [input.booking_id, primaryUserId]);
       await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'job_assignment',$3,'replaced',$4::jsonb)",[randomUUID(),user.user_id,input.booking_id,JSON.stringify({ ...input, assignments })]);
     });
   }

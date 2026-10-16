@@ -463,11 +463,21 @@ export async function updateBooking(
       await q<Booking>("SELECT * FROM wl.bookings WHERE id=$1 FOR UPDATE", [id])
     ).rows[0];
     if (!b) throw new AppError("Appointment not found.", 404);
-    if (staff && b.assigned_to !== actor)
-      throw new AppError(
-        "You can update only your assigned appointments.",
-        403,
-      );
+    if (staff && b.assigned_to !== actor) {
+      const sharedAssignment = (
+        await q(
+          `SELECT 1 FROM wl.employee_job_assignments assignment
+           JOIN wl.employees employee ON employee.id=assignment.employee_id
+           WHERE assignment.booking_id=$1 AND employee.user_id=$2 LIMIT 1`,
+          [id, actor],
+        )
+      ).rows.length;
+      if (!sharedAssignment)
+        throw new AppError(
+          "You can update only your assigned appointments.",
+          403,
+        );
+    }
     if (staff && (
       data.price_cents !== undefined || data.assigned_to !== undefined ||
       data.date !== undefined || data.start_minute !== undefined || data.assignment_override ||

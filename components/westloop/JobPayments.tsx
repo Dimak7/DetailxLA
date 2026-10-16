@@ -144,6 +144,12 @@ export function JobPayments({ booking }: { booking: RecordData }) {
                 the rest due on the service date. It does not charge a card or
                 send an email automatically. Share the link with the customer.
               </p>
+              <p className="small-note">
+                Taking payment in person? Open this invoice by its appointment
+                reference in Square Invoices and collect it on the Square
+                device. Do not start an unrelated custom-amount sale; the
+                invoice order is what matches the payment and tip to this job.
+              </p>
               <button
                 className="button"
                 disabled={busy || total === null || total < 2}
@@ -154,12 +160,19 @@ export function JobPayments({ booking }: { booking: RecordData }) {
             </>
           )}
           {invoice && (
-            <button
-              disabled={busy}
-              onClick={() => void save("refresh_detail_invoice")}
-            >
-              Refresh Square payments
-            </button>
+            <>
+              <p className="small-note">
+                For an in-person balance, open this appointment reference in
+                Square Invoices and take the card payment there. Its payment,
+                tip, fee and refund history will sync to this booking.
+              </p>
+              <button
+                disabled={busy}
+                onClick={() => void save("refresh_detail_invoice")}
+              >
+                Refresh Square payments
+              </button>
+            </>
           )}
           {error && <p role="alert">{error}</p>}
           <p className="small-note">
@@ -184,41 +197,27 @@ export function JobTipAllocation({
     [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  type Split = { employee_id: string; share: string; tip: string };
-  const [splits, setSplits] = useState<Split[]>([]),
-    [explicit, setExplicit] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
   function launch() {
     const existing = Array.isArray(booking.job_assignments)
       ? (booking.job_assignments as RecordData[])
       : [];
     const assigned = employees.find((e) => e.user_id === booking.assigned_to);
-    setSplits(
+    setSelected(
       existing.length
-        ? existing.map((a) => ({
-            employee_id: String(a.employee_id),
-            share: String(Number(a.pool_share_bps) / 100),
-            tip:
-              a.tip_override_cents == null
-                ? ""
-                : String(Number(a.tip_override_cents) / 100),
-          }))
+        ? existing.map((a) => String(a.employee_id))
         : assigned
-          ? [
-              {
-                employee_id: String(assigned.employee_id),
-                share: "100",
-                tip: "",
-              },
-            ]
+          ? [String(assigned.employee_id)]
           : [],
     );
-    setExplicit(existing.some((a) => a.tip_override_cents != null));
     setError("");
     setOpen(true);
   }
-  function change(index: number, key: keyof Split, value: string) {
-    setSplits(
-      splits.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
+  function toggle(employeeId: string) {
+    setSelected((current) =>
+      current.includes(employeeId)
+        ? current.filter((id) => id !== employeeId)
+        : [...current, employeeId],
     );
   }
   async function save() {
@@ -227,148 +226,71 @@ export function JobTipAllocation({
     try {
       await action("save_job_assignments", {
         booking_id: booking.id,
-        assignments: splits.map((row) => ({
-          employee_id: row.employee_id,
-          pool_share_bps: Math.round(Number(row.share) * 100),
-          tip_override_cents: explicit
-            ? Math.round(Number(row.tip) * 100)
-            : null,
-        })),
+        employee_ids: selected,
       });
       setOpen(false);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not allocate tips.");
+      setError(e instanceof Error ? e.message : "Could not assign detailers.");
     } finally {
       setBusy(false);
     }
   }
   return (
     <>
-      <button onClick={launch}>Detailers & tip split</button>
+      <button onClick={launch}>Assign detailers</button>
       {open && (
         <Modal
-          title={`Detailers & tips · ${booking.reference}`}
+          title={`Assign detailers · ${booking.reference}`}
           onClose={() => setOpen(false)}
         >
           <p>
-            Total tip: <strong>{money(Number(booking.tip_cents || 0))}</strong>.
-            Assign the detailers who worked this job. Job shares must add up to
-            100% and control their commission allocation.
+            Select everyone working on this vehicle. Job credit and tips are
+            divided automatically and evenly across the assigned detailers.
           </p>
-          <label>
-            <input
-              type="checkbox"
-              checked={explicit}
-              onChange={(e) => setExplicit(e.target.checked)}
-            />{" "}
-            Set individual tip amounts
-          </label>
-          <p className="small-note">
-            Otherwise tips split equally among the assigned detailers.
-            Individual amounts must add up to the total tip. Changing the total
-            tip resets individual amounts to an equal split.
-          </p>
-          {splits.map((row, index) => (
-            <div className="job-tip-row" key={index}>
-              <label>
-                Detailer
-                <select
-                  value={row.employee_id}
-                  onChange={(e) => change(index, "employee_id", e.target.value)}
-                >
-                  <option value="">Choose detailer</option>
-                  {employees.map((e) => (
-                    <option
-                      key={String(e.employee_id)}
-                      value={String(e.employee_id)}
-                    >
-                      {String(e.name)}
-                    </option>
-                  ))}
-                  {!employees.some((e) => e.employee_id === row.employee_id) &&
-                    row.employee_id && (
-                      <option value={row.employee_id}>
-                        Previously assigned detailer
-                      </option>
-                    )}
-                </select>
-              </label>
-              <label>
-                Job share (%)
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={row.share}
-                  onChange={(e) => change(index, "share", e.target.value)}
-                />
-              </label>
-              {explicit && (
-                <label>
-                  Tip ($)
+          <div className="job-detailer-options">
+            {employees.map((employee) => {
+              const id = String(employee.employee_id);
+              return (
+                <label className="job-detailer-option" key={id}>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={row.tip}
-                    onChange={(e) => change(index, "tip", e.target.value)}
+                    type="checkbox"
+                    checked={selected.includes(id)}
+                    onChange={() => toggle(id)}
                   />
-                </label>
-              )}
-              <>
-                {!explicit && (
                   <span>
-                    Tip:{" "}
-                    {money(
-                      Math.floor(
-                        Number(booking.tip_cents || 0) / splits.length,
-                      ) +
-                        (row.employee_id ===
-                        [...splits].sort((a, b) =>
-                          a.employee_id.localeCompare(b.employee_id),
-                        )[0]?.employee_id
-                          ? Number(booking.tip_cents || 0) % splits.length
-                          : 0),
-                    )}
+                    <strong>{String(employee.name)}</strong>
+                    <small>{String(employee.position || "Detailer")}</small>
                   </span>
-                )}
-              </>
-              <button
-                onClick={() => setSplits(splits.filter((_, i) => i !== index))}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
+                </label>
+              );
+            })}
+          </div>
+          {selected.length > 0 && (
+            <p className="small-note" role="status">
+              {selected.length === 1
+                ? "This detailer receives 100% of the job credit and tip."
+                : `${selected.length} detailers receive an equal ${(
+                    100 / selected.length
+                  ).toFixed(2)}% share. Any rounding cent is assigned consistently.`}
+              {Number(booking.tip_cents || 0) > 0
+                ? ` Current tip: ${money(Number(booking.tip_cents || 0))}.`
+                : ""}
+            </p>
+          )}
           <div className="button-row">
             <button
-              onClick={() =>
-                setSplits([
-                  ...splits,
-                  {
-                    employee_id: "",
-                    share: splits.length ? "0" : "100",
-                    tip: "0",
-                  },
-                ])
-              }
-            >
-              Add detailer
-            </button>
-            <button
               className="button"
-              disabled={busy || !splits.length}
+              disabled={busy || !selected.length}
               onClick={() => void save()}
             >
-              {busy ? "Saving…" : "Save allocations"}
+              {busy ? "Saving…" : "Save assignments"}
             </button>
           </div>
           {error && <p role="alert">{error}</p>}
           <p>
-            See each detailer’s tips in Team → Payroll and Performance. Tips
-            stay separate from service commission.
+            Square and cash tips appear automatically in Payroll. Tips stay
+            separate from service commission.
           </p>
         </Modal>
       )}

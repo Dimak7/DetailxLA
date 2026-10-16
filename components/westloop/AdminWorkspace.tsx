@@ -862,9 +862,12 @@ export function AdminWorkspace({
             {timeLabel(n(r.start_minute))} CT · {n(r.duration_minutes) / 60}h
           </small>
         </>,
-        !staff ? (
-          r.assigned_to ? <><strong>{s(scheduleEmployees.find((e) => s(e.user_id) === s(r.assigned_to))?.name) || "Assigned"}</strong><small>Detailer assigned</small></> : <><strong>Unassigned</strong><small>Assign a detailer</small></>
-        ) : null,
+        !staff ? (() => {
+          const assignedNames = rows(r.job_assignments).map((assignment) => s(assignment.name)).filter(Boolean);
+          const fallback = s(scheduleEmployees.find((e) => s(e.user_id) === s(r.assigned_to))?.name);
+          const names = assignedNames.length ? assignedNames : fallback ? [fallback] : [];
+          return names.length ? <><strong>{names.join(", ")}</strong><small>{names.length} detailer{names.length === 1 ? "" : "s"} assigned</small></> : <><strong>Unassigned</strong><small>Assign detailers</small></>;
+        })() : null,
         status(r.status),
         ...(!staff
           ? [<><strong>{money(r.price_cents == null ? null : n(r.price_cents))}</strong><small>{n(r.tip_cents) ? "Tip " + money(n(r.tip_cents)) : "No tip recorded"}</small><small>Collected {money(n(r.collected_cents))} · Due {money(r.price_cents==null?null:Math.max(0,n(r.price_cents)-n(r.collected_cents)))}</small></>]
