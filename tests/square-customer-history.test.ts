@@ -28,10 +28,11 @@ test("Square CSV parsing preserves source fields, currency cents and anonymous p
   assert.equal(parsed.rows[1].email, "");
 });
 test("invalid Square CSVs fail before saving any profiles", () => {
-  for (const overrides of [
+  const invalidProfiles: Array<Record<string, string>> = [
     { "Square Customer ID": "" }, { "First Visit": "2026-02-30" }, { "Last Visit": "2020-01-01" }, { "Transaction Count": "1.2" },
     { "Lifetime Spend": "-12" }, { "Lifetime Spend": "1,2.50" }, { "Lifetime Spend": "9007199254740991.99" }, { "Instant Profile": "sometimes" },
-  ]) assert.throws(() => parseSquareCustomerHistory(csv([{ "Square Customer ID": "C1", ...overrides }])));
+  ];
+  for (const overrides of invalidProfiles) assert.throws(() => parseSquareCustomerHistory(csv([{ "Square Customer ID": "C1", ...overrides }])));
   assert.throws(() => parseSquareCustomerHistory(csv([{ "Square Customer ID": "C1" }, { "Square Customer ID": "C1" }])), /unique/);
   assert.throws(() => parseSquareCustomerHistory('"Square Customer ID",Name\n"unfinished'), /unfinished/);
   assert.throws(() => parseSquareCustomerHistory("Name,Email\nTest,test@example.test"), /not a Square/);
