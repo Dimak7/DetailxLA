@@ -111,6 +111,7 @@ export function AdminWorkspace({
     [customerArchiveVersion, setCustomerArchiveVersion] = useState(0);
   const canArchiveCustomers = ["owner", "admin"].includes(user.role);
   const archivedCustomers = params.get("archived") === "1";
+  const archivedBookings = section === "bookings" && Boolean(data.archivedBookings);
   function refreshCustomers() {
     setCustomerArchiveVersion(version => version + 1);
     router.refresh();
@@ -845,7 +846,7 @@ export function AdminWorkspace({
           {!staff ? (
             <Link
               className="text-link"
-              href={"/admin/customers?id=" + s(r.customer_id)}
+              href={"/admin/customers?id=" + s(r.customer_id) + (archivedBookings ? "&archived=1" : "")}
             >
               {s(r.customer_name)}
             </Link>
@@ -1568,7 +1569,7 @@ export function AdminWorkspace({
             Search &amp; filters
           </button>
           <form id="admin-record-filters" className={`toolbar admin-filter-panel${recordFiltersOpen ? " is-open" : ""}`}>
-            {section === "customers" && archivedCustomers && <input type="hidden" name="archived" value="1" />}
+            {((section === "customers" && archivedCustomers) || archivedBookings) && <input type="hidden" name="archived" value="1" />}
             <label className="field">
               <span>{section === "payments" ? "Search website appointments" : "Search records"}</span>
               <input
@@ -1602,7 +1603,7 @@ export function AdminWorkspace({
               </>
             )}
             <button className="button">Filter</button>
-            <Link className="text-link" href={"/admin/" + section + (section === "customers" && archivedCustomers ? "?archived=1" : "")}>
+            <Link className="text-link" href={"/admin/" + section + ((section === "customers" && archivedCustomers) || archivedBookings ? "?archived=1" : "")}>
               Clear
             </Link>
           </form>
@@ -1620,11 +1621,15 @@ export function AdminWorkspace({
               ["?status=cancelled", "Cancelled"],
               ["?status=no_show", "No-show"],
             ].map(([q, l]) => (
-              <Link key={l} href={"/admin/bookings" + q}>
+              <Link key={l} href={"/admin/bookings" + q + (archivedBookings ? (q ? "&" : "?") + "archived=1" : "")}>
                 {l}
               </Link>
             ))}
+            {canArchiveCustomers && <Link href={archivedBookings ? "/admin/bookings" : "/admin/bookings?archived=1"}>
+              {archivedBookings ? "Back to bookings" : "Archived customer appointments"}
+            </Link>}
           </div>
+          {archivedBookings && <p className="small-note">Appointments for archived customers. Payment history remains available in Payments. Restore a customer from Customers → Archived records to return their appointments to the main list.</p>}
           {bookingsTable(list)}
           <p className="small-note">
             {s(data.total)} matching appointments. Showing up to 100 per page.

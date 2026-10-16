@@ -74,6 +74,71 @@ test("customer archive removes active contacts while preserving paid bookings, r
   } finally { await closeDatabase(); }
 });
 
+test("Bookings separates archived customer appointments without changing payment history or booking records", async () => {
+  try {
+    const user = await owner();
+    const service = (await query<{ id: string }>("SELECT id FROM wl.services ORDER BY sort_order LIMIT 1"))[0].id;
+    const fixtures: { id: string; booking: string; name: string }[] = [];
+    for (const name of ["Tony", "Dima", "Moe"]) {
+      const fixture = await customer(), vehicle = randomUUID(), booking = randomUUID();
+      await query("UPDATE wl.customers SET first_name=$2,last_name='Booking fixture' WHERE id=$1", [fixture.id, name]);
+      await query("INSERT INTO wl.vehicles(id,customer_id,make,model,year,type) VALUES($1,$2,'Fixture','Coupe',2026,'Sedan')", [vehicle, fixture.id]);
+      await query("INSERT INTO wl.bookings(id,request_key,request_hash,reference,customer_id,vehicle_id,service_id,service_name,service_snapshot,booking_date,start_minute,duration_minutes,price_cents,status) VALUES($1,$2,'fixture',$2,$3,$4,$5,'Detail','{}','2030-06-15',480,60,12000,'completed')", [booking, randomUUID(), fixture.id, vehicle, service]);
+      if (name !== "Tony") {
+        const external = `booking-archive-${name.toLowerCase()}`;
+        await query("INSERT INTO wl.payments(id,booking_id,customer_id,amount_cents,status,provider,external_id,metadata,paid_at) VALUES($1,$2,$3,6000,'paid','square',$4,'{\"square_environment\":\"production\"}',now())", [randomUUID(), booking, fixture.id, external]);
+        await query("INSERT INTO wl.square_payments(environment,payment_id,status,amount_cents,currency,paid_at) VALUES('production',$1,'COMPLETED',6000,'USD',now())", [external]);
+      }
+      fixtures.push({ id: fixture.id, booking, name });
+    }
+    const [tony, dima, moe] = fixtures;
+    const readPreserved = () => Promise.all([
+      query("SELECT * FROM wl.bookings ORDER BY id"),
+      query("SELECT * FROM wl.payments ORDER BY id"),
+      query("SELECT * FROM wl.square_payments ORDER BY payment_id"),
+      query("SELECT * FROM wl.revenue_payments ORDER BY id"),
+    ]);
+    const preserved = await readPreserved();
+    const beforePayments = await adminData("payments", new URLSearchParams(), user);
+    await setCustomerArchived(user, change(dima.id));
+    await setCustomerArchived(user, change(moe.id));
+
+    const active = await adminData("bookings", new URLSearchParams(), user);
+    assert.deepEqual((active.rows as Row[]).map(row => row.id), [tony.booking]);
+    assert.equal(active.total, 1, "active count must use the same archive filter as the records");
+    assert.equal(active.archivedBookings, false);
+    for (const role of ["owner", "admin"] as const) {
+      const archived = await adminData("bookings", new URLSearchParams("archived=1"), { ...user, role });
+      assert.deepEqual((archived.rows as Row[]).map(row => row.id).sort(), [dima.booking, moe.booking].sort());
+      assert.equal(archived.total, 2);
+      assert.equal(archived.archivedBookings, true);
+    }
+    const filtered = await adminData("bookings", new URLSearchParams("archived=1&search=Dima&date=2030-06-15&status=completed"), user);
+    assert.deepEqual((filtered.rows as Row[]).map(row => row.id), [dima.booking]);
+    assert.equal(filtered.total, 1);
+    const wrongDate = await adminData("bookings", new URLSearchParams("archived=1&date=2030-06-16"), user);
+    assert.equal(wrongDate.total, 0);
+    const manager = { ...user, role: "manager" as const };
+    assert.deepEqual(((await adminData("bookings", new URLSearchParams(), manager)).rows as Row[]).map(row => row.id), [tony.booking]);
+    await assert.rejects(() => adminData("bookings", new URLSearchParams("archived=1"), manager), /owner|admin|archiv|access/i);
+
+    const afterPayments = await adminData("payments", new URLSearchParams(), user);
+    assert.deepEqual(afterPayments.rows, beforePayments.rows, "Payments keeps appointments for archived customers");
+    assert.deepEqual(afterPayments.payments, beforePayments.payments);
+    assert.deepEqual(afterPayments.squarePayments, beforePayments.squarePayments);
+    assert.deepEqual(await readPreserved(), preserved, "archiving customer visibility must not mutate any booking or payment");
+    const profile = await adminData("customers", new URLSearchParams({ id: dima.id, archived: "1" }), user);
+    assert.deepEqual((profile.profile?.bookings as Row[]).map(row => row.id), [dima.booking]);
+
+    await setCustomerArchived(user, change(dima.id, "restore"));
+    const restored = await adminData("bookings", new URLSearchParams(), user);
+    assert.deepEqual((restored.rows as Row[]).map(row => row.id).sort(), [tony.booking, dima.booking].sort());
+    assert.equal(restored.total, 2);
+    assert.deepEqual(((await adminData("bookings", new URLSearchParams("archived=1"), user)).rows as Row[]).map(row => row.id), [moe.booking]);
+    assert.deepEqual(await readPreserved(), preserved);
+  } finally { await closeDatabase(); }
+});
+
 test("archive suppresses campaign audiences and queued marketing without altering transactional history", async t => {
   t.mock.method(globalThis, "fetch", async () => { throw Error("Archived recipient must not contact a provider"); });
   try {

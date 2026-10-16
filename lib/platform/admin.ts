@@ -339,6 +339,9 @@ export async function adminData(
     section === "calendar" ||
     section === "payments"
   ) {
+    const archivedBookings = section === "bookings" && p.get("archived") === "1";
+    if (archivedBookings && !["owner", "admin"].includes(user.role))
+      throw new AppError("Only an owner or admin can view archived customer appointments.", 403);
     const squarePage = Number(p.get("squarePage") || 1);
     if (section === "payments" && (!Number.isSafeInteger(squarePage) || squarePage < 1 || !Number.isSafeInteger((squarePage - 1) * 100)))
       throw new AppError("Choose a valid Square payment page.");
@@ -347,6 +350,12 @@ export async function adminData(
       view = p.get("view") || "";
     let filters = "";
     const args: unknown[] = ["%" + search + "%"];
+    // Keep archived customers out of the working booking list without changing
+    // appointments, receipts, or the payment ledger retained for those records.
+    if (section === "bookings") {
+      args.push(archivedBookings);
+      filters += " AND (c.archived_at IS NOT NULL)=$" + args.length;
+    }
     if (staff) {
       args.push(user.user_id);
       filters += " AND b.assigned_to=$" + args.length;
@@ -400,6 +409,7 @@ export async function adminData(
     );
     return {
       rows,
+      archivedBookings,
       squareEnvironment: squareEnvironment(),
       total: count,
       ...(section === "payments" ? {
