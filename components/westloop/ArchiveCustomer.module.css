@@ -1,0 +1,6 @@
+.trigger { border: 1px solid #dce4dd; background: #fff; color: #315e4e; border-radius: 8px; padding: .55rem .8rem; font: inherit; font-size: .8rem; cursor: pointer; white-space: nowrap; }
+.trigger:hover { background: #f1f5ee; }
+.trigger:focus-visible { outline: 2px solid #315e4e; outline-offset: 3px; }
+.trigger:disabled { opacity: .6; cursor: wait; }
+.actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+.error { color: #9d3c32; }

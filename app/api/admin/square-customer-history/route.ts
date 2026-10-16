@@ -28,10 +28,10 @@ export async function GET(request: Request) {
   try {
     const user = await requireSession(request, "customers"), params = new URL(request.url).searchParams;
     requireSquareHistoryAccess(user);
-    if (params.get("export") === "csv") return new NextResponse(await exportSquareCustomerHistory(user), { headers: {
+    if (params.get("export") === "csv") return new NextResponse(await exportSquareCustomerHistory(user, params.get("archived") === "1"), { headers: {
       "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="west-loop-square-customer-history.csv"', "Cache-Control": "no-store",
     } });
-    return NextResponse.json(await squareCustomerHistory(user, Number(params.get("page") || 1), params.get("search") || ""), { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(await squareCustomerHistory(user, Number(params.get("page") || 1), params.get("search") || "", params.get("archived") === "1"), { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return apiError(error); }
 }
 export async function POST(request: Request) {

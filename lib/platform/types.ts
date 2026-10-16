@@ -82,6 +82,7 @@ export type BusinessSettings = {
 };
 export type Customer = {
   id: string;
+  archived_at?: string | null;
   first_name: string;
   last_name: string;
   email: string;

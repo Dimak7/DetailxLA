@@ -20,6 +20,8 @@ export type SquareCustomerHistoryRow = {
   source_filename?: string;
   imported_at?: string;
   source_fields?: Record<string, string>;
+  archived_at?: string | null;
+  archived_customer_id?: string | null;
 };
 export type SquareCustomerHistorySummary = {
   profiles: number;
@@ -139,8 +141,17 @@ async function matchCustomer(q: Query, row: SquareCustomerHistoryRow): Promise<{
   if ((email && existingEmail && email !== existingEmail) || (phone && existingPhone && phone !== existingPhone)) return { id: null, create: false };
   return { id: candidate.id, create: false };
 }
-async function customerRecord(q: Query, row: SquareCustomerHistoryRow, user: Session, source: string, recordConsent: boolean) {
-  const match = await matchCustomer(q, row);
+async function recordSourceConsent(q: Query, row: SquareCustomerHistoryRow, id: string, source: string, recordConsent: boolean, created = false) {
+  const consent = row.email_subscription_status.toLowerCase();
+  if (recordConsent && (consent === "unsubscribed" || (consent === "subscribed" && created))) {
+    // An explicit opt-out remains effective while archived and after restoration.
+    // An undated export cannot reverse an existing customer's opt-out.
+    await q("UPDATE wl.customers SET marketing_email=$2,updated_at=now() WHERE id=$1", [id, consent === "subscribed"]);
+    await q("INSERT INTO wl.consent_events(id,customer_id,channel,consent,wording,source) VALUES($1,$2,'email',$3,$4,$5)", [randomUUID(), id, consent === "subscribed", `Square export email subscription status: ${consent}`, `Square customer import: ${source}`]);
+  }
+}
+async function customerRecord(q: Query, row: SquareCustomerHistoryRow, user: Session, source: string, recordConsent: boolean, existingCustomerId?: string | null) {
+  const match = existingCustomerId ? { id: existingCustomerId, create: false } : await matchCustomer(q, row);
   let id = match.id, created = false;
   if (match.create) {
     id = (await q<{ id: string }>(`INSERT INTO wl.customers(id,first_name,last_name,email,phone,notes) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(email) DO NOTHING RETURNING id`,
@@ -149,16 +160,12 @@ async function customerRecord(q: Query, row: SquareCustomerHistoryRow, user: Ses
     if (!id) id = (await matchCustomer(q, row)).id;
     if (id && created) await q("INSERT INTO wl.timeline(id,customer_id,type,body,actor_id) VALUES($1,$2,'customer_imported',$3,$4)", [randomUUID(), id, `Customer imported from Square (${source}).`, user.user_id]);
   }
-  if (!id) return { id: null, created: false };
+  if (!id) return { id: null, created: false, archived_at: null };
+  const archive = (await q<{ archived_at: string | null }>("SELECT archived_at FROM wl.customers WHERE id=$1 FOR UPDATE", [id])).rows[0]?.archived_at || null;
+  await recordSourceConsent(q, row, id, source, recordConsent, created);
+  if (archive) return { id, created, archived_at: archive };
   await q(`UPDATE wl.customers SET first_name=CASE WHEN first_name='' THEN $2 ELSE first_name END,last_name=CASE WHEN last_name='' THEN $3 ELSE last_name END,phone=CASE WHEN phone='' THEN $4 ELSE phone END WHERE id=$1`, [id, row.first_name, row.last_name, row.phone]);
-  const consent = row.email_subscription_status.toLowerCase();
-  if (recordConsent && (consent === "unsubscribed" || (consent === "subscribed" && created))) {
-    // Unknown never grants consent. A CSV with no opt-in timestamp cannot reverse
-    // an existing customer's opt-out; an explicit unsubscribe always takes effect.
-    await q("UPDATE wl.customers SET marketing_email=$2,updated_at=now() WHERE id=$1", [id, consent === "subscribed"]);
-    await q("INSERT INTO wl.consent_events(id,customer_id,channel,consent,wording,source) VALUES($1,$2,'email',$3,$4,$5)", [randomUUID(), id, consent === "subscribed", `Square export email subscription status: ${consent}`, `Square customer import: ${source}`]);
-  }
-  return { id, created };
+  return { id, created, archived_at: null };
 }
 export async function importSquareCustomerHistory(text: string, filename: string, user: Session, preview = false) {
   requireSquareHistoryAccess(user);
@@ -173,38 +180,44 @@ export async function importSquareCustomerHistory(text: string, filename: string
     await q("LOCK TABLE wl.square_customer_history IN SHARE ROW EXCLUSIVE MODE");
     let added = 0, linked = 0, customers_added = 0;
     for (const row of parsed.rows) {
-      const existing = (await q<{ source_hash: string }>("SELECT source_hash FROM wl.square_customer_history WHERE square_customer_id=$1", [row.square_customer_id])).rows[0];
+      const existing = (await q<{ source_hash: string; customer_id: string | null; archived_at: string | null; archived_customer_id: string | null }>("SELECT source_hash,customer_id,archived_at,archived_customer_id FROM wl.square_customer_history WHERE square_customer_id=$1", [row.square_customer_id])).rows[0];
       if (!existing) added++;
-      const customer = await customerRecord(q, row, user, source, existing?.source_hash !== parsed.source_hash);
+      // An archived Square profile remains a tombstone on repeated or updated
+      // imports. It must not create a fresh, visible contact from changed details.
+      const customer = existing?.archived_at
+        ? { id: existing.customer_id, created: false, archived_at: null }
+        : await customerRecord(q, row, user, source, existing?.source_hash !== parsed.source_hash, existing?.customer_id);
+      if (existing?.archived_at && customer.id) await recordSourceConsent(q, row, customer.id, source, existing.source_hash !== parsed.source_hash);
       if (customer.id) linked++;
       if (customer.created) customers_added++;
-      await q(`INSERT INTO wl.square_customer_history(square_customer_id,customer_id,first_name,last_name,email,phone,creation_source,first_visit,last_visit,transaction_count,lifetime_spend_cents,email_subscription_status,instant_profile,source_filename,source_hash,imported_by,source_fields)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb)
+      await q(`INSERT INTO wl.square_customer_history(square_customer_id,customer_id,first_name,last_name,email,phone,creation_source,first_visit,last_visit,transaction_count,lifetime_spend_cents,email_subscription_status,instant_profile,source_filename,source_hash,imported_by,source_fields,archived_at,archived_customer_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19)
         ON CONFLICT(square_customer_id) DO UPDATE SET customer_id=EXCLUDED.customer_id,first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,email=EXCLUDED.email,phone=EXCLUDED.phone,
         creation_source=EXCLUDED.creation_source,first_visit=EXCLUDED.first_visit,last_visit=EXCLUDED.last_visit,transaction_count=EXCLUDED.transaction_count,lifetime_spend_cents=EXCLUDED.lifetime_spend_cents,
         email_subscription_status=EXCLUDED.email_subscription_status,instant_profile=EXCLUDED.instant_profile,source_filename=EXCLUDED.source_filename,source_hash=EXCLUDED.source_hash,imported_by=EXCLUDED.imported_by,source_fields=EXCLUDED.source_fields,
+        archived_at=COALESCE(wl.square_customer_history.archived_at,EXCLUDED.archived_at),archived_customer_id=CASE WHEN wl.square_customer_history.archived_at IS NOT NULL THEN wl.square_customer_history.archived_customer_id ELSE EXCLUDED.archived_customer_id END,
         imported_at=CASE WHEN wl.square_customer_history.source_hash<>EXCLUDED.source_hash THEN now() ELSE wl.square_customer_history.imported_at END`,
-      [row.square_customer_id, customer.id, row.first_name, row.last_name, row.email, row.phone, row.creation_source, row.first_visit, row.last_visit, row.transaction_count, row.lifetime_spend_cents, row.email_subscription_status, row.instant_profile, source, parsed.source_hash, user.user_id, JSON.stringify(row.source_fields)]);
+      [row.square_customer_id, customer.id, row.first_name, row.last_name, row.email, row.phone, row.creation_source, row.first_visit, row.last_visit, row.transaction_count, row.lifetime_spend_cents, row.email_subscription_status, row.instant_profile, source, parsed.source_hash, user.user_id, JSON.stringify(row.source_fields), customer.archived_at, customer.archived_at ? customer.id : null]);
     }
     await q(`INSERT INTO wl.square_customer_imports(source_hash,source_filename,profile_count,summary,imported_by) VALUES($1,$2,$3,$4::jsonb,$5) ON CONFLICT(source_hash) DO NOTHING`, [parsed.source_hash, source, parsed.rows.length, JSON.stringify(parsed.summary), user.user_id]);
     return { summary: parsed.summary, existing: parsed.rows.length - added, added, linked, customers_added, source_hash: parsed.source_hash, preview: false };
   });
 }
-export async function squareCustomerHistory(user: Session, page = 1, search = "") {
+export async function squareCustomerHistory(user: Session, page = 1, search = "", archived = false) {
   requireSquareHistoryAccess(user);
   if (!Number.isSafeInteger(page) || page < 1 || page > 1_000_000) throw new AppError("Choose a valid history page.");
   const summary = (await query<{ profiles: number; named: number; anonymous: number; transactions: string; lifetime_spend_cents: string; first_visit: string | null; last_visit: string | null }>(`SELECT count(*)::int profiles,count(*) FILTER(WHERE first_name<>'' OR last_name<>'')::int named,
     count(*) FILTER(WHERE first_name='' AND last_name='' AND email='' AND phone='')::int anonymous,COALESCE(sum(transaction_count),0)::text transactions,COALESCE(sum(lifetime_spend_cents),0)::text lifetime_spend_cents,
-    min(first_visit)::text first_visit,max(last_visit)::text last_visit FROM wl.square_customer_history`))[0];
+    min(first_visit)::text first_visit,max(last_visit)::text last_visit FROM wl.square_customer_history WHERE (archived_at IS NOT NULL)=$1`, [archived]))[0];
   const filter = `%${search.trim().slice(0, 200)}%`;
-  const matched = (await query<{ count: number }>("SELECT count(*)::int count FROM wl.square_customer_history WHERE first_name||' '||last_name||' '||email||' '||phone||' '||square_customer_id ILIKE $1", [filter]))[0].count;
-  const rows = await query<SquareCustomerHistoryRow>(`SELECT h.*,h.first_visit::text,h.last_visit::text,h.lifetime_spend_cents::float8 FROM wl.square_customer_history h WHERE first_name||' '||last_name||' '||email||' '||phone||' '||square_customer_id ILIKE $2 ORDER BY h.last_visit DESC NULLS LAST,h.square_customer_id LIMIT 25 OFFSET $1`, [(page - 1) * 25, filter]);
-  return { rows, summary: { ...summary, transactions: Number(summary.transactions), lifetime_spend_cents: Number(summary.lifetime_spend_cents) }, page, pages: Math.max(1, Math.ceil(matched / 25)) };
+  const matched = (await query<{ count: number }>("SELECT count(*)::int count FROM wl.square_customer_history WHERE (archived_at IS NOT NULL)=$2 AND first_name||' '||last_name||' '||email||' '||phone||' '||square_customer_id ILIKE $1", [filter, archived]))[0].count;
+  const rows = await query<SquareCustomerHistoryRow>(`SELECT h.*,h.first_visit::text,h.last_visit::text,h.lifetime_spend_cents::float8 FROM wl.square_customer_history h WHERE (h.archived_at IS NOT NULL)=$3 AND first_name||' '||last_name||' '||email||' '||phone||' '||square_customer_id ILIKE $2 ORDER BY h.last_visit DESC NULLS LAST,h.square_customer_id LIMIT 25 OFFSET $1`, [(page - 1) * 25, filter, archived]);
+  return { rows, summary: { ...summary, transactions: Number(summary.transactions), lifetime_spend_cents: Number(summary.lifetime_spend_cents) }, page, pages: Math.max(1, Math.ceil(matched / 25)), archived };
 }
 /** Text cells are escaped against spreadsheet formula execution on download. */
-export async function exportSquareCustomerHistory(user: Session) {
+export async function exportSquareCustomerHistory(user: Session, archived = false) {
   requireSquareHistoryAccess(user);
-  const rows = await query<SquareCustomerHistoryRow>("SELECT *,first_visit::text,last_visit::text FROM wl.square_customer_history ORDER BY square_customer_id");
+  const rows = await query<SquareCustomerHistoryRow>("SELECT *,first_visit::text,last_visit::text FROM wl.square_customer_history WHERE (archived_at IS NOT NULL)=$1 ORDER BY square_customer_id", [archived]);
   const value = (input: unknown) => { const text = String(input ?? ""); return `"${(/^[\s]*[=+@-]/.test(text) ? "'" + text : text).replaceAll('"', '""')}"`; };
   const columns = [...new Set([...exportHeaders, ...rows.flatMap(row => Object.keys(row.source_fields || {}))])];
   return [columns, ...rows.map(row => columns.map(column => row.source_fields?.[column] ?? ""))].map(row => row.map(value).join(",")).join("\r\n");

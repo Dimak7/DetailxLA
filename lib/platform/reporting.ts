@@ -45,7 +45,7 @@ export async function report(params: URLSearchParams) {
       [...values, dateToday()],
     ),
     query<Row>(
-      `SELECT count(*)::int total,count(*) FILTER(WHERE ${time})::int new_customers,count(*) FILTER(WHERE (SELECT count(*) FROM wl.bookings b WHERE b.customer_id=c.id AND status='completed')>1)::int "returning" FROM wl.customers c`,
+      `SELECT count(*)::int total,count(*) FILTER(WHERE ${time})::int new_customers,count(*) FILTER(WHERE (SELECT count(*) FROM wl.bookings b WHERE b.customer_id=c.id AND status='completed')>1)::int "returning" FROM wl.customers c WHERE c.archived_at IS NULL`,
       values,
     ),
     query<Row>(

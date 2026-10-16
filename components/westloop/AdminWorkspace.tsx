@@ -23,6 +23,7 @@ import { marketingStreamLabel } from "@/lib/marketing-streams";
 import { MarketingCommissions } from "./MarketingCommissions";
 import { SquareRevenue } from "./SquareRevenue";
 import SquareCustomerHistory from "./SquareCustomerHistory";
+import { ArchiveCustomer } from "./ArchiveCustomer";
 import { TestDataCleanup } from "./TestDataCleanup";
 import type { squareRevenueStatus } from "@/lib/integrations/square-reporting";
 import {
@@ -106,7 +107,14 @@ export function AdminWorkspace({
     [busy, setBusy] = useState(false),
     [recordFiltersOpen, setRecordFiltersOpen] = useState(() => Boolean(params.get("search") || params.get("date") || params.get("status"))),
     [scheduleView, setScheduleView] = useState<"week" | "staff" | "day">("week"),
-    [scheduleDay, setScheduleDay] = useState("");
+    [scheduleDay, setScheduleDay] = useState(""),
+    [customerArchiveVersion, setCustomerArchiveVersion] = useState(0);
+  const canArchiveCustomers = ["owner", "admin"].includes(user.role);
+  const archivedCustomers = params.get("archived") === "1";
+  function refreshCustomers() {
+    setCustomerArchiveVersion(version => version + 1);
+    router.refresh();
+  }
   const list = rows(data.rows),
     team = rows(data.team),
     employeeAvailability = rows(data.availability),
@@ -1560,6 +1568,7 @@ export function AdminWorkspace({
             Search &amp; filters
           </button>
           <form id="admin-record-filters" className={`toolbar admin-filter-panel${recordFiltersOpen ? " is-open" : ""}`}>
+            {section === "customers" && archivedCustomers && <input type="hidden" name="archived" value="1" />}
             <label className="field">
               <span>{section === "payments" ? "Search website appointments" : "Search records"}</span>
               <input
@@ -1593,7 +1602,7 @@ export function AdminWorkspace({
               </>
             )}
             <button className="button">Filter</button>
-            <Link className="text-link" href={"/admin/" + section}>
+            <Link className="text-link" href={"/admin/" + section + (section === "customers" && archivedCustomers ? "?archived=1" : "")}>
               Clear
             </Link>
           </form>
@@ -1721,6 +1730,11 @@ export function AdminWorkspace({
       {["customers","leads"].includes(section)&&<CrmTagLibrary tags={crmTagRows(data.tags)}/>}
       {section === "customers" && (
         <>
+          {canArchiveCustomers && <nav className="filter-tabs" aria-label="Customer records">
+            <Link href="/admin/customers" className={!archivedCustomers ? "active" : undefined} aria-current={!archivedCustomers ? "page" : undefined}>Active customers</Link>
+            <Link href="/admin/customers?archived=1" className={archivedCustomers ? "active" : undefined} aria-current={archivedCustomers ? "page" : undefined}>Archived records</Link>
+          </nav>}
+          {archivedCustomers && <p className="small-note">Archived customers are excluded from the active list and promotional campaigns. Their bookings and payments remain available.</p>}
           {profile?.customer && (
             <section className="paper">
               <div className="section-heading">
@@ -1733,13 +1747,12 @@ export function AdminWorkspace({
                     {s(profile.customer.email)} · {s(profile.customer.phone)}
                   </p>
                 </div>
-                <button
-                  className="button"
-                  onClick={() => customerEdit(profile.customer)}
-                >
-                  Edit profile
-                </button>
+                <div className="button-row">
+                  <button className="button" onClick={() => customerEdit(profile.customer)}>Edit profile</button>
+                  {canArchiveCustomers && <ArchiveCustomer kind="customer" id={s(profile.customer.id)} name={[s(profile.customer.first_name), s(profile.customer.last_name)].filter(Boolean).join(" ") || s(profile.customer.email) || "customer"} archived={Boolean(profile.customer.archived_at)} onChanged={refreshCustomers} />}
+                </div>
               </div>
+              {Boolean(profile.customer.archived_at) && <p role="status" className="small-note">Archived on {stamp(profile.customer.archived_at)}. This customer is excluded from promotional campaigns.</p>}
               <RecordTags kind="customer" id={s(profile.customer.id)} tags={crmTagRows(profile.customer.tags)} catalog={crmTagRows(data.tags)}/>
               <div className="profile-details">
                 <div>
@@ -1870,17 +1883,15 @@ export function AdminWorkspace({
                 {s(r.last_booking) || "No past visit"}
                 <small>{s(r.upcoming_booking) || "No upcoming visit"}</small>
               </>,
-              <Link
-                className="text-link"
-                href={"/admin/customers?id=" + s(r.id)}
-              >
-                Open profile
-              </Link>,
+              <div className="button-row">
+                <Link className="text-link" href={"/admin/customers?id=" + s(r.id) + (archivedCustomers ? "&archived=1" : "")}>Open profile</Link>
+                {canArchiveCustomers && <ArchiveCustomer kind="customer" id={s(r.id)} name={[s(r.first_name), s(r.last_name)].filter(Boolean).join(" ") || s(r.email) || "customer"} archived={Boolean(r.archived_at)} onChanged={refreshCustomers} />}
+              </div>,
             ]),
           )}
         </>
       )}
-      {section === "customers" && ["owner", "admin"].includes(user.role) && <SquareCustomerHistory onImported={() => router.refresh()} />}
+      {section === "customers" && canArchiveCustomers && <SquareCustomerHistory onImported={refreshCustomers} refreshKey={customerArchiveVersion} />}
       {section === "settings" && ["owner", "admin"].includes(user.role) && <TestDataCleanup />}
       {section === "leads" && <section className="paper">
         <p className="eyebrow">PHONE ENQUIRIES</p>

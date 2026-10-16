@@ -40,8 +40,9 @@ export async function processOutbox(limit = 25) {
             marketing_email: boolean;
             sms_opted_out: boolean;
             phone: string;
+            archived_at: string | null;
           }>(
-            "SELECT marketing_sms,marketing_email,sms_opted_out,phone FROM wl.customers WHERE id=$1",
+            "SELECT marketing_sms,marketing_email,sms_opted_out,phone,archived_at FROM wl.customers WHERE id=$1",
             [m.customer_id],
           )
         )[0];
@@ -57,7 +58,7 @@ export async function processOutbox(limit = 25) {
           !c ||
           (m.channel === "sms" && (c.sms_opted_out || otherStop)) ||
           (m.purpose === "marketing" &&
-            !(m.channel === "sms" ? c.marketing_sms : c.marketing_email))
+            (c.archived_at || !(m.channel === "sms" ? c.marketing_sms : c.marketing_email)))
         ) {
           await query(
             "UPDATE wl.messages SET status='cancelled',error='No current consent or recipient opted out' WHERE id=$1",

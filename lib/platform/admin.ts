@@ -279,27 +279,29 @@ export async function adminData(
       templates: await query("SELECT * FROM wl.email_templates ORDER BY key"),
     };
   if (section === "customers") {
+    const archived = p.get("archived") === "1", canArchive = user.role === "owner" || user.role === "admin";
+    if (archived && !canArchive) throw new AppError("Only an owner or admin can view archived customers.", 403);
     const customers = await query<Customer>(
       `SELECT c.*,${recordTagsSql("customer","c")},
   (SELECT count(*)::int FROM wl.bookings b WHERE b.customer_id=c.id) booking_count,
   COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::bigint FROM wl.revenue_payments p WHERE p.customer_id=c.id AND status IN ('paid','partially_refunded','refunded')),0) total_spent,
   (SELECT max(booking_date) FROM wl.bookings b WHERE b.customer_id=c.id AND booking_date<=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')) last_booking,
   (SELECT min(booking_date) FROM wl.bookings b WHERE b.customer_id=c.id AND booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND status IN ('new','confirmed')) upcoming_booking
-  FROM wl.customers c WHERE ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM wl.customer_tags ct JOIN wl.crm_tags t ON t.id=ct.tag_id WHERE ct.customer_id=c.id AND t.id=$4 AND t.archived_at IS NULL)) AND (first_name||' '||last_name||' '||email||' '||phone) ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-      ["%" + search + "%", limit, offset,p.get("tag")?uuid.parse(p.get("tag")):null],
+  FROM wl.customers c WHERE (c.archived_at IS NOT NULL)=$5 AND ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM wl.customer_tags ct JOIN wl.crm_tags t ON t.id=ct.tag_id WHERE ct.customer_id=c.id AND t.id=$4 AND t.archived_at IS NULL)) AND (first_name||' '||last_name||' '||email||' '||phone) ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      ["%" + search + "%", limit, offset,p.get("tag")?uuid.parse(p.get("tag")):null, archived],
     );
     const selected = p.get("id");
+    const selectedCustomer = selected ? (await query(
+      `SELECT c.*,a.source,a.campaign,${recordTagsSql("customer","c")} FROM wl.customers c LEFT JOIN wl.attributions a ON a.id=c.attribution_id WHERE c.id=$1 AND ($2 OR c.archived_at IS NULL)`,
+      [uuid.parse(selected), canArchive],
+    ))[0] : null;
     return {
       rows: customers,
+      archived,
       tags:await crmTags(),
-      profile: selected
+      profile: selectedCustomer
         ? {
-            customer: (
-              await query(
-                `SELECT c.*,a.source,a.campaign,${recordTagsSql("customer","c")} FROM wl.customers c LEFT JOIN wl.attributions a ON a.id=c.attribution_id WHERE c.id=$1`,
-                [uuid.parse(selected)],
-              )
-            )[0],
+            customer: selectedCustomer,
             vehicles: await query(
               "SELECT * FROM wl.vehicles WHERE customer_id=$1",
               [selected],
@@ -1164,6 +1166,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       ])
     )[0];
     if (!c) throw new AppError("Customer not found.");
+    if (m.purpose === "marketing" && c.archived_at) throw new AppError("This customer is archived. Restore them before sending promotional messages.");
     if (
       m.purpose === "marketing" &&
       !(m.channel === "sms"

@@ -34,7 +34,7 @@ export async function audience(q: Query, name: string, channel: string) {
       : "c.marketing_email";
   return (
     await q<Customer>(
-      "SELECT c.* FROM wl.customers c WHERE " +
+      "SELECT c.* FROM wl.customers c WHERE c.archived_at IS NULL AND " +
         consent +
         " AND " +
         clauses[name] +

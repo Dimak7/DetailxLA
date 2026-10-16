@@ -477,4 +477,8 @@ CREATE TABLE IF NOT EXISTS wl.test_data_archives (
  id uuid PRIMARY KEY, label text NOT NULL, snapshot jsonb NOT NULL,
  created_by uuid NOT NULL REFERENCES wl.users(id),created_at timestamptz NOT NULL DEFAULT now(),
  restored_by uuid REFERENCES wl.users(id),restored_at timestamptz);
+ALTER TABLE wl.customers ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+ALTER TABLE wl.square_customer_history ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+ALTER TABLE wl.square_customer_history ADD COLUMN IF NOT EXISTS archived_customer_id uuid REFERENCES wl.customers(id);
+CREATE INDEX IF NOT EXISTS wl_customer_active ON wl.customers(created_at DESC) WHERE archived_at IS NULL;
 `;

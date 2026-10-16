@@ -26,6 +26,12 @@
 .details dd { margin: .2rem 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .pagination { justify-content: flex-end; margin-top: 1rem; font-size: .85rem; }
 .search { margin-bottom: 1rem; }
+.recordTabs { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.5rem 0 1rem; }
+.recordTabs button { border: 1px solid #dce4dd; border-radius: 8px; padding: .65rem .85rem; background: #fff; color: #315e4e; font: inherit; font-size: .85rem; cursor: pointer; }
+.recordTabs button[aria-pressed="true"] { background: #eaf1e7; border-color: #b9cdbd; font-weight: 600; }
+.recordTabs button:focus-visible { outline: 2px solid #315e4e; outline-offset: 3px; }
+.rowActions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-top: .7rem; }
+.table .rowActions a { margin: 0; }
 .error { color: #9d3c32; }
 .message { color: #2e6652; }
 @media (max-width: 600px) {
