@@ -26,6 +26,10 @@ export async function report(params: URLSearchParams) {
     "(created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date";
   const payments =
     "(p.paid_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date AND p.status IN ('paid','partially_refunded','refunded')";
+  // Operational booking counts and sales estimates use active customers. The
+  // collected-payment ledger remains complete, including archived customers.
+  const activeBookingCustomer =
+    "EXISTS (SELECT 1 FROM wl.customers c WHERE c.id=b.customer_id AND c.archived_at IS NULL)";
   const [
     bookings,
     customers,
@@ -41,7 +45,7 @@ export async function report(params: URLSearchParams) {
     labor,
   ] = await Promise.all([
     query<Row>(
-      `SELECT count(*)::int total,count(*) FILTER(WHERE status='completed')::int completed,count(*) FILTER(WHERE status='cancelled')::int cancelled,count(*) FILTER(WHERE status='no_show')::int no_show,count(*) FILTER(WHERE booking_date>=$3 AND status IN ('new','confirmed'))::int upcoming FROM wl.bookings WHERE ${time}`,
+      `SELECT count(*)::int total,count(*) FILTER(WHERE status='completed')::int completed,count(*) FILTER(WHERE status='cancelled')::int cancelled,count(*) FILTER(WHERE status='no_show')::int no_show,count(*) FILTER(WHERE booking_date>=$3 AND status IN ('new','confirmed'))::int upcoming FROM wl.bookings b WHERE ${time} AND ${activeBookingCustomer}`,
       [...values, dateToday()],
     ),
     query<Row>(
@@ -63,11 +67,15 @@ export async function report(params: URLSearchParams) {
         COALESCE(SUM((SELECT SUM(quantity*unit_price_cents) FROM wl.booking_line_items li WHERE li.booking_id=b.id AND li.kind='upsell')),0)::int upsells,
         COALESCE(SUM((SELECT SUM(amount_cents) FROM wl.booking_discounts d WHERE d.booking_id=b.id)),0)::int discounts,
         COALESCE(SUM(GREATEST(0,b.price_cents-COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.revenue_payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded')),0))),0)::int outstanding,
-        count(*)::int completed_jobs FROM wl.bookings b WHERE b.status='completed' AND (COALESCE(b.completed_at,b.updated_at) AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date`,
+        count(*)::int completed_jobs FROM wl.bookings b WHERE b.status='completed' AND ${activeBookingCustomer} AND (COALESCE(b.completed_at,b.updated_at) AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date`,
       values,
     ),
     query<Row>(
-      `SELECT name,count(*)::int count,count(DISTINCT session_id)::int sessions FROM wl.events WHERE ${time} GROUP BY name`,
+      `SELECT name,count(*)::int count,count(DISTINCT session_id)::int sessions FROM wl.events e WHERE ${time}
+        AND (e.name<>'booking_completed' OR (
+          NOT EXISTS (SELECT 1 FROM wl.customers c WHERE c.id=e.customer_id AND c.archived_at IS NOT NULL)
+          AND NOT EXISTS (SELECT 1 FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE b.id=e.booking_id AND c.archived_at IS NOT NULL)
+        )) GROUP BY name`,
       values,
     ),
     query<Row>(
@@ -81,8 +89,8 @@ export async function report(params: URLSearchParams) {
     query<{ source: string; lead_stream: string; campaign: string; leads: number; bookings: number; clients: number; revenue: number | string }>(
       `SELECT a.source,a.lead_stream,a.campaign,
  (SELECT count(*)::int FROM wl.leads l WHERE l.attribution_id=a.id AND l.origin<>'booking' AND (l.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) leads,
- (SELECT count(*)::int FROM wl.bookings b WHERE b.attribution_id=a.id AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) bookings,
- (SELECT count(DISTINCT b.customer_id)::int FROM wl.bookings b WHERE b.attribution_id=a.id AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) clients,
+ (SELECT count(*)::int FROM wl.bookings b WHERE b.attribution_id=a.id AND ${activeBookingCustomer} AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) bookings,
+ (SELECT count(DISTINCT b.customer_id)::int FROM wl.bookings b WHERE b.attribution_id=a.id AND ${activeBookingCustomer} AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) clients,
  COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::bigint FROM wl.revenue_payments p JOIN wl.bookings b ON p.booking_id=b.id WHERE b.attribution_id=a.id AND ${payments}),0)::bigint revenue FROM wl.attributions a`,
       values,
     ),
@@ -130,10 +138,10 @@ export async function report(params: URLSearchParams) {
           WHERE a.source='Google Ads' AND e.name='booking_started'
             AND (e.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) booking_starts,
         (SELECT count(*)::int FROM wl.bookings b JOIN wl.attributions a ON a.id=b.attribution_id
-          WHERE a.source='Google Ads' AND b.status NOT IN ('cancelled','no_show')
+          WHERE a.source='Google Ads' AND b.status NOT IN ('cancelled','no_show') AND ${activeBookingCustomer}
             AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date) bookings,
         COALESCE((SELECT SUM(b.price_cents)::int FROM wl.bookings b JOIN wl.attributions a ON a.id=b.attribution_id
-          WHERE a.source='Google Ads' AND b.status NOT IN ('cancelled','no_show')
+          WHERE a.source='Google Ads' AND b.status NOT IN ('cancelled','no_show') AND ${activeBookingCustomer}
             AND (b.created_at AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date),0)::int booked_value,
         COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents)::bigint FROM wl.revenue_payments p
           JOIN wl.bookings b ON b.id=p.booking_id JOIN wl.attributions a ON a.id=b.attribution_id

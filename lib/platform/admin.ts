@@ -153,19 +153,20 @@ export async function adminData(
         "SELECT c.*,(SELECT count(*)::int FROM wl.messages m WHERE m.campaign_id=c.id AND m.status='sent') sent,(SELECT count(*)::int FROM wl.messages m WHERE m.campaign_id=c.id AND m.status IN ('failed','uncertain')) failed FROM wl.campaigns c ORDER BY created_at DESC LIMIT 100",
       ),
       today: await query(
-        "SELECT b.id,b.reference,b.service_name,b.start_minute,b.duration_minutes,b.status,b.assigned_to,c.first_name||' '||c.last_name customer_name,u.name detailer_name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id LEFT JOIN wl.users u ON u.id=b.assigned_to WHERE booking_date=$1 ORDER BY start_minute",
+        "SELECT b.id,b.reference,b.service_name,b.start_minute,b.duration_minutes,b.status,b.assigned_to,c.first_name||' '||c.last_name customer_name,u.name detailer_name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id LEFT JOIN wl.users u ON u.id=b.assigned_to WHERE booking_date=$1 AND c.archived_at IS NULL ORDER BY start_minute",
         [(await import("./types")).dateToday()],
       ),
       operations: (await query(
         `SELECT
           (SELECT count(*)::int FROM wl.employees WHERE active=true AND lower(trim(position))='detailer') active_detailers,
-          (SELECT count(*)::int FROM wl.bookings WHERE booking_date=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND status NOT IN ('cancelled','no_show')) today_jobs,
-          (SELECT count(*)::int FROM wl.bookings WHERE booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND assigned_to IS NULL AND status IN ('new','confirmed','in_progress')) unassigned_jobs`,
+          (SELECT count(*)::int FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE c.archived_at IS NULL AND booking_date=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND status NOT IN ('cancelled','no_show')) today_jobs,
+          (SELECT count(*)::int FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE c.archived_at IS NULL AND booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND assigned_to IS NULL AND status IN ('new','confirmed','in_progress')) unassigned_jobs`,
       ))[0],
       unassigned: await query(
         `SELECT b.id,b.reference,b.booking_date,b.start_minute,b.service_name,c.first_name||' '||c.last_name customer_name
          FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id
          WHERE b.booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')
+           AND c.archived_at IS NULL
            AND b.assigned_to IS NULL AND b.status IN ('new','confirmed','in_progress')
          ORDER BY b.booking_date,b.start_minute LIMIT 12`,
       ),
@@ -218,7 +219,7 @@ export async function adminData(
   if (section === "schedule") {
     const week = p.get("week") || (await import("./types")).dateToday();
     await query("CREATE TABLE IF NOT EXISTS wl.daily_staffing_requirements (staffing_date text PRIMARY KEY, required_staff integer NOT NULL DEFAULT 0 CHECK(required_staff BETWEEN 0 AND 100), created_by uuid REFERENCES wl.users(id), updated_at timestamptz NOT NULL DEFAULT now())");
-    return { week, employees: await query("SELECT * FROM wl.employees WHERE active=true ORDER BY name"), shifts: await query("SELECT s.*,e.name,e.position FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text ORDER BY s.shift_date,s.start_minute", [week]), availability: await query("SELECT * FROM wl.employee_availability"), workload: await query("SELECT booking_date,count(*)::int bookings FROM wl.bookings WHERE booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND status NOT IN ('cancelled','no_show') GROUP BY booking_date", [week]), appointments: await query("SELECT b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.service_name,b.status,c.first_name||' '||c.last_name customer_name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE b.booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND b.status NOT IN ('cancelled','no_show') ORDER BY b.booking_date,b.start_minute", [week]), staffing: await query("SELECT * FROM wl.daily_staffing_requirements WHERE staffing_date BETWEEN $1::date::text AND ($1::date+6)::text", [week]), notifications: await query("SELECT n.*,e.name FROM wl.schedule_notifications n JOIN wl.employees e ON e.id=n.employee_id WHERE n.week_start=$1 ORDER BY n.created_at DESC", [week]), integrations: await integrationStatus() };
+    return { week, employees: await query("SELECT * FROM wl.employees WHERE active=true ORDER BY name"), shifts: await query("SELECT s.*,e.name,e.position FROM wl.employee_shifts s JOIN wl.employees e ON e.id=s.employee_id WHERE s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text ORDER BY s.shift_date,s.start_minute", [week]), availability: await query("SELECT * FROM wl.employee_availability"), workload: await query("SELECT booking_date,count(*)::int bookings FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE c.archived_at IS NULL AND booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND status NOT IN ('cancelled','no_show') GROUP BY booking_date", [week]), appointments: await query("SELECT b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.service_name,b.status,c.first_name||' '||c.last_name customer_name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE c.archived_at IS NULL AND b.booking_date BETWEEN $1::date::text AND ($1::date+6)::text AND b.status NOT IN ('cancelled','no_show') ORDER BY b.booking_date,b.start_minute", [week]), staffing: await query("SELECT * FROM wl.daily_staffing_requirements WHERE staffing_date BETWEEN $1::date::text AND ($1::date+6)::text", [week]), notifications: await query("SELECT n.*,e.name FROM wl.schedule_notifications n JOIN wl.employees e ON e.id=n.employee_id WHERE n.week_start=$1 ORDER BY n.created_at DESC", [week]), integrations: await integrationStatus() };
   }
   if (section === "hours") {
     const end = p.get("end") || (await import("./types")).dateToday();
@@ -250,6 +251,7 @@ export async function adminData(
          JOIN wl.customers c ON c.id=b.customer_id
          JOIN wl.vehicles v ON v.id=b.vehicle_id
          WHERE b.assigned_to=$1
+           AND c.archived_at IS NULL
            AND b.booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD')
            AND b.status NOT IN ('cancelled','no_show')
          ORDER BY b.booking_date,b.start_minute`,
@@ -350,9 +352,9 @@ export async function adminData(
       view = p.get("view") || "";
     let filters = "";
     const args: unknown[] = ["%" + search + "%"];
-    // Keep archived customers out of the working booking list without changing
+    // Keep archived customers out of operational appointment lists without changing
     // appointments, receipts, or the payment ledger retained for those records.
-    if (section === "bookings") {
+    if (section === "bookings" || section === "calendar") {
       args.push(archivedBookings);
       filters += " AND (c.archived_at IS NOT NULL)=$" + args.length;
     }

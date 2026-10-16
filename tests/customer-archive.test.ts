@@ -9,7 +9,8 @@ import { processOutbox } from "../lib/platform/worker";
 import { hash } from "../lib/platform/auth";
 import { exportSquareCustomerHistory, importSquareCustomerHistory, parseSquareCustomerHistory, squareCustomerHistory } from "../lib/platform/square-customer-history";
 import { POST } from "../app/api/admin/customer-archive/route";
-import type { Row, Session } from "../lib/platform/types";
+import { report } from "../lib/platform/reporting";
+import { dateToday, type Row, type Session } from "../lib/platform/types";
 
 Object.assign(process.env, { NODE_ENV: "test", PGLITE_PATH: "memory://customer-archive" });
 for (const key of ["DATABASE_URL", "RAILWAY_ENVIRONMENT", "ADMIN_EMAIL", "ADMIN_PASSWORD", "SQUARE_ACCESS_TOKEN", "STRIPE_SECRET_KEY", "EMAIL_PROVIDER_API_KEY", "RESEND_API_KEY", "TELEGRAM_BOT_TOKEN", "TWILIO_AUTH_TOKEN"])
@@ -144,6 +145,135 @@ test("Bookings separates archived customer appointments without changing payment
     assert.equal(restored.total, 2);
     assert.deepEqual(((await adminData("bookings", new URLSearchParams("archived=1"), user)).rows as Row[]).map(row => row.id), [moe.booking]);
     assert.deepEqual(await readPreserved(), preserved);
+  } finally { await closeDatabase(); }
+});
+
+test("archived customers stay out of calendars, dashboard operations and staff schedules while Square finances remain intact", async () => {
+  try {
+    const user = await owner(), today = dateToday(), employee = randomUUID(), attribution = randomUUID();
+    const service = (await query<{ id: string }>("SELECT id FROM wl.services ORDER BY sort_order LIMIT 1"))[0].id;
+    const period = new URLSearchParams({ from: today, to: today });
+    await query("INSERT INTO wl.employees(id,user_id,name,email,position,active) VALUES($1,$2,'Archive owner',$3,'Detailer',true)", [employee, user.user_id, user.email]);
+    await query("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,published) VALUES($1,$2,$3,480,1080,true)", [randomUUID(), employee, today]);
+    await query("INSERT INTO wl.attributions(id,session_id,source,lead_stream,campaign,gclid) VALUES($1,$2,'Google Ads','Dima Leads','archive-operations','fixture-click')", [attribution, randomUUID()]);
+    const fixtures: { id: string; booking: string; name: string }[] = [];
+    for (const [index, name] of ["Tony", "Dima", "Moe"].entries()) {
+      const fixture = await customer(), vehicle = randomUUID(), booking = randomUUID();
+      await query("UPDATE wl.customers SET first_name=$2,last_name='Operations fixture' WHERE id=$1", [fixture.id, name]);
+      await query("INSERT INTO wl.vehicles(id,customer_id,make,model,year,type) VALUES($1,$2,'Fixture','Coupe',2026,'Sedan')", [vehicle, fixture.id]);
+      await query("INSERT INTO wl.bookings(id,request_key,request_hash,reference,customer_id,vehicle_id,service_id,service_name,service_snapshot,booking_date,start_minute,duration_minutes,price_cents,status,attribution_id) VALUES($1,$2,'fixture',$2,$3,$4,$5,'Detail','{}',$6,$7,60,12000,$8,$9)", [booking, randomUUID(), fixture.id, vehicle, service, today, 480 + index * 60, name === "Moe" ? "completed" : "confirmed", attribution]);
+      const session = `operations-${name.toLowerCase()}`;
+      await query("INSERT INTO wl.events(id,name,session_id,customer_id,booking_id) VALUES($1,'booking_completed',$2,$3,$4)", [randomUUID(), session, name === "Moe" ? null : fixture.id, name === "Dima" ? null : booking]);
+      await query("INSERT INTO wl.events(id,name,session_id,customer_id) VALUES($1,'page_view',$2,$3)", [randomUUID(), session, fixture.id]);
+      if (name !== "Tony") {
+        const external = `operations-archive-${name.toLowerCase()}`;
+        await query("INSERT INTO wl.payments(id,booking_id,customer_id,amount_cents,status,provider,external_id,metadata,paid_at) VALUES($1,$2,$3,6000,'paid','square',$4,'{\"square_environment\":\"production\"}',now())", [randomUUID(), booking, fixture.id, external]);
+        await query("INSERT INTO wl.square_payments(environment,payment_id,status,amount_cents,currency,paid_at) VALUES('production',$1,'COMPLETED',6000,'USD',now())", [external]);
+        await query("INSERT INTO wl.events(id,name,session_id,customer_id,booking_id) VALUES($1,'payment_completed',$2,$3,$4)", [randomUUID(), session, fixture.id, booking]);
+      }
+      fixtures.push({ id: fixture.id, booking, name });
+    }
+    const [tony, dima, moe] = fixtures;
+    await query("INSERT INTO wl.events(id,name,session_id) VALUES($1,'booking_submitted','anonymous-session')", [randomUUID()]);
+    const readPreserved = () => Promise.all([
+      query("SELECT * FROM wl.bookings ORDER BY id"),
+      query("SELECT * FROM wl.payments ORDER BY id"),
+      query("SELECT * FROM wl.square_payments ORDER BY payment_id"),
+      query("SELECT * FROM wl.revenue_payments ORDER BY id"),
+      query("SELECT * FROM wl.events ORDER BY id"),
+    ]);
+    const finances = (data: Awaited<ReturnType<typeof report>>) => ({
+      revenue: data.revenue, payments_collected: data.payments_collected,
+      refunds: data.refunds, processor_fees: data.processor_fees, square: data.square,
+      expenses: data.expenses, net_operating_profit: data.net_operating_profit, operating_margin: data.operating_margin,
+      financial_series: data.financial_series, labor_cost: data.labor_cost, windows: data.windows,
+      average_order: data.average_order, revenue_per_customer: data.revenue_per_customer,
+      series: data.series, topServices: data.topServices,
+      channelRevenue: data.channels.map(row => [row.channel, row.revenue]),
+      streamRevenue: data.lead_streams.map(row => [row.lead_stream, row.revenue]),
+      campaignRevenue: data.campaigns.map(row => [row.campaign, row.revenue]),
+      googlePaidRevenue: data.google_ads.paid_revenue,
+    });
+    const preserved = await readPreserved(), before = await report(period);
+    assert.equal(before.revenue, 12000);
+    assert.equal(before.bookings.total, 3);
+    assert.equal(before.bookings.completed, 1);
+    assert.equal(before.bookings.upcoming, 2);
+    assert.equal(before.net_sales, 12000);
+    assert.equal(before.outstanding, 6000);
+    assert.equal(before.google_ads.booked_value, 36000);
+    assert.equal(before.events.find(row => row.name === "booking_completed")?.count, 3);
+    assert.equal(before.conversion_rate, 100);
+    const beforeDashboard = await adminData("dashboard", period, user);
+    assert.ok("today" in beforeDashboard && "unassigned" in beforeDashboard && "operations" in beforeDashboard);
+    assert.equal(beforeDashboard.today?.length, 3);
+    assert.equal(beforeDashboard.unassigned?.length, 2);
+    assert.equal(beforeDashboard.operations?.today_jobs, 3);
+    assert.equal(beforeDashboard.operations?.unassigned_jobs, 2);
+
+    await setCustomerArchived(user, change(dima.id));
+    await setCustomerArchived(user, change(moe.id));
+
+    for (const role of ["owner", "manager"] as const) {
+      const calendar = await adminData("calendar", new URLSearchParams({ date: today }), { ...user, role });
+      assert.ok("total" in calendar && "rows" in calendar);
+      assert.deepEqual(calendar.rows?.map(row => row.id), [tony.booking]);
+      assert.equal(calendar.total, 1);
+    }
+    const archivedCalendar = await adminData("calendar", new URLSearchParams({ date: today, archived: "1", search: "Dima" }), user);
+    assert.ok("total" in archivedCalendar);
+    assert.equal(archivedCalendar.total, 0, "the Bookings archive toggle must not expose test jobs on the calendar");
+    for (const section of ["dashboard", "marketing", "analytics"]) {
+      const dashboard = await adminData(section, period, user);
+      assert.ok("today" in dashboard && "unassigned" in dashboard && "operations" in dashboard && "report" in dashboard);
+      assert.deepEqual(dashboard.today?.map(row => row.id), [tony.booking]);
+      assert.deepEqual(dashboard.unassigned?.map(row => row.id), [tony.booking]);
+      assert.equal(dashboard.operations?.today_jobs, 1);
+      assert.equal(dashboard.operations?.unassigned_jobs, 1);
+      assert.equal(dashboard.report?.bookings.total, 1);
+      assert.equal(dashboard.report?.bookings.completed, 0);
+      assert.equal(dashboard.report?.bookings.upcoming, 1);
+      assert.equal(dashboard.report?.revenue, before.revenue);
+    }
+    const after = await report(period);
+    assert.equal(after.completed_jobs, 0);
+    assert.equal(after.net_sales, 0, "archived test jobs do not inflate completed sales");
+    assert.equal(after.outstanding, 0, "archived test jobs do not leave operational balances to chase");
+    assert.equal(after.google_ads.booked_value, 12000);
+    assert.equal(after.google_ads.bookings, 1);
+    assert.equal(after.channels.find(row => row.channel === "Google Ads")?.bookings, 1);
+    assert.equal(after.channels.find(row => row.channel === "Google Ads")?.clients, 1);
+    assert.equal(after.lead_streams.find(row => row.lead_stream === "Dima Leads")?.bookings, 1);
+    assert.equal(after.campaigns.find(row => row.campaign === "archive-operations")?.bookings, 1);
+    assert.equal(after.events.find(row => row.name === "booking_completed")?.count, 1, "exclude both direct customer and booking-only archived event links");
+    assert.ok(Math.abs((after.conversion_rate ?? 0) - 100 / 3) < 0.000001);
+    for (const name of ["page_view", "payment_completed", "booking_submitted"])
+      assert.deepEqual(after.events.find(row => row.name === name), before.events.find(row => row.name === name), `${name} history remains visible`);
+    assert.deepEqual(finances(after), finances(before), "hiding operational appointments must retain every financial total and paid revenue breakdown");
+    const schedule = await adminData("schedule", new URLSearchParams({ week: today }), user);
+    assert.ok("appointments" in schedule && "workload" in schedule && "shifts" in schedule);
+    assert.deepEqual(schedule.appointments?.map(row => row.id), [tony.booking]);
+    assert.deepEqual(schedule.workload, [{ booking_date: today, bookings: 1 }]);
+    assert.equal(schedule.shifts?.length, 1, "employee shifts are independent of customer archives");
+    assert.deepEqual(await readPreserved(), preserved, "no read or archive operation can rewrite booking or payment history");
+    await query("INSERT INTO wl.events(id,name,session_id) VALUES($1,'booking_completed','unlinked-session')", [randomUUID()]);
+    assert.equal((await report(period)).events.find(row => row.name === "booking_completed")?.count, 2, "unlinked conversion events are retained because they cannot be classified as archived");
+
+    // Assign all three existing appointments to exercise the employee-facing view.
+    await query("UPDATE wl.bookings SET assigned_to=$1", [user.user_id]);
+    for (const role of ["owner", "staff"] as const) {
+      const personal = await adminData("my_schedule", new URLSearchParams(), { ...user, role });
+      assert.ok("appointments" in personal && "employee" in personal && "shifts" in personal);
+      assert.deepEqual(personal.appointments?.map(row => row.id), [tony.booking]);
+      assert.equal(personal.shifts?.length, 1);
+    }
+    await assert.rejects(() => adminData("calendar", new URLSearchParams({ date: today }), { ...user, role: "staff" }), /access/i);
+    await setCustomerArchived(user, change(dima.id, "restore"));
+    const restored = await adminData("calendar", new URLSearchParams({ date: today }), user);
+    assert.ok("rows" in restored && "total" in restored);
+    assert.deepEqual(restored.rows?.map(row => row.id), [tony.booking, dima.booking]);
+    assert.equal(restored.total, 2);
+    assert.deepEqual(finances(await report(period)), finances(before), "restoring visibility also leaves all financial totals unchanged");
   } finally { await closeDatabase(); }
 });
 

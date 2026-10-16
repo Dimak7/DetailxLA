@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       name: string;
       status: string;
     }>(
-      "SELECT b.reference,b.service_name,b.start_minute,b.status,c.first_name||' '||c.last_name name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE booking_date=$1 AND status NOT IN ('cancelled','no_show') ORDER BY start_minute",
+      "SELECT b.reference,b.service_name,b.start_minute,b.status,c.first_name||' '||c.last_name name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE booking_date=$1 AND c.archived_at IS NULL AND status NOT IN ('cancelled','no_show') ORDER BY start_minute",
       [date],
     );
     const body = [

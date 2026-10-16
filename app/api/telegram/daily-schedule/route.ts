@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     service_name: string;
     start_minute: number;
   }>(
-    "SELECT c.first_name||' '||c.last_name name,b.service_name,b.start_minute FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE booking_date=$1 AND status NOT IN ('cancelled','no_show') ORDER BY start_minute",
+    "SELECT c.first_name||' '||c.last_name name,b.service_name,b.start_minute FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id WHERE booking_date=$1 AND c.archived_at IS NULL AND status NOT IN ('cancelled','no_show') ORDER BY start_minute",
     [date],
   );
   await transaction((q) =>
