@@ -22,6 +22,8 @@ import { AdsPerformance } from "./AdsPerformance";
 import { marketingStreamLabel } from "@/lib/marketing-streams";
 import { MarketingCommissions } from "./MarketingCommissions";
 import { SquareRevenue } from "./SquareRevenue";
+import SquareCustomerHistory from "./SquareCustomerHistory";
+import { TestDataCleanup } from "./TestDataCleanup";
 import type { squareRevenueStatus } from "@/lib/integrations/square-reporting";
 import {
   money,
@@ -46,7 +48,7 @@ const n = (v: unknown) => Number(v || 0);
 const serviceLinePrice = (booking: R, item: R) => {
   const service = rows((booking.service_snapshot as R | undefined)?.selected_services)
     .find((selection) => selection.id === item.service_id);
-  return service?.base_cents === null ? money(null) : money(n(item.quantity) * n(item.unit_price_cents));
+  return item.quote_pending || (item.kind === "base_service" && service?.base_cents === null) ? "By quote" : money(n(item.quantity) * n(item.unit_price_cents));
 };
 const title = (v: string) =>
   v.replaceAll("_", " ").replace(/\b\w/g, (x) => x.toUpperCase());
@@ -334,11 +336,11 @@ export function AdminWorkspace({
     ]);
   }
   function servicePricesEdit(booking: R) {
-    const items = rows(booking.line_items).filter((item) => item.kind === "base_service");
-    const values = (item: R) => ({ ...item, booking_id: booking.id, unit_price_cents: n(item.unit_price_cents) / 100 });
+    const items = rows(booking.line_items).filter((item) => item.kind === "base_service" || item.kind === "upsell");
+    const values = (item: R) => ({ ...item, booking_id: booking.id, unit_price_cents: item.quote_pending ? "" : n(item.unit_price_cents) / 100 });
     edit("Service prices · " + s(booking.reference), "save_booking_line_item", values(items[0]), [
-      f("id", "Service", "select", { options: items.map((item) => ({ value: s(item.id), label: `${s(item.name)} — ${serviceLinePrice(booking,item)}` })) }),
-      f("unit_price_cents", "Agreed service price ($)", "money", { min: 0, hint: booking.price_cents == null ? "Save each service price, then use Manage to enter the agreed appointment total and confirm the quote." : "Only change a price after agreeing it with the customer." }),
+      f("id", "Service or upgrade", "select", { options: items.map((item) => ({ value: s(item.id), label: `${s(item.name)} — ${serviceLinePrice(booking,item)}` })) }),
+      f("unit_price_cents", "Agreed item price ($)", "money", { required: true, min: 0, hint: booking.price_cents == null ? "Price every quoted item, then use Manage to enter the agreed appointment total and confirm the quote." : "Only change a price after agreeing it with the customer." }),
     ], undefined, (key,value) => key === "id" ? values(items.find((item) => item.id === value)!) : undefined);
   }
   function discountEdit(r: R) {
@@ -383,7 +385,10 @@ export function AdminWorkspace({
         f("name", "Full name", "text", { required: true }),
         f("email", "Email", "email"),
         f("phone", "Phone"),
-        f("source", "Source", "select", { options: [...channels] }),
+        f("source", "Lead source", "select", {
+          options: channels.map(value => ({ value, label: value === "Phone" ? "Phone call · source unknown" : value })),
+          hint: "For calls to your regular number, keep Phone when the source is unknown. Select an ad source only when call tracking identifies it.",
+        }),
         f("lead_stream", "Lead stream", "select", { options: leadStreams.map(value => ({ value, label: marketingStreamLabel(value) })) }),
         f("campaign", "Campaign"),
         f("status", "Status", "select", { options: leadStatuses.map(value=>({value,label:value==="won"?"Sold":title(value)})) }),
@@ -515,7 +520,7 @@ export function AdminWorkspace({
     if (user.role !== "owner" && r.login_role === "owner") return;
     const availability = Array.isArray(r.availability) ? r.availability : Array.from({ length: 7 }, (_, weekday) => ({ weekday, available: weekday > 0 && weekday < 6, start_minute: 480, end_minute: 1020 }));
     const canSetRole = allowedSections.includes("team") && !["owner", "admin"].includes(s(r.login_role));
-    edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", login_role: "staff", hourly_rate_cents: 10, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : "Login password (12+ characters)", "password", { required: !r.user_id }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"], hint: "Job title. Dashboard permissions are set by the login access role." }), ...(canSetRole ? [f("login_role", "Login access role", "select", { options: [{ value: "staff", label: "Detailer — My Schedule and time clock only" }, { value: "manager", label: "Manager — operations, employees and payroll" }], hint: "Owner and admin accounts are managed in Team → Team Access." })] : []), f("hourly_rate_cents", "Starting hourly rate ($)", "money", { hint: "New Detailers start on an hourly + 30% plan. Use Pay settings after saving to customize the plan.", visibleWhen: (values) => !values.id }), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => { const { hourly_rate_cents, login_role, ...profile } = d; return { ...profile, ...(canSetRole ? { login_role } : {}), ...(!profile.id ? { hourly_rate_cents } : {}), hire_date: d.hire_date || null }; });
+    edit(r.id ? "Edit employee" : "Add employee", "save_employee", { name: "", phone: "", email: "", password: "", position: "Detailer", login_role: "staff", hourly_rate_cents: 10, max_weekly_minutes: 2400, hire_date: "", notes: "", active: true, availability, ...r }, [f("name", "Full name", "text", { required: true }), f("phone", "Phone number", "tel", { required: true }), f("email", "Employee login email", "email", { required: true }), f("password", r.user_id ? "New login password (leave blank to keep)" : r.id ? "Password (only needed for a new login)" : "Login password (12+ characters)", "password", { required: !r.id, hint: r.id && !r.user_id ? "If this email already has a team login, leave blank to keep that password and link the profile." : "Use at least 12 characters. Share the login details directly with this employee." }), f("position", "Position", "select", { options: ["Manager", "Lead Detailer", "Detailer", "Washer", "Reception", "Admin"], hint: "Job title. Dashboard permissions are set by the login access role." }), ...(canSetRole ? [f("login_role", "Login access role", "select", { options: [{ value: "staff", label: "Detailer — My Schedule and time clock only" }, { value: "manager", label: "Manager — operations, employees and payroll" }], hint: "Owner and admin accounts are managed in Team → Team Access." })] : []), f("hourly_rate_cents", "Starting hourly rate ($)", "money", { hint: "New Detailers start on an hourly + 30% plan. Use Pay settings after saving to customize the plan.", visibleWhen: (values) => !values.id }), f("max_weekly_minutes", "Weekly hour cap (minutes)", "number", { min: 60, max: 10080, hint: "2,400 minutes = 40 hours" }), f("hire_date", "Hire date", "date"), f("active", "Active employee", "checkbox"), f("availability", "Weekly availability", "availability", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => { const { hourly_rate_cents, login_role, ...profile } = d; return { ...profile, ...(canSetRole ? { login_role } : {}), ...(!profile.id ? { hourly_rate_cents } : {}), hire_date: d.hire_date || null }; });
   }
   function expenseEdit(r: R = {}) {
     edit(r.id ? "Edit expense" : "Add expense", "save_expense", { expense_date: dateToday(), amount_cents: 0, category: "Supplies", vendor: "", description: "", payment_method: "Card", funding_source: "Business", payment_account: "", marketing_stream: "", recurrence: "one_time", recurring_start: "", recurring_end: "", receipt_url: "", notes: "", ...r, ...(r.amount_cents != null ? { amount_cents: n(r.amount_cents) / 100 } : {}) }, [f("expense_date", "Date", "date", { required: true }), f("amount_cents", "Amount ($)", "money", { required: true }), f("category", "Category", "select", { options: ["Rent", "Utilities", "Payroll", "Chemicals", "Equipment", "Supplies", "Insurance", "Advertising", "Software", "Vehicle", "Repairs", "Taxes / Fees", "Other"] }), f("vendor", "Vendor"), f("payment_method", "Payment method", "select", { options: ["Card", "Cash", "ACH", "Check", "Other"] }), f("funding_source", "Paid from", "select", { options: ["Business", "Partner", "Unassigned"] }), f("payment_account", "Payment account", "text", { hint: "A label such as Business checking or Card ending 1234. Do not enter full account numbers." }), f("marketing_stream", "Marketing source (optional)", "select", { options: [{value:"",label:"Not a marketing expense"},{value:"business-google",label:"Business Google"},{value:"business-meta",label:"Business Meta"},{value:"dima-google",label:"Partner Google"}] }), f("recurrence", "Frequency", "select", { options: [{ value: "one_time", label: "One-time" }, { value: "weekly", label: "Weekly" }, { value: "monthly", label: "Monthly" }, { value: "yearly", label: "Yearly" }] }), f("recurring_start", "Recurring start", "date"), f("recurring_end", "Recurring end (optional)", "date"), f("receipt_url", "Receipt", "upload"), f("description", "Description", "textarea", { wide: true }), f("notes", "Notes", "textarea", { wide: true })], (d) => ({ ...d, recurring_start: d.recurring_start || null, recurring_end: d.recurring_end || null }));
@@ -857,7 +862,7 @@ export function AdminWorkspace({
           : []),
         <>
           <button onClick={() => bookingEdit(r)}>Manage</button>
-          {!staff && rows(r.line_items).filter((item) => item.kind === "base_service").length > 1 && <button onClick={() => servicePricesEdit(r)}>Service prices</button>}
+          {!staff && (rows(r.line_items).filter((item) => item.kind === "base_service").length > 1 || rows(r.line_items).some((item) => item.kind === "upsell" || item.quote_pending)) && <button onClick={() => servicePricesEdit(r)}>Service prices</button>}
           {!staff && <button onClick={() => upsellEdit(r)}>Add upsell</button>}
           {!staff && <button onClick={() => discountEdit(r)}>Discount</button>}
           {!staff && <button onClick={() => tipEdit(r)}>Record cash tip</button>}
@@ -957,7 +962,7 @@ export function AdminWorkspace({
           <p className="small-note">Each employee gets a separate login. Detailers see only their own assigned work, schedule and time clock. Managers can add detailers and manage payroll; admins set login access roles. Scheduled hours are separate from actual clocked hours.</p>
           {table(["Employee", "Position & access", "Phone", "Status", "Default pay plan", "Scheduled this week", "Actions"], list.map((r) => [
             <><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>,
-            <>{s(r.position)}<small>{accessRoleLabel(s(r.login_role) || "staff")} access</small></>, s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
+            <>{s(r.position)}<small>{!r.user_id ? "Login not linked" : !r.login_active ? "Login disabled" : `${accessRoleLabel(s(r.login_role) || "staff")} access`}</small></>, s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
             compensationPlanLabel(r), (n(r.scheduled_minutes) / 60).toFixed(1) + "h",
             <>{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit profile</button>}
               {allowedSections.includes("payroll") && !staff && <button className="button" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Commission & pay</button>}</>,
@@ -1057,7 +1062,7 @@ export function AdminWorkspace({
         <section className="paper empty-state">
           <p className="eyebrow">EMPLOYEE WORKSPACE</p>
           <h2>This login is not linked to a detailer profile.</h2>
-          <p>Your manager can link this account from Employees. Once linked, your published shifts, assigned jobs, and time clock will appear here.</p>
+          <p>Your manager can open Employees, edit your profile with the same login email, and enable Active employee. Your published shifts, assigned jobs and time clock will then appear here.</p>
           {user.role !== "staff" && <Link className="button" href="/admin/employees">Open employees</Link>}
         </section>
       )}
@@ -1068,7 +1073,7 @@ export function AdminWorkspace({
             {table(["Date", "Shift", "Break", "Notes"], rows(data.shifts).map((r) => [s(r.shift_date), timeLabel(n(r.start_minute)) + " - " + timeLabel(n(r.end_minute)), n(r.break_minutes) + " min", s(r.notes) || "-"]))}
           </section>
           <section className="paper"><div className="section-heading"><div><p className="eyebrow">ASSIGNED WORK</p><h2>Upcoming appointments</h2></div></div>
-            {table(["When", "Customer", "Vehicle", "Service", "Location", "Status", "Actions"], rows(data.appointments).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))} - {timeLabel(n(r.start_minute) + n(r.duration_minutes))}</small></>, <><strong>{s(r.customer_name)}</strong><small>{s(r.phone)}</small></>, s(r.vehicle) || "Vehicle details pending", <><strong>{s(r.service_name)}</strong><small>{s(r.reference)} · {money(r.price_cents == null ? null : n(r.price_cents))}</small></>, <><strong>{s(r.location)}</strong><small>{s(r.notes) || "No access notes"}</small></>, status(r.status), <><button onClick={() => bookingEdit(r)}>View job</button>{r.status === "in_progress" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "completed" }, "Job marked complete.")}>Complete job</button> : r.status !== "completed" && r.status !== "cancelled" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "in_progress" }, "Job started.")}>Start job</button> : null}</>]))}
+            {table(["When", "Customer", "Vehicle", "Service", "Location", "Status", "Actions"], rows(data.appointments).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))} - {timeLabel(n(r.start_minute) + n(r.duration_minutes))}</small></>, <><strong>{s(r.customer_name)}</strong><small>{s(r.phone)}</small></>, s(r.vehicle) || "Vehicle details pending", <><strong>{s(r.service_name)}</strong><small>{s(r.reference)}{!staff && <> · {money(r.price_cents == null ? null : n(r.price_cents))}</>}</small></>, <><strong>{s(r.location)}</strong><small>{s(r.notes) || "No access notes"}</small></>, status(r.status), <><button onClick={() => bookingEdit(r)}>View job</button>{r.status === "in_progress" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "completed" }, "Job marked complete.")}>Complete job</button> : r.status !== "completed" && r.status !== "cancelled" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "in_progress" }, "Job started.")}>Start job</button> : null}</>]))}
           </section>
           <section className="paper"><h2>Recent time entries</h2>{table(["Clock in", "Clock out", "Break", "Worked"], rows(data.entries).map((r) => [stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "In progress", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h"]))}</section>
         </>
@@ -1851,7 +1856,7 @@ export function AdminWorkspace({
             ],
             list.map((r) => [
               <>
-                {s(r.first_name)} {s(r.last_name)}
+                {[s(r.first_name), s(r.last_name)].filter(Boolean).join(" ") || s(r.email) || s(r.phone) || "Customer"}
                 <small>Since {stamp(r.created_at)}</small>
                 <RecordTags kind="customer" id={s(r.id)} tags={crmTagRows(r.tags)} catalog={crmTagRows(data.tags)}/>
               </>,
@@ -1875,6 +1880,14 @@ export function AdminWorkspace({
           )}
         </>
       )}
+      {section === "customers" && ["owner", "admin"].includes(user.role) && <SquareCustomerHistory onImported={() => router.refresh()} />}
+      {section === "settings" && ["owner", "admin"].includes(user.role) && <TestDataCleanup />}
+      {section === "leads" && <section className="paper">
+        <p className="eyebrow">PHONE ENQUIRIES</p>
+        <h2>Record the call. Keep the source accurate.</h2>
+        <p>Calls to one shared phone number do not identify the ad or website that brought the caller. Use <strong>Phone call · source unknown</strong> until a tracking number or call report confirms the source.</p>
+        <p className="small-note">Google Ads call reporting covers calls from ads. To distinguish your website, Google Business and other campaigns, use dedicated tracking numbers that forward to your existing number. Website phone clicks measure intent, not answered calls.</p>
+      </section>}
       {section === "leads" && allowedSections.includes("marketing") && <MetaLeadForms />}
       {section === "leads" &&
         table(

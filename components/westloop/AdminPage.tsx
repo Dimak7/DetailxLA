@@ -4,6 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import { sessionFromToken, sessionCookie, access, AppError } from "@/lib/platform/auth";
 import { adminData } from "@/lib/platform/admin";
 import { settings, publicSettings } from "@/lib/platform/settings";
+import { adminLandingPage } from "@/lib/platform/admin-navigation";
 import { AdminWorkspace } from "./AdminWorkspace";
 export async function AdminPage({
   section,
@@ -16,7 +17,8 @@ export async function AdminPage({
     (await cookies()).get(sessionCookie)?.value || "",
   );
   if (!user) redirect("/admin/login");
-  if (!access[section]?.includes(user.role)) notFound();
+  if (!access[section]) notFound();
+  if (!access[section].includes(user.role)) redirect(adminLandingPage(user.role));
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(await searchParams))
     if (typeof v === "string") params.set(k, v);

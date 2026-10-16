@@ -87,9 +87,11 @@ export function PublicHeader({ business }: { business: BusinessSettings }) {
 }
 
 export function PublicFooter({ business, showBookingCTA = true, mobileBookingCTA = showBookingCTA, mobileBookingHref = "/booking" }: { business: BusinessSettings; showBookingCTA?: boolean; mobileBookingCTA?: boolean; mobileBookingHref?: string }) {
+  const pathname = usePathname();
+  const inBooking = pathname === "/booking" || pathname.startsWith("/booking/");
   return (
     <>
-      {showBookingCTA && <section className="ceramics-final-cta" aria-labelledby="final-cta-heading">
+      {showBookingCTA && !inBooking && <section className="ceramics-final-cta" aria-labelledby="final-cta-heading">
         <div className="wrap ceramics-final-inner">
           <div><p className="eyebrow">READY WHEN YOU ARE</p><h2 id="final-cta-heading">Give your car the finish it deserves.</h2><p>Compare the services, choose the care that fits and reserve your time online. Your estimate, appointment details and any required deposit are shown before confirmation.</p></div>
           <div className="ceramics-final-actions"><Link href="/booking" className="button">Book an appointment</Link><Link href="/services" className="text-link">View services & pricing</Link></div>
@@ -114,7 +116,7 @@ export function PublicFooter({ business, showBookingCTA = true, mobileBookingCTA
           <p>Website &amp; product designed and developed by <strong>Operopsy LLC.</strong><span>Copyright © {new Date().getFullYear()}</span></p>
         </div>
       </a>
-      <div className="mobile-bar ceramics-mobile-bar"><Link className="button small" href={mobileBookingCTA ? mobileBookingHref : "/contact"}>{mobileBookingCTA ? "Book appointment" : "Contact the studio"}</Link><CallLink phone={business.phone} className="button small outline" /></div>
+      {!inBooking && <div className="mobile-bar ceramics-mobile-bar"><Link className="button small" href={mobileBookingCTA ? mobileBookingHref : "/contact"}>{mobileBookingCTA ? "Book appointment" : "Contact the studio"}</Link><CallLink phone={business.phone} className="button small outline" /></div>}
     </>
   );
 }

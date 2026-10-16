@@ -81,6 +81,8 @@ async function preparePayment(
       ["cancelled", "no_show"].includes(current.status)
     )
       throw new AppError("This appointment cannot be paid online.");
+    if ((await q("SELECT id FROM wl.booking_line_items WHERE booking_id=$1 AND quote_pending LIMIT 1", [bookingId])).rows.length)
+      throw new AppError("An upgrade quote must be agreed before creating an invoice.");
     const environment = squareEnvironment(), activeLocation = await secret("square_location_id");
     if((await q("SELECT booking_id FROM wl.square_invoices WHERE booking_id=$1 AND environment=$2",[bookingId,environment])).rows.length)throw new AppError("Use this booking’s Square invoice to collect payment.");
     const unclassified = (await q(

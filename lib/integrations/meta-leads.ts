@@ -40,8 +40,8 @@ async function graphLead(id:string){
 export async function importMetaLead(event:{leadgen_id:string;page_id:string;form_id:string},input:unknown){
  const contact=metaLeadContact(input);if(contact.data.id!==event.leadgen_id||contact.data.form_id!==event.form_id)throw new AppError("Meta lead does not match the subscribed form.");
  const business=await settings();return transaction(async q=>{
-  const locked=(await q<{lead_id:string|null}>("SELECT lead_id FROM wl.meta_lead_events WHERE leadgen_id=$1 FOR UPDATE",[event.leadgen_id])).rows[0];
-  if(!locked||locked.lead_id)return false;
+  const locked=(await q<{lead_id:string|null;imported_at:string|null}>("SELECT lead_id,imported_at FROM wl.meta_lead_events WHERE leadgen_id=$1 FOR UPDATE",[event.leadgen_id])).rows[0];
+  if(!locked||locked.lead_id||locked.imported_at)return false;
   const config=(await q<{value:MetaLeadsConfig}>("SELECT value FROM wl.settings WHERE key='meta_leads'" )).rows[0]?.value;
   if(!config||config.page_id!==event.page_id||!config.form_ids.includes(event.form_id))throw new AppError("This form is no longer connected.");
   const id=randomUUID(),session=randomUUID(),attribution=await saveAttribution(q,session,{source:"meta",medium:"paid_social",lead_stream:"business-meta",campaign:contact.data.campaign_id||"",content:contact.data.ad_id||""});

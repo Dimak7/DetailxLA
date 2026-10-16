@@ -83,7 +83,8 @@ async function syncBookingFinancialTotal(q: Query, bookingId: string) {
   const totals = (await q<Row>(
     `SELECT
       COALESCE((SELECT SUM(quantity*unit_price_cents) FROM wl.booking_line_items WHERE booking_id=$1),0)::int gross_cents,
-      COALESCE((SELECT SUM(amount_cents) FROM wl.booking_discounts WHERE booking_id=$1),0)::int discount_cents`,
+      COALESCE((SELECT SUM(amount_cents) FROM wl.booking_discounts WHERE booking_id=$1),0)::int discount_cents,
+      EXISTS(SELECT 1 FROM wl.booking_line_items WHERE booking_id=$1 AND quote_pending) quote_pending`,
     [bookingId],
   )).rows[0];
   const grossCents = Number(totals.gross_cents || 0);
@@ -91,7 +92,7 @@ async function syncBookingFinancialTotal(q: Query, bookingId: string) {
   const netCents = Math.max(0, grossCents - discountCents);
   // Adding an upsell or a discount cannot turn an unpriced quote into an agreed invoice.
   // A manager sets the agreed total explicitly after each requested service is priced.
-  await q("UPDATE wl.bookings SET price_cents=$2,updated_at=now() WHERE id=$1", [bookingId, booking.price_cents === null ? null : netCents]);
+  await q("UPDATE wl.bookings SET price_cents=$2,updated_at=now() WHERE id=$1", [bookingId, booking.price_cents === null || totals.quote_pending ? null : netCents]);
   return { grossCents, discountCents, netCents };
 }
 function operationalReport(full: Awaited<ReturnType<typeof report>>) {
@@ -208,7 +209,7 @@ export async function adminData(
     const week = p.get("week") || (await import("./types")).dateToday();
     return {
       rows: await query(
-        `SELECT e.*,COALESCE(u.role,'staff') login_role,COALESCE((SELECT SUM(s.end_minute-s.start_minute-s.break_minutes) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text AND s.status='scheduled'),0)::int scheduled_minutes,
+        `SELECT e.*,COALESCE(u.role,'staff') login_role,COALESCE(u.active,false) login_active,COALESCE((SELECT SUM(s.end_minute-s.start_minute-s.break_minutes) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date BETWEEN $1::date::text AND ($1::date+6)::text AND s.status='scheduled'),0)::int scheduled_minutes,
          (SELECT min(s.shift_date) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND s.status='scheduled') next_shift
          FROM wl.employees e LEFT JOIN wl.users u ON u.id=e.user_id WHERE u.removed_at IS NULL ORDER BY e.active DESC,e.name`, [week]),
       availability: await query("SELECT * FROM wl.employee_availability ORDER BY employee_id,weekday"),
@@ -386,7 +387,7 @@ export async function adminData(
     )[0].total;
     const fields = staff
       ? "b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.customer_id,b.notes,b.location,b.assigned_to"
-      : `b.*,EXISTS(SELECT 1 FROM wl.payments pc WHERE pc.booking_id=b.id AND pc.status IN ('pending','paid','partially_refunded','refunded') AND ((pc.provider='square' AND COALESCE(pc.metadata->>'square_environment','production')='${squareEnvironment()}') OR (pc.provider<>'square' AND '${squareEnvironment()}'='production'))) has_checkout,(SELECT row_to_json(si) FROM wl.square_invoices si WHERE si.booking_id=b.id AND si.environment='${squareEnvironment()}') square_invoice,${squareEnvironment()==='sandbox'?"COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.provider='square' AND p.metadata->>'square_environment'='sandbox' AND p.status IN ('paid','partially_refunded','refunded')),0)":"COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded') AND (p.provider<>'square' OR p.metadata->>'square_environment'='production')),0)"} collected_cents,COALESCE((SELECT jsonb_agg(jsonb_build_object('employee_id',a.employee_id,'name',e.name,'pool_share_bps',a.pool_share_bps,'tip_override_cents',a.tip_override_cents)) FROM wl.employee_job_assignments a JOIN wl.employees e ON e.id=a.employee_id WHERE a.booking_id=b.id),'[]'::jsonb) job_assignments,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',li.id,'service_id',li.service_id,'kind',li.kind,'name',li.name,'quantity',li.quantity,'unit_price_cents',li.unit_price_cents) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items`;
+      : `b.*,EXISTS(SELECT 1 FROM wl.payments pc WHERE pc.booking_id=b.id AND pc.status IN ('pending','paid','partially_refunded','refunded') AND ((pc.provider='square' AND COALESCE(pc.metadata->>'square_environment','production')='${squareEnvironment()}') OR (pc.provider<>'square' AND '${squareEnvironment()}'='production'))) has_checkout,(SELECT row_to_json(si) FROM wl.square_invoices si WHERE si.booking_id=b.id AND si.environment='${squareEnvironment()}') square_invoice,${squareEnvironment()==='sandbox'?"COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.provider='square' AND p.metadata->>'square_environment'='sandbox' AND p.status IN ('paid','partially_refunded','refunded')),0)":"COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded') AND (p.provider<>'square' OR p.metadata->>'square_environment'='production')),0)"} collected_cents,COALESCE((SELECT jsonb_agg(jsonb_build_object('employee_id',a.employee_id,'name',e.name,'pool_share_bps',a.pool_share_bps,'tip_override_cents',a.tip_override_cents)) FROM wl.employee_job_assignments a JOIN wl.employees e ON e.id=a.employee_id WHERE a.booking_id=b.id),'[]'::jsonb) job_assignments,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',li.id,'service_id',li.service_id,'kind',li.kind,'name',li.name,'quantity',li.quantity,'unit_price_cents',li.unit_price_cents,'quote_pending',li.quote_pending) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items`;
     args.push(
       section === "calendar" ? 2000 : limit,
       section === "calendar" ? 0 : offset,
@@ -492,7 +493,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     if (user.role === "staff")
       throw new AppError("A manager must change appointment pricing.", 403);
     const item = z.object({ id: uuid.optional(), booking_id: uuid, service_id: uuid.nullable().optional(), kind: z.enum(["base_service","upsell"]), name: z.string().trim().min(2).max(160), quantity: z.number().int().min(1).max(1000).default(1), unit_price_cents: z.number().int().min(0).max(100000000) }).parse(data);
-    if (item.kind === "base_service") item.name = item.name.replace(/ · By quote$/i, "");
+    item.name = item.name.replace(/ · By quote$/i, "");
     const id = item.id || randomUUID();
     return transaction(async (q) => {
       const booking = (await q<{ service_id: string; service_snapshot: BookingSnapshot }>("SELECT service_id,service_snapshot FROM wl.bookings WHERE id=$1 FOR UPDATE", [item.booking_id])).rows[0];
@@ -510,13 +511,13 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         serviceId = existing.service_id || booking.service_id;
       }
       await syncBookingFinancialTotal(q, item.booking_id);
-      await q("INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(id) DO UPDATE SET kind=$4,name=$5,quantity=$6,unit_price_cents=$7", [id,item.booking_id,serviceId,item.kind,item.name,item.quantity,item.unit_price_cents,user.user_id]);
+      await q("INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(id) DO UPDATE SET kind=$4,name=$5,quantity=$6,unit_price_cents=$7,quote_pending=false", [id,item.booking_id,serviceId,item.kind,item.name,item.quantity,item.unit_price_cents,user.user_id]);
       if (booking.service_snapshot.selected_services?.length) {
-        const serviceTotals = (await q<{ base_cents: number; total_cents: number }>(
-          "SELECT COALESCE(SUM(quantity*unit_price_cents) FILTER(WHERE kind='base_service'),0)::int base_cents,COALESCE(SUM(quantity*unit_price_cents),0)::int total_cents FROM wl.booking_line_items WHERE booking_id=$1 AND COALESCE(service_id,$2::uuid)=$3::uuid", [item.booking_id,booking.service_id,serviceId],
+        const serviceTotals = (await q<{ base_cents: number; total_cents: number; quote_pending: boolean }>(
+          "SELECT COALESCE(SUM(quantity*unit_price_cents) FILTER(WHERE kind='base_service'),0)::int base_cents,COALESCE(SUM(quantity*unit_price_cents),0)::int total_cents,COALESCE(BOOL_OR(quote_pending),false) quote_pending FROM wl.booking_line_items WHERE booking_id=$1 AND COALESCE(service_id,$2::uuid)=$3::uuid", [item.booking_id,booking.service_id,serviceId],
         )).rows[0];
         const snapshot = { ...booking.service_snapshot, selected_services: booking.service_snapshot.selected_services.map((service) => service.id === serviceId
-          ? { ...service, base_cents: item.kind === "base_service" ? Number(serviceTotals.base_cents) : service.base_cents, total_cents: service.base_cents === null && item.kind !== "base_service" ? null : Number(serviceTotals.total_cents) }
+          ? { ...service, selected_addons: service.selected_addons?.map((addon) => addon.line_item_id === id ? { ...addon, priceCents: item.quantity * item.unit_price_cents } : addon), base_cents: item.kind === "base_service" ? Number(serviceTotals.base_cents) : service.base_cents, total_cents: serviceTotals.quote_pending || (service.base_cents === null && item.kind !== "base_service") ? null : Number(serviceTotals.total_cents) }
           : service) };
         await q("UPDATE wl.bookings SET service_snapshot=$2::jsonb WHERE id=$1", [item.booking_id,JSON.stringify(snapshot)]);
       }
@@ -714,7 +715,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     return requirement;
   }
   if (action === "save_employee") {
-    const e = z.object({ id: uuid.optional(), name: z.string().trim().min(2).max(100), phone: z.string().min(7).max(30), email: z.email(), password: z.string().max(128).optional(), login_role: z.enum(["staff", "manager"]).optional(), position: z.string().min(2).max(80), hourly_rate_cents: z.number().int().min(0).max(100000000).optional(), max_weekly_minutes: z.number().int().min(60).max(10080).default(2400), hire_date: z.string().max(10).nullable(), notes: txt, active: z.boolean(), availability: z.array(z.object({ weekday: z.number().int().min(0).max(6), available: z.boolean(), start_minute: z.number().int().min(0).max(1439), end_minute: z.number().int().min(1).max(1440) })).length(7) }).parse(data);
+    const e = z.object({ id: uuid.optional(), name: z.string().trim().min(2).max(100), phone: z.string().min(7).max(30), email: z.string().trim().toLowerCase().pipe(z.email()), password: z.string().max(128).optional(), login_role: z.enum(["staff", "manager"]).optional(), position: z.string().min(2).max(80), hourly_rate_cents: z.number().int().min(0).max(100000000).optional(), max_weekly_minutes: z.number().int().min(60).max(10080).default(2400), hire_date: z.string().max(10).nullable(), notes: txt, active: z.boolean(), availability: z.array(z.object({ weekday: z.number().int().min(0).max(6), available: z.boolean(), start_minute: z.number().int().min(0).max(1439), end_minute: z.number().int().min(1).max(1440) })).length(7) }).parse(data);
     if (user.role === "manager" && e.login_role && e.login_role !== "staff")
       throw new AppError("Only an administrator can grant manager access.", 403);
     if (e.password && e.password.length < 12)
@@ -725,6 +726,20 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       const existing = e.id ? (await q<{ user_id: string | null; hourly_rate_cents: number }>("SELECT user_id,hourly_rate_cents FROM wl.employees WHERE id=$1 FOR UPDATE", [id])).rows[0] : undefined;
       if (e.id && !existing) throw new AppError("Employee not found.", 404);
       let userId = existing?.user_id || null;
+      const matchingAccounts = (await q<{ id: string; role: Session["role"]; removed_at: string | null }>(
+        "SELECT id,role,removed_at FROM wl.users WHERE lower(btrim(email))=$1 FOR UPDATE", [e.email],
+      )).rows;
+      if (matchingAccounts.length > 1) throw new AppError("More than one team login uses this email. An administrator must resolve the duplicate accounts first.");
+      const matchingAccount = matchingAccounts[0];
+      if (matchingAccount && matchingAccount.id !== userId) {
+        if (userId) throw new AppError("Another team login already uses this email. Choose that person's existing employee profile.");
+        if (matchingAccount.removed_at) throw new AppError("Restore this person in Team Access before linking their employee profile.");
+        if ((user.role === "manager" && matchingAccount.role !== "staff") || (user.role === "admin" && matchingAccount.role === "owner"))
+          throw new AppError("Your role cannot change this employee account.", 403);
+        const linkedProfile = (await q("SELECT id FROM wl.employees WHERE user_id=$1", [matchingAccount.id])).rows[0];
+        if (linkedProfile) throw new AppError("This login already has an employee profile. Edit that profile instead of adding another.");
+        userId = matchingAccount.id;
+      }
       if (!userId) {
         if (!e.password || e.password.length < 12) throw new AppError("Set an employee login password of at least 12 characters.");
         userId = randomUUID();
@@ -748,7 +763,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       // New Detailers start on the previous default plan. Editing an existing
       // employee, including their position, never resets their chosen pay settings.
       const detailer = e.position.toLowerCase() === "detailer";
-      await q("INSERT INTO wl.employees(id,user_id,name,email,phone,position,hourly_rate_cents,max_weekly_minutes,hire_date,notes,active,compensation_model,default_commission_bps) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(id) DO UPDATE SET user_id=$2,name=$3,email=$4,phone=$5,position=$6,hourly_rate_cents=$7,max_weekly_minutes=$8,hire_date=$9,notes=$10,active=$11,updated_at=now()", [id,userId,e.name,e.email,e.phone,e.position,existing ? existing.hourly_rate_cents : e.hourly_rate_cents,e.max_weekly_minutes,e.hire_date,e.notes,e.active,detailer ? "hourly_commission" : "hourly",detailer ? 3000 : 0]);
+      await q("INSERT INTO wl.employees(id,user_id,name,email,phone,position,hourly_rate_cents,max_weekly_minutes,hire_date,notes,active,compensation_model,default_commission_bps) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(id) DO UPDATE SET user_id=$2,name=$3,email=$4,phone=$5,position=$6,hourly_rate_cents=$7,max_weekly_minutes=$8,hire_date=$9,notes=$10,active=$11,updated_at=now()", [id,userId,e.name,e.email.toLowerCase(),e.phone,e.position,existing ? existing.hourly_rate_cents : e.hourly_rate_cents,e.max_weekly_minutes,e.hire_date,e.notes,e.active,detailer ? "hourly_commission" : "hourly",detailer ? 3000 : 0]);
       for (const a of e.availability) await q("INSERT INTO wl.employee_availability(employee_id,weekday,available,start_minute,end_minute) VALUES($1,$2,$3,$4,$5) ON CONFLICT(employee_id,weekday) DO UPDATE SET available=$3,start_minute=$4,end_minute=$5",[id,a.weekday,a.available,a.start_minute,a.end_minute]);
     });
     return { id };
@@ -951,7 +966,17 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       .parse(data);
     await transaction(async (q) => {
       const leadId=l.id||randomUUID();
-      const attributionId = await saveAttribution(q, randomUUID(), {
+      const existing = l.id ? (await q<Row>(
+        `SELECT l.attribution_id,a.source,a.lead_stream,a.campaign
+         FROM wl.leads l LEFT JOIN wl.attributions a ON a.id=l.attribution_id
+         WHERE l.id=$1 FOR UPDATE OF l`, [l.id],
+      )).rows[0] : undefined;
+      // Editing contact details or status must retain the original click IDs and landing page.
+      const sameAttribution = existing?.attribution_id &&
+        (existing.source || "Direct") === l.source &&
+        (existing.lead_stream || "Unassigned") === l.lead_stream &&
+        (existing.campaign || "") === l.campaign;
+      const attributionId = sameAttribution ? existing.attribution_id : await saveAttribution(q, randomUUID(), {
         source: l.source,
         lead_stream: l.lead_stream,
         campaign: l.campaign,
@@ -1037,7 +1062,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       .object({
         id: uuid.optional(),
         name: z.string().min(2).max(80),
-        email: z.email(),
+        email: z.string().trim().toLowerCase().pipe(z.email()),
         role: z.enum(["owner", "admin", "manager", "staff"]),
         password: z.string().max(128).default(""),
         active: z.boolean().default(true),
@@ -1055,6 +1080,8 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       throw new AppError("Add a valid phone number for the detailer profile.");
     const savedId = u.id || randomUUID();
     await transaction(async (q) => {
+      const duplicate = (await q("SELECT id FROM wl.users WHERE lower(btrim(email))=$1 AND id<>$2", [u.email, savedId])).rows[0];
+      if (duplicate) throw new AppError("A team login already uses this email. Edit the existing account in Team Access.");
       if (!u.id) {
         if (!u.password) throw new AppError("Use a password of at least 12 characters.");
         await q("INSERT INTO wl.users(id,name,email,password_hash,role,active) VALUES($1,$2,$3,$4,$5,$6)", [savedId,u.name,u.email.toLowerCase(),passwordHash(u.password),u.role,u.active]);
@@ -1076,16 +1103,23 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
         }
         await q("DELETE FROM wl.sessions WHERE user_id=$1", [u.id]);
       }
-      const employee = (await q<{ id: string }>(
+      let employee = (await q<{ id: string }>(
         "SELECT id FROM wl.employees WHERE user_id=$1 FOR UPDATE",
         [savedId],
       )).rows[0];
+      if (u.role === "staff" && !employee) {
+        const matches = (await q<{ id: string; user_id: string | null }>(
+          "SELECT id,user_id FROM wl.employees WHERE lower(btrim(email))=$1 FOR UPDATE", [u.email],
+        )).rows;
+        if (matches.length > 1 || matches[0]?.user_id) throw new AppError("This email matches another employee profile. Update the intended profile from Employees before creating team access.");
+        employee = matches[0];
+      }
       if (u.role === "staff") {
         const employeeId = employee?.id || randomUUID();
         await q(
           `INSERT INTO wl.employees(id,user_id,name,email,phone,position,active)
            VALUES($1,$2,$3,$4,$5,$6,$7)
-           ON CONFLICT(user_id) DO UPDATE SET name=$3,email=$4,phone=$5,position=$6,active=$7,updated_at=now()`,
+           ON CONFLICT(id) DO UPDATE SET user_id=$2,name=$3,email=$4,phone=$5,position=$6,active=$7,updated_at=now()`,
           [employeeId,savedId,u.name,u.email.toLowerCase(),u.phone,u.position || "Detailer",u.active],
         );
         if (!employee)

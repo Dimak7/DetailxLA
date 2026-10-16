@@ -87,7 +87,7 @@ export function BookingConfirmation({ initialReceipt, token, checkoutHint, cance
           <p className={styles.eyebrow}>APPOINTMENT DETAILS</p>
           <h2 id="appointment-details">{receipt.serviceName}</h2>
           {(receipt.lineItems?.length ?? 0) > 1 && <ul className={styles.services} aria-label="Selected services and extras">
-            {receipt.lineItems!.map((item) => <li key={item.id}><span>{item.name}{item.quantity > 1 ? ` × ${item.quantity}` : ""}</span><strong>{money(item.totalCents)}</strong></li>)}
+            {receipt.lineItems!.map((item) => <li key={item.id}><span>{item.name}{item.quantity > 1 ? ` × ${item.quantity}` : ""}</span><strong>{item.totalCents === null ? "By quote" : money(item.totalCents)}</strong></li>)}
           </ul>}
           <dl className={styles.details}>
             <div><dt>Date</dt><dd>{appointmentDate(receipt.date)}</dd></div>

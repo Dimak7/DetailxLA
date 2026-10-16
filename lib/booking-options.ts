@@ -3,7 +3,7 @@ import { priceFor, type Service } from "./platform/types";
 export type BookingAddOn = {
   id: string;
   name: string;
-  priceCents: number;
+  priceCents: number | null;
   description: string;
 };
 
@@ -21,32 +21,31 @@ export type BookingServiceChoice = {
 };
 
 const addOns: Record<string, BookingAddOn> = {
-  "engine-bay": { id: "engine-bay", name: "Engine Bay", priceCents: 6500, description: "A careful clean and finish for accessible engine-bay surfaces." },
-  "ceramic-sealant": { id: "ceramic-sealant", name: "Ceramic Sealant", priceCents: 3500, description: "Adds protection, gloss and water repellency to the exterior finish." },
-  "tar-removal": { id: "tar-removal", name: "Tar Removal", priceCents: 4500, description: "Targets bonded road tar that a routine hand wash cannot safely lift." },
+  "engine-bay": { id: "engine-bay", name: "Engine Bay", priceCents: 6000, description: "A careful clean and finish for accessible engine-bay surfaces." },
+  "ceramic-sealant": { id: "ceramic-sealant", name: "Ceramic Sealant", priceCents: 15000, description: "Gloss and water-repellent protection that lasts up to 6 months." },
+  "tar-removal": { id: "tar-removal", name: "Tar Removal", priceCents: null, description: "Targets bonded road tar that a routine hand wash cannot safely lift." },
+  "iron-removal": { id: "iron-removal", name: "Iron Removal", priceCents: null, description: "Targeted treatment for embedded iron particles. Priced after checking the paint condition." },
   "trim-restoration": { id: "trim-restoration", name: "Trim Restoration", priceCents: 4500, description: "Revives faded exterior trim for a darker, more even appearance." },
   "overspray-removal": { id: "overspray-removal", name: "Overspray Removal", priceCents: 17500, description: "Condition-based removal of suitable bonded paint mist and contamination." },
-  decontamination: { id: "decontamination", name: "Decontamination", priceCents: 5500, description: "Removes bonded surface contamination to leave the paint noticeably smoother." },
   "interior-trim-polish": { id: "interior-trim-polish", name: "Interior Trim Polish", priceCents: 8000, description: "Refines suitable gloss trim to reduce light haze and improve clarity." },
-  "headlight-restoration": { id: "headlight-restoration", name: "Headlight Restoration", priceCents: 7500, description: "Improves clarity on suitable oxidized headlight lenses and adds protection." },
-  "scratch-removal": { id: "scratch-removal", name: "Scratch Removal", priceCents: 15000, description: "Focused assessment and correction of suitable isolated paint scratches." },
+  "headlight-restoration": { id: "headlight-restoration", name: "Headlight Restoration", priceCents: 15000, description: "Restore clarity and add protection to both headlights. Price includes the pair." },
   "window-polish": { id: "window-polish", name: "Window Polish", priceCents: 22500, description: "Deep glass refinement for suitable mineral deposits and bonded contamination." },
   "chrome-polish": { id: "chrome-polish", name: "Chrome Polish", priceCents: 12500, description: "Restores clarity and shine to suitable exterior chrome surfaces." },
   "exhaust-tip-polish": { id: "exhaust-tip-polish", name: "Exhaust Tip Polish", priceCents: 2500, description: "Cleans and refines accessible exhaust tips for a crisp finishing detail." },
   "hair-removal": { id: "hair-removal", name: "Hair Removal", priceCents: 7500, description: "Additional time and tools for embedded pet hair throughout the cabin." },
   "heavy-soil": { id: "heavy-soil", name: "Heavy Soil / Stains", priceCents: 7500, description: "Extra treatment for heavily soiled areas and suitable stubborn stains." },
   "bio-clean": { id: "bio-clean", name: "Bio Clean", priceCents: 15000, description: "A deeper condition-based interior cleaning for biological contamination." },
-  ozone: { id: "ozone", name: "Ozone", priceCents: 7500, description: "An odor-treatment cycle after the source has been cleaned and removed." },
+  ozone: { id: "ozone", name: "Ozone Odor Treatment", priceCents: null, description: "An odor-treatment cycle after the source has been cleaned and removed." },
   "car-seat": { id: "car-seat", name: "Car Seat", priceCents: 1000, description: "Surface cleaning for one removable child car seat, when appropriate." },
 };
 
 const serviceAddOns: Record<string, string[]> = {
   "interior-detail": ["hair-removal", "heavy-soil", "bio-clean", "ozone", "car-seat", "interior-trim-polish"],
   "deep-interior-cleaning": ["bio-clean", "ozone", "car-seat", "interior-trim-polish"],
-  "exterior-detail": ["ceramic-sealant", "decontamination", "tar-removal", "trim-restoration", "engine-bay", "headlight-restoration", "scratch-removal", "exhaust-tip-polish"],
-  "full-detail": ["ceramic-sealant", "decontamination", "engine-bay", "hair-removal", "heavy-soil", "ozone"],
-  "ceramic-coating": ["decontamination", "trim-restoration", "window-polish", "chrome-polish", "exhaust-tip-polish"],
-  "paint-correction": ["ceramic-sealant", "trim-restoration", "headlight-restoration", "scratch-removal", "window-polish", "chrome-polish", "exhaust-tip-polish"],
+  "exterior-detail": ["ceramic-sealant", "tar-removal", "iron-removal", "trim-restoration", "engine-bay", "headlight-restoration", "exhaust-tip-polish"],
+  "full-detail": ["ceramic-sealant", "engine-bay", "headlight-restoration", "hair-removal", "heavy-soil", "ozone", "tar-removal", "iron-removal"],
+  "ceramic-coating": ["trim-restoration", "window-polish", "chrome-polish", "exhaust-tip-polish"],
+  "paint-correction": ["ceramic-sealant", "trim-restoration", "headlight-restoration", "window-polish", "chrome-polish", "exhaust-tip-polish"],
   "headlight-restoration": ["ceramic-sealant"],
 };
 
@@ -100,7 +99,8 @@ export function bookingSelection(
     selectedAddOns: selectedAddOns as BookingAddOn[],
     baseCents,
     addOnCents,
-    totalCents: baseCents === null ? null : baseCents + addOnCents,
+    knownCents: (baseCents ?? 0) + addOnCents,
+    totalCents: baseCents === null || selectedAddOns.some((item) => item?.priceCents === null) ? null : baseCents + addOnCents,
   };
 }
 
@@ -137,6 +137,7 @@ export function bookingCartSelection(
     totalCents: items.some((item) => item.totalCents === null)
       ? null
       : items.reduce((sum, item) => sum + item.totalCents!, 0),
+    knownCents: items.reduce((sum, item) => sum + item.knownCents, 0),
     durationMinutes: items.reduce((sum, item) => sum + item.service.duration_minutes, 0),
     requiresQuote: items.some((item) => item.totalCents === null || item.service.pricing_mode === "quote" || item.service.slug === "ceramic-coating"),
   };

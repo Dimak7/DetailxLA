@@ -324,7 +324,7 @@ export async function createBooking(value: unknown, admin = false) {
     const selectedServices = selection.items.map((item) => ({
       ...item.service,
       selected_package: item.selectedPackage || null,
-      selected_addons: item.selectedAddOns,
+      selected_addons: item.selectedAddOns.map((addOn) => ({ ...addOn, line_item_id: randomUUID() })),
       base_cents: item.baseCents,
       total_cents: item.totalCents,
     }));
@@ -360,15 +360,15 @@ export async function createBooking(value: unknown, admin = false) {
         ],
       )
     ).rows[0];
-    for (const item of selection.items) {
+    for (const [index, item] of selection.items.entries()) {
       await q(
-        "INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,$3,'base_service',$4,1,$5)",
-        [randomUUID(), id, item.service.id, itemName(item) + (item.baseCents === null && !itemName(item).includes("By Quote") ? " · By quote" : ""), item.baseCents ?? 0],
+        "INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents,quote_pending) VALUES($1,$2,$3,'base_service',$4,1,$5,$6)",
+        [randomUUID(), id, item.service.id, itemName(item) + (item.baseCents === null && !itemName(item).includes("By Quote") ? " · By quote" : ""), item.baseCents ?? 0, item.baseCents === null],
       );
-      for (const addOn of item.selectedAddOns)
+      for (const addOn of selectedServices[index].selected_addons)
         await q(
-          "INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents) VALUES($1,$2,$3,'upsell',$4,1,$5)",
-          [randomUUID(), id, item.service.id, addOn.name, addOn.priceCents],
+          "INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents,quote_pending) VALUES($1,$2,$3,'upsell',$4,1,$5,$6)",
+          [addOn.line_item_id, id, item.service.id, addOn.name, addOn.priceCents ?? 0, addOn.priceCents === null],
         );
     }
     const leadId = input.lead_id || null;
@@ -550,12 +550,14 @@ export async function updateBooking(
     }
     if(data.price_cents!==undefined&&data.price_cents!==b.price_cents&&(await q("SELECT booking_id FROM wl.square_invoices WHERE booking_id=$1",[id])).rows.length)throw new AppError("This job has a Square invoice. Keep its agreed price consistent with Square.");
     if (data.price_cents !== undefined && data.price_cents !== b.price_cents) {
-      const lines = (await q<{ id: string; service_id: string | null; kind: string; quantity: number; unit_price_cents: number }>(
-        "SELECT id,service_id,kind,quantity,unit_price_cents FROM wl.booking_line_items WHERE booking_id=$1 ORDER BY created_at,id FOR UPDATE", [id],
+      const lines = (await q<{ id: string; service_id: string | null; kind: string; quantity: number; unit_price_cents: number; quote_pending: boolean }>(
+        "SELECT id,service_id,kind,quantity,unit_price_cents,quote_pending FROM wl.booking_line_items WHERE booking_id=$1 ORDER BY created_at,id FOR UPDATE", [id],
       )).rows;
       if (lines.length) {
         if (data.price_cents === null)
           throw new AppError("Enter an agreed service price for this appointment's existing line items.");
+        if (lines.some((line) => line.kind === "upsell" && line.quote_pending))
+          throw new AppError("Enter an agreed price for each quoted upgrade in Service prices before setting the appointment total.");
         const baseLines = lines.filter((line) => line.kind === "base_service");
         const upsells = lines.filter((line) => line.kind === "upsell")
           .reduce((sum, line) => sum + line.quantity * line.unit_price_cents, 0);
@@ -588,7 +590,7 @@ export async function updateBooking(
           }
         }
         for (const [lineId, amount] of allocations)
-          await q("UPDATE wl.booking_line_items SET quantity=1,unit_price_cents=$2,name=regexp_replace(name,' · By quote$','','i') WHERE id=$1", [lineId, amount]);
+          await q("UPDATE wl.booking_line_items SET quantity=1,unit_price_cents=$2,quote_pending=false,name=regexp_replace(name,' · By quote$','','i') WHERE id=$1", [lineId, amount]);
         if (!baseLines.length)
           await q("INSERT INTO wl.booking_line_items(id,booking_id,service_id,kind,name,quantity,unit_price_cents,created_by) VALUES($1,$2,$3,'base_service',$4,1,$5,$6)", [randomUUID(), id, b.service_id, b.service_name, baseCents, actor]);
         if (b.service_snapshot.selected_services) {
@@ -604,6 +606,12 @@ export async function updateBooking(
         await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'booking',$3,'agreed_price_updated',$4::jsonb,$5::jsonb)",
           [randomUUID(), actor, id, JSON.stringify({ price_cents: b.price_cents, base_line_items: baseLines }), JSON.stringify({ price_cents: data.price_cents, base_service_cents: baseCents, upsell_cents: upsells, discount_cents: discount })]);
       }
+    }
+    if (status === "completed" && b.status !== "completed") {
+      const finalPrice = data.price_cents === undefined ? b.price_cents : data.price_cents;
+      const pendingQuote = (await q("SELECT id FROM wl.booking_line_items WHERE booking_id=$1 AND quote_pending LIMIT 1", [id])).rows.length > 0;
+      if (finalPrice === null || pendingQuote)
+        throw new AppError("A manager must agree the final price and resolve quoted items before this appointment can be completed.");
     }
     const next = (
       await q<Booking>(

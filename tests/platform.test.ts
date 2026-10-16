@@ -98,7 +98,7 @@ test("Relational platform integration", async (t) => {
       "booking creates a client and appointment without duplicating it as a lead",
       async () => {
         booking = await createBooking(input);
-        assert.equal(booking.booking.price_cents, 37500);
+        assert.equal(booking.booking.price_cents, 48500);
         const lineItems = await query<{
           kind: string;
           name: string;
@@ -117,8 +117,8 @@ test("Relational platform integration", async (t) => {
           })),
           [
             { kind: "base_service", name: "Exterior Detail", total_cents: 27500 },
-            { kind: "upsell", name: "Engine Bay", total_cents: 6500 },
-            { kind: "upsell", name: "Ceramic Sealant", total_cents: 3500 },
+            { kind: "upsell", name: "Engine Bay", total_cents: 6000 },
+            { kind: "upsell", name: "Ceramic Sealant", total_cents: 15000 },
           ],
         );
         assert.equal((await query("SELECT * FROM wl.customers")).length, 1);
@@ -214,7 +214,7 @@ test("Relational platform integration", async (t) => {
               }>;
             }
           ).line_items[0].base_price_money.amount,
-          37500,
+          48500,
         );
         const returnUrl = new URL(
           (
@@ -269,14 +269,14 @@ test("Relational platform integration", async (t) => {
         reason: "Returning customer",
         code: "WELCOME25",
       }, owner!) as unknown as { amount_cents: number; netCents: number };
-        assert.equal(result.amount_cents, 10500);
-        assert.equal(result.netCents, 31500);
+        assert.equal(result.amount_cents, 13250);
+        assert.equal(result.netCents, 39750);
         const financials = await jobFinancials(booking.booking.id);
         assert.equal(financials?.base_service_cents, 27500);
-        assert.equal(financials?.upsell_cents, 14500);
-        assert.equal(financials?.discount_cents, 10500);
-        assert.equal(financials?.net_service_cents, 31500);
-        assert.equal((await query<{ price_cents: number }>("SELECT price_cents FROM wl.bookings WHERE id=$1", [booking.booking.id]))[0].price_cents, 31500);
+        assert.equal(financials?.upsell_cents, 25500);
+        assert.equal(financials?.discount_cents, 13250);
+        assert.equal(financials?.net_service_cents, 39750);
+        assert.equal((await query<{ price_cents: number }>("SELECT price_cents FROM wl.bookings WHERE id=$1", [booking.booking.id]))[0].price_cents, 39750);
     });
     await t.test(
       "idempotent retries and concurrent overlap protection",
@@ -369,9 +369,17 @@ test("Relational platform integration", async (t) => {
             ),
           /assigned/,
         );
+        const workerProfile = (await query<{ id: string }>("SELECT id FROM wl.employees WHERE user_id=$1", [staff.user_id]))[0];
+        assert.ok(workerProfile, "a successfully authenticated staff login gets its worker profile");
+        await query("UPDATE wl.employees SET active=false WHERE id=$1", [workerProfile.id]);
         await assert.rejects(
           () => updateBooking(booking.booking.id, { assigned_to: staff.user_id }, owner!.user_id),
           /active detailer/,
+        );
+        await query("UPDATE wl.employees SET active=true WHERE id=$1", [workerProfile.id]);
+        await assert.rejects(
+          () => updateBooking(booking.booking.id, { assigned_to: staff.user_id }, owner!.user_id),
+          /not scheduled/,
         );
         await assert.rejects(
           () => adminData("bookings", new URLSearchParams(), staff),

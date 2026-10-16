@@ -2,10 +2,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Wordmark } from "./PublicShell";
-export function LoginForm({ token = "" }: { token?: string }) {
+export function LoginForm({ token = "", initialError = "", initialMessage = "" }: { token?: string; initialError?: string; initialMessage?: string }) {
   const [reset, setReset] = useState(!!token),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState(""),
+    [error, setError] = useState(initialError),
+    [message, setMessage] = useState(initialMessage),
     [busy, setBusy] = useState(false);
   return (
     <main id="main" className="login-wrap">
@@ -16,6 +16,8 @@ export function LoginForm({ token = "" }: { token?: string }) {
         <p className="eyebrow">BUSINESS WORKSPACE</p>
         <h1>{reset ? "A fresh start." : "Welcome back."}</h1>
         <form
+          method="post"
+          action={reset ? "/api/admin/reset" : "/api/admin/login"}
           onSubmit={async (e) => {
             e.preventDefault();
             setBusy(true);
@@ -52,6 +54,7 @@ export function LoginForm({ token = "" }: { token?: string }) {
             }
           }}
         >
+          {token && <input type="hidden" name="token" value={token} />}
           {!token && (
             <label className="field">
               <span>Email</span>
@@ -59,6 +62,8 @@ export function LoginForm({ token = "" }: { token?: string }) {
                 type="email"
                 name="email"
                 autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 required
               />
             </label>
@@ -109,8 +114,8 @@ export function LoginForm({ token = "" }: { token?: string }) {
           </button>
         )}
         <p className="small-note">
-          Authorized team members only. Initial owner access is configured
-          securely on the server.
+          Use the email and password your manager set for your team account.
+          Your role opens the workspace for your shifts, assigned jobs and tools.
         </p>
       </div>
     </main>

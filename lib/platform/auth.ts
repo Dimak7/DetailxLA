@@ -8,6 +8,7 @@ import {
 } from "node:crypto";
 import { query, transaction } from "./db";
 import type { Session, Role } from "./types";
+import { ensureStaffEmployeeProfile } from "./employee-profile";
 export const sessionCookie = "wl_session";
 export class AppError extends Error {
   constructor(
@@ -72,7 +73,7 @@ export async function sessionFromToken(token: string): Promise<Session | null> {
     (
       await query<Session>(
         `SELECT s.id,u.id user_id,u.name,u.email,u.role FROM wl.sessions s JOIN wl.users u ON u.id=s.user_id
- WHERE s.id=$1 AND s.expires_at>now() AND u.active=true`,
+ WHERE s.id=$1 AND s.expires_at>now() AND u.active=true AND u.removed_at IS NULL`,
         [hash(token)],
       )
     )[0] || null
@@ -122,22 +123,26 @@ export async function requireSession(request: Request, section = "bookings") {
   return s;
 }
 export async function login(email: string, password: string, ip: string) {
+  const normalizedEmail = email.toLowerCase().trim();
   await rateLimit("login-ip:" + ip, 30, 900);
-  await rateLimit("login:" + email.toLowerCase(), 8, 900);
-  const u = (
-    await query<{ id: string; password_hash: string }>(
-      "SELECT id,password_hash FROM wl.users WHERE email=$1 AND active=true",
-      [email.toLowerCase().trim()],
-    )
-  )[0];
-  if (!u || !passwordMatches(password, u.password_hash))
-    throw new AppError("Invalid email or password.", 401);
-  const token = randomBytes(32).toString("hex");
-  await query(
-    "INSERT INTO wl.sessions(id,user_id,expires_at) VALUES($1,$2,now()+interval '7 days')",
-    [hash(token), u.id],
-  );
-  return token;
+  await rateLimit("login:" + normalizedEmail, 8, 900);
+  return transaction(async (q) => {
+    const accounts = (await q<{ id: string; name: string; email: string; role: Role; password_hash: string }>(
+      "SELECT id,name,email,role,password_hash FROM wl.users WHERE lower(btrim(email))=$1 AND active=true AND removed_at IS NULL FOR UPDATE",
+      [normalizedEmail],
+    )).rows;
+    // Old imports may contain case variants of an email. Fail closed instead of guessing an account.
+    const u = accounts.length === 1 ? accounts[0] : undefined;
+    if (!u || !passwordMatches(password, u.password_hash))
+      throw new AppError("Invalid email or password.", 401);
+    await ensureStaffEmployeeProfile(q, u);
+    const token = randomBytes(32).toString("hex");
+    await q(
+      "INSERT INTO wl.sessions(id,user_id,expires_at) VALUES($1,$2,now()+interval '7 days')",
+      [hash(token), u.id],
+    );
+    return token;
+  });
 }
 export async function logout(request: Request) {
   const s = await requestSession(request);
@@ -178,13 +183,12 @@ export async function verifyReceipt(id: string, token: string) {
 }
 export async function createReset(email: string, ip: string) {
   await rateLimit("reset:" + ip, 8, 900);
-  const user = (
-    await query<{ id: string }>(
-      "SELECT id FROM wl.users WHERE email=$1 AND active=true",
-      [email.toLowerCase().trim()],
-    )
-  )[0];
-  if (!user) return null;
+  const accounts = await query<{ id: string }>(
+    "SELECT id FROM wl.users WHERE lower(btrim(email))=$1 AND active=true AND removed_at IS NULL",
+    [email.toLowerCase().trim()],
+  );
+  if (accounts.length !== 1) return null;
+  const user = accounts[0];
   const token = randomBytes(32).toString("hex");
   await query(
     "INSERT INTO wl.password_resets(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '30 minutes')",

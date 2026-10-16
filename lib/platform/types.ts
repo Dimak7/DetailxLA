@@ -38,7 +38,7 @@ export type Service = {
 };
 export type BookingServiceSnapshot = Service & {
   selected_package?: { id: string; name: string; priceCents: number | null; description: string } | null;
-  selected_addons?: Array<{ id: string; name: string; priceCents: number; description: string }>;
+  selected_addons?: Array<{ id: string; name: string; priceCents: number | null; description: string; line_item_id?: string }>;
   base_cents?: number | null;
   total_cents?: number | null;
 };

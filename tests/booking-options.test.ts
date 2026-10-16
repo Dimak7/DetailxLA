@@ -39,8 +39,8 @@ test("booking options use the approved service packages and relevant upgrades", 
 test("booking estimate includes vehicle size and validated upgrades", () => {
   const selected = bookingSelection(service("exterior-detail"), "SUV", "", ["ceramic-sealant", "engine-bay"]);
   assert.equal(selected.baseCents, 27500);
-  assert.equal(selected.addOnCents, 10000);
-  assert.equal(selected.totalCents, 37500);
+  assert.equal(selected.addOnCents, 21000);
+  assert.equal(selected.totalCents, 48500);
   assert.throws(() => bookingSelection(service("interior-detail"), "Sedan", "", ["engine-bay"]), /valid upgrades/i);
 });
 
@@ -66,7 +66,7 @@ test("multiple services combine server prices, size adjustments and duration", (
     { service_id: interior.id, addons: ["car-seat"] },
   ]);
   assert.equal(cart.items.length, 2);
-  assert.equal(cart.totalCents, 92500);
+  assert.equal(cart.totalCents, 92000);
   assert.equal(cart.durationMinutes, 420);
   assert.equal(cart.requiresQuote, false);
 });
@@ -100,4 +100,26 @@ test("cart rejects duplicate services, duplicate upgrades, unavailable services 
     { service_id: exterior.id, addons: ["headlight-restoration"] }, { service_id: headlight.id },
   ]), /already selected as a service/);
   assert.throws(() => bookingCartSelection([exterior], "Sedan", [{ service_id: exterior.id, service_package: "invalid" }]), /valid service package/);
+});
+
+
+test("approved upgrades show pair pricing, six-month sealant and explicit quotes", () => {
+  const full = bookingAddOns("full-detail");
+  assert.equal(full.find((item) => item.id === "ceramic-sealant")?.priceCents, 15000);
+  assert.match(full.find((item) => item.id === "ceramic-sealant")!.description, /up to 6 months/);
+  assert.equal(full.find((item) => item.id === "engine-bay")?.priceCents, 6000);
+  assert.equal(full.find((item) => item.id === "headlight-restoration")?.priceCents, 15000);
+  assert.match(full.find((item) => item.id === "headlight-restoration")!.description, /both headlights/i);
+  for (const id of ["ozone", "tar-removal", "iron-removal"]) {
+    assert.equal(full.find((item) => item.id === id)?.priceCents, null);
+    const selected = bookingCartSelection([service("full-detail")], "Sedan", [{ service_id: service("full-detail").id, addons: [id, "engine-bay"] }]);
+    assert.equal(selected.totalCents, null);
+    assert.equal(selected.requiresQuote, true);
+    assert.equal(selected.knownCents, 31000);
+  }
+  for (const slug of ["full-detail", "exterior-detail", "interior-detail", "ceramic-coating", "paint-correction"]) {
+    assert.ok(bookingAddOns(slug).every((item) => !["decontamination", "scratch-removal"].includes(item.id)));
+  }
+  assert.throws(() => bookingSelection(service("full-detail"), "Sedan", "", ["decontamination"]), /valid upgrades/);
+  assert.throws(() => bookingSelection(service("exterior-detail"), "Sedan", "", ["scratch-removal"]), /valid upgrades/);
 });

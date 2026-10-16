@@ -77,6 +77,8 @@ export async function createSquareInvoice(bookingId: string) {
       throw new AppError(
         "Agree a positive service price before creating the invoice.",
       );
+    if ((await q("SELECT id FROM wl.booking_line_items WHERE booking_id=$1 AND quote_pending LIMIT 1", [bookingId])).rows.length)
+      throw new AppError("Agree a price for every quoted upgrade before creating the invoice.");
     const existing = (
       await q<Saved>(
         "SELECT * FROM wl.square_invoices WHERE booking_id=$1 AND environment=$2",

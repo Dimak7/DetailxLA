@@ -241,7 +241,7 @@ export const serviceContent: Record<string, ServiceContent> = {
   "headlight-restoration": {
     eyebrow: "A CLEARER FINISH",
     headline: "Bring clarity\nback to the front.",
-    introduction: "Focused care for suitable cloudy or weathered headlight surfaces, with preparation, restoration and a protective finish.",
+    introduction: "Restore clarity to both headlights for $150. Includes care for suitable cloudy or weathered exterior lenses and a protective finish.",
     overview: "Surface deterioration can leave a headlight looking hazy even when the car is clean. Restoration addresses suitable exterior lens condition. We first review whether the concern is on the outside of the lens or involves damage that detailing cannot resolve.",
     image: "/brand/photos/mercedes-foam.webp",
     imageAlt: "Front of a black Mercedes covered in wash foam",

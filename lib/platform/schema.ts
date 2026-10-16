@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS wl.booking_line_items (
  kind text NOT NULL CHECK(kind IN ('base_service','upsell')), name text NOT NULL, quantity integer NOT NULL DEFAULT 1 CHECK(quantity>0), unit_price_cents integer NOT NULL CHECK(unit_price_cents>=0), created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS wl_booking_line_items_booking ON wl.booking_line_items(booking_id);
 ALTER TABLE wl.booking_line_items ADD COLUMN IF NOT EXISTS service_id uuid REFERENCES wl.services(id);
+ALTER TABLE wl.booking_line_items ADD COLUMN IF NOT EXISTS quote_pending boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS wl.booking_discounts (
  id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.bookings(id) ON DELETE CASCADE,
  kind text NOT NULL CHECK(kind IN ('fixed','percent')), value integer NOT NULL CHECK(value>=0), amount_cents integer NOT NULL CHECK(amount_cents>=0), reason text NOT NULL DEFAULT '', code text NOT NULL DEFAULT '', applied_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
@@ -411,6 +412,15 @@ WHERE source='Meta Ads' AND landing_page<>''
   AND lower(medium) !~ '(^|[_ -])(cpc|ppc|paid|paid social|paidsocial)($|[_ -])'
   AND EXISTS (SELECT 1 FROM migration);
 
+-- The owner-approved headlight price covers both lenses. Existing booking snapshots stay unchanged.
+WITH migration AS (
+  INSERT INTO wl.migrations(version) VALUES (11) ON CONFLICT DO NOTHING RETURNING version
+)
+UPDATE wl.services SET price_cents=15000,suv_extra_cents=0,truck_extra_cents=0,pricing_mode='fixed',
+  description='Restore clarity and add protection to both headlights. Price includes the pair.',
+  includes='["Both headlight lenses", "Oxidation removal and refinement", "Protective finish"]'::jsonb
+WHERE slug='headlight-restoration' AND EXISTS (SELECT 1 FROM migration);
+
 -- Marketing settlements are separate from employee compensation and customer payments.
 CREATE TABLE IF NOT EXISTS wl.marketing_commission_approvals (
  booking_id uuid PRIMARY KEY REFERENCES wl.bookings(id), lead_stream text NOT NULL,
@@ -450,4 +460,21 @@ INSERT INTO wl.crm_tags(id,name,color) SELECT id::uuid,name,color FROM (VALUES
 ('10000000-0000-4000-8000-000000000005','Needs quote','#426b60')) AS defaults(id,name,color)
 WHERE NOT EXISTS(SELECT 1 FROM wl.settings WHERE key='crm_tag_defaults_seeded') ON CONFLICT(name) DO NOTHING;
 INSERT INTO wl.settings(key,value) VALUES('crm_tag_defaults_seeded','true'::jsonb) ON CONFLICT DO NOTHING;
+-- Square customer exports are historical snapshots, never payment or booking evidence.
+CREATE TABLE IF NOT EXISTS wl.square_customer_history (
+ square_customer_id text PRIMARY KEY,customer_id uuid REFERENCES wl.customers(id) ON DELETE SET NULL,
+ first_name text NOT NULL DEFAULT '',last_name text NOT NULL DEFAULT '',email text NOT NULL DEFAULT '',phone text NOT NULL DEFAULT '',
+ creation_source text NOT NULL DEFAULT '',first_visit date,last_visit date,
+ transaction_count integer NOT NULL CHECK(transaction_count>=0),lifetime_spend_cents bigint NOT NULL CHECK(lifetime_spend_cents>=0),
+ email_subscription_status text NOT NULL DEFAULT '',instant_profile boolean NOT NULL DEFAULT false,
+ source_filename text NOT NULL,source_hash text NOT NULL,source_fields jsonb NOT NULL DEFAULT '{}',imported_by uuid REFERENCES wl.users(id),imported_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE wl.square_customer_history ADD COLUMN IF NOT EXISTS source_fields jsonb NOT NULL DEFAULT '{}';
+CREATE INDEX IF NOT EXISTS wl_square_customer_history_visit ON wl.square_customer_history(last_visit DESC,square_customer_id);
+CREATE TABLE IF NOT EXISTS wl.square_customer_imports (
+ source_hash text PRIMARY KEY,source_filename text NOT NULL,profile_count integer NOT NULL,summary jsonb NOT NULL,
+ imported_by uuid REFERENCES wl.users(id),imported_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS wl.test_data_archives (
+ id uuid PRIMARY KEY, label text NOT NULL, snapshot jsonb NOT NULL,
+ created_by uuid NOT NULL REFERENCES wl.users(id),created_at timestamptz NOT NULL DEFAULT now(),
+ restored_by uuid REFERENCES wl.users(id),restored_at timestamptz);
 `;

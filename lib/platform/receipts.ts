@@ -81,11 +81,11 @@ export async function bookingReceipt(id: string): Promise<BookingReceipt | null>
           OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(b.service_snapshot->'selected_services','[]'::jsonb)) selected
             WHERE selected->>'pricing_mode'='quote' OR selected->>'slug'='ceramic-coating'),false) quote_based,
         COALESCE((SELECT jsonb_agg(jsonb_build_object(
-          'id',li.id,'name',li.name,'quantity',li.quantity,'totalCents',CASE WHEN b.price_cents IS NULL AND li.kind='base_service'
+          'id',li.id,'name',li.name,'quantity',li.quantity,'totalCents',CASE WHEN li.quote_pending THEN NULL WHEN b.price_cents IS NULL AND li.kind='base_service'
             AND EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(b.service_snapshot->'selected_services','[]'::jsonb)) selected
               WHERE selected->>'id'=li.service_id::text AND selected->>'base_cents' IS NULL)
             THEN NULL ELSE li.quantity*li.unit_price_cents END
-          ) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items,
+          ) ORDER BY CASE WHEN li.kind='base_service' THEN 0 ELSE 1 END,li.created_at,li.name,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items,
         COALESCE((SELECT jsonb_agg(jsonb_build_object(
           'id',p.id,'status',p.status,'provider',p.provider,'kind',p.kind,
           'amount_cents',p.amount_cents,'refunded_cents',p.refunded_cents,'checkout_url',p.checkout_url,

@@ -6,7 +6,8 @@ export const metadata = {
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; error?: string }>;
 }) {
-  return <LoginForm token={(await searchParams).token || ""} />;
+  const params = await searchParams;
+  return <LoginForm token={params.token || ""} initialError={params.error ? "The reset link is invalid or expired, or the password is too short. Use 12–128 characters or request a new link." : ""} />;
 }

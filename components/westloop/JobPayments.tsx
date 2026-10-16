@@ -55,7 +55,7 @@ export function JobPayments({ booking }: { booking: RecordData }) {
                 {money(
                   invoice
                     ? Math.round(Number(invoice.amount_cents) / 2)
-                    : Math.round(Number(total || 0) / 2),
+                    : total === null ? null : Math.round(total / 2),
                 )}
               </dd>
             </div>
