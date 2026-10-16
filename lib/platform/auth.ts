@@ -56,6 +56,18 @@ export function assertOrigin(request: Request) {
       ? "https://" + process.env.RAILWAY_PUBLIC_DOMAIN
       : undefined,
   ]);
+  // Railway's internal request URL does not preserve the public www host.
+  // Trust only the configured site's matching apex/www pair, never forwarded hosts.
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    const canonical = new URL(process.env.NEXT_PUBLIC_SITE_URL);
+    if (canonical.protocol === "https:" && canonical.hostname === "westloopceramics.com") {
+      canonical.hostname = "www.westloopceramics.com";
+      allowed.add(canonical.origin);
+    } else if (canonical.protocol === "https:" && canonical.hostname === "www.westloopceramics.com") {
+      canonical.hostname = "westloopceramics.com";
+      allowed.add(canonical.origin);
+    }
+  }
   if (origin && !allowed.has(origin))
     throw new AppError("Invalid request origin.", 403);
   const fetchSite = request.headers.get("sec-fetch-site");
