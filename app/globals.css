@@ -2928,3 +2928,55 @@ td small {
 .crm-toolbar{display:flex;gap:22px;align-items:center;flex-wrap:wrap}.crm-toolbar h2{font-size:22px;margin-bottom:6px}.crm-toolbar>div{flex:1;min-width:220px}.crm-toolbar form{display:flex;gap:10px;align-items:end}.crm-toolbar label,.crm-tag-editor label{display:grid;gap:8px;font-size:12px}.crm-toolbar select,.crm-record-tags select,.lead-outcomes select{border:1px solid #d8dfd8;border-radius:8px;padding:9px 12px;background:white;font-size:12px;max-width:220px}.crm-tags{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.crm-tag{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border:1px solid;border-radius:30px;font-size:11px;background:#fff;color:#243b33;white-space:nowrap}.crm-tag i{width:6px;height:6px;border-radius:50%}.crm-tag button{padding:0 2px!important;min-height:20px!important;background:none!important;border:0!important;color:#4e605a;font-size:16px}.crm-record-tags{margin:8px 0}.crm-tag-editor{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:24px 0}.crm-tag-editor input[type=color]{height:42px;width:60px}.crm-tag-library>div{display:flex;justify-content:space-between;align-items:center;gap:16px;border-top:1px solid #e0e5df;padding:12px 0}.crm-tag-library>div>div{display:flex;gap:10px}.lead-outcomes{margin-top:10px}
 
 .job-payment-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:24px 0}.job-payment-totals div{padding:14px;border:1px solid var(--line,#ddd);border-radius:12px}.job-payment-totals dt{font-size:13px}.job-payment-totals dd{font-size:22px;margin:6px 0 0}.job-detailer-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:20px 0}.job-detailer-option{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line,#ddd);border-radius:12px;background:#fff;cursor:pointer}.job-detailer-option:has(input:checked){border-color:#255f56;background:#eef6f2}.job-detailer-option input{width:18px;height:18px}.job-detailer-option span{display:grid;gap:2px}.job-detailer-option small{color:#61716b}
+
+/* Team workflow: keep day-to-day operations above financial reporting. */
+.dashboard-operations { margin: 20px 0 28px; }
+.admin-theme-toggle { width: 40px; min-width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); color: var(--ink); font-size: 23px; cursor: pointer; }
+.admin-shell[data-theme="dark"] { --ink: #e6eee9; --paper: #141c19; --white: #1e2923; --muted: #afbeb4; --line: #3a4a40; --sage: #26372c; --gold: #a5d6ba; color-scheme: dark; }
+.admin-shell[data-theme="dark"] :is(.app-global-bar,.admin-sidebar,.admin-mobile-nav,.admin-topbar,.paper,.stat,.modal,.app-profile>div,.admin-quick-menu>div,.admin-mobile-menu,.admin-mobile-search) { background: var(--white); color: var(--ink); border-color: var(--line); }
+.admin-shell[data-theme="dark"] :is(input,select,textarea,.admin-global-search input,.admin-global-search button,.admin-quick-menu summary,.app-profile summary,.job-detailer-option,.booking-add-service) { background: #18221c; color: var(--ink); border-color: var(--line); }
+.admin-shell[data-theme="dark"] :is(th,.filter-tabs a,.role-permissions-grid>div,.job-detailer-option:has(input:checked),.booking-additional-services,.ads-connection-form) { background: var(--sage); color: var(--ink); }
+.admin-shell[data-theme="dark"] :is(td,th,.summary-row,.field input,.field textarea,.field select) { border-color: var(--line); }
+.admin-shell[data-theme="dark"] :is(.admin-sidebar nav a,.admin-mobile-nav a,.admin-mobile-nav button,small,.small-note) { color: var(--muted); }
+.admin-shell[data-theme="dark"] :is(.admin-sidebar nav a.active,.admin-sidebar nav a:hover,.admin-mobile-nav a.active,.admin-mobile-nav button.active) { color: var(--gold); background: var(--sage); border-color: var(--line); }
+.admin-shell[data-theme="dark"] .button { background: #a5d6ba; color: #14261d; border-color: #a5d6ba; }
+.admin-shell[data-theme="dark"] :is(.button.outline,.text-link,.link-button) { background: transparent; color: var(--gold); }
+.admin-shell[data-theme="dark"] .modal-backdrop { background: #000a; }
+.admin-shell[data-theme="dark"] :is(.error-message,.error) { color: #ffb5a8; background: #432b26; }
+.admin-shell[data-theme="dark"] .success-message { color: #c3ead4; background: #253d2e; }
+.job-photo-columns,.sales-booking-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.job-photo-drop { display: grid; place-items: center; gap: 8px; padding: 24px 16px; border: 2px dashed var(--line); border-radius: 12px; background: var(--paper); text-align: center; cursor: pointer; }
+.job-photo-drop:focus-within { outline: 2px solid var(--gold); outline-offset: 3px; }
+.job-photo-drop input { max-width: 100%; font-size: 12px; }
+.job-photo-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 16px; }
+.job-photo-grid figure { margin: 0; }
+.job-photo-grid img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 8px; }
+.job-photo-grid figcaption { color: var(--muted); font-size: 11px; margin-top: 6px; }
+.sales-booking-section { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); }
+.sales-booking-section h3 { margin: 0 0 18px; font-size: 18px; }
+.sales-field-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.sales-booking .field { margin-bottom: 12px; }
+.sales-booking .field :is(input,select,textarea) { width: 100%; min-height: 44px; }
+.sales-booking .field textarea { min-height: 72px; }
+.sales-service-list { display: grid; gap: 8px; max-height: 520px; overflow-y: auto; padding-right: 4px; }
+.sales-service-list > div { border: 1px solid var(--line); border-radius: 9px; }
+.sales-service-list > .selected { border-color: var(--gold); }
+.sales-service-list > div > label { display: flex; gap: 12px; align-items: center; padding: 12px; cursor: pointer; }
+.sales-service-list small { display: block; color: var(--muted); font-size: 11px; }
+.sales-service-options { padding: 0 12px 12px; }
+.sales-addon { display: flex; gap: 8px; align-items: center; padding: 6px 0; font-size: 12px; cursor: pointer; }
+.sales-addon small { margin-left: auto; white-space: nowrap; }
+.sales-booking input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; flex-shrink: 0; accent-color: var(--gold); }
+.sales-customer-results { display: grid; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.sales-customer-results button { padding: 10px 12px; background: var(--paper); text-align: left; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); cursor: pointer; }
+.sales-customer-results small { display: block; color: var(--muted); }
+.sales-booking-summary > strong { display: block; font-size: 28px; }
+.sales-booking-summary p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.sales-agreement { display: flex; gap: 10px; margin: 20px 0; font-size: 12px; line-height: 1.6; }
+.sales-booking-summary .button { width: 100%; }
+@media(max-width: 720px) { .job-photo-columns,.sales-booking-grid { grid-template-columns: minmax(0,1fr); } .sales-booking-section { padding: 16px; } .admin-theme-toggle { width: 34px; min-width: 34px; height: 36px; } }
+.admin-shell[data-theme="dark"] .field input:not([type="checkbox"]):not([type="radio"]),
+.admin-shell[data-theme="dark"] .booking-main .field input:not([type="checkbox"]):not([type="radio"]),
+.admin-shell[data-theme="dark"] :is(.field select,.field textarea,input.control,select.control,textarea.control) { background: #18221c; color: var(--ink); border-color: var(--line); }
+.admin-shell[data-theme="dark"] :is(.field>span,.field>label) { color: var(--muted); }
+.admin-shell[data-theme="dark"] .empty-state { background: var(--paper); color: var(--ink); border-color: var(--line); }

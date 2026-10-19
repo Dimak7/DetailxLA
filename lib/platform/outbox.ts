@@ -46,6 +46,7 @@ export async function enqueueBooking(
   token: string,
   event = "booking_confirmation",
   suffix = "",
+  channels: Array<"email" | "sms"> = ["email", "sms"],
 ) {
   const c = (
     await q<{
@@ -107,7 +108,7 @@ export async function enqueueBooking(
   const key = b.id + ":" + event + ":" + suffix;
   const subject = renderTemplate(template.subject, vars),
     body = renderTemplate(template.body, vars);
-  await enqueue(q, {
+  if (channels.includes("email")) await enqueue(q, {
     key: key + ":email",
     channel: "email",
     recipient: c.email,
@@ -116,20 +117,22 @@ export async function enqueueBooking(
     customerId: b.customer_id,
     bookingId: b.id,
   });
-  if (event !== "review_request")
+  if (event !== "review_request" && channels.includes("sms"))
     await enqueue(q, {
       key: key + ":sms",
       channel: "sms",
       recipient: c.phone,
-      body,
+      body: event === "booking_request"
+        ? `${s.name}: Hi ${c.first_name}, we received your ${b.service_name} booking for ${b.booking_date} at ${vars.booking_time} CT. ${b.deposit_cents > 0 ? `Pay your ${money(b.deposit_cents)} deposit to confirm: ` : "View your booking and any quote or payment steps: "}${vars.booking_url}`
+        : body,
       customerId: b.customer_id,
       bookingId: b.id,
     });
-  if (
+  if (channels.includes("email") && (
     event === "booking_request" ||
     event === "booking_cancelled" ||
     event === "payment"
-  ) {
+  )) {
     const businessKey =
       event === "booking_request"
         ? "new_booking"
@@ -154,7 +157,7 @@ export async function enqueueBooking(
           bookingId: b.id,
         });
   }
-  if (event === "booking_confirmation" || event === "booking_rescheduled") {
+  if (["booking_request", "booking_confirmation", "booking_rescheduled"].includes(event)) {
     const reminder = (
       await q<{ subject: string; body: string }>(
         "SELECT subject,body FROM wl.email_templates WHERE key='booking_reminder'",
@@ -162,21 +165,18 @@ export async function enqueueBooking(
     ).rows[0];
     const due = (
       await q<{ due: string }>(
-        `SELECT (($1::date + $2 * interval '1 minute') AT TIME ZONE 'America/Chicago' - interval '1 day')::text due`,
+        `SELECT (($1::date + $2 * interval '1 minute') AT TIME ZONE 'America/Chicago' - interval '48 hours')::text due`,
         [b.booking_date, b.start_minute],
       )
     ).rows[0].due;
-    if (new Date(due) > new Date())
+    if (reminder && new Date(due) > new Date())
       for (const channel of ["email", "sms"])
+      {
+        const reminderKey = b.id + ":reminder:48h:" + b.booking_date + ":" + b.start_minute + ":" + channel;
+        // Rescheduling back to a previous time must restore its cancelled reminder.
+        await q("UPDATE wl.messages SET status='queued',scheduled_at=$2::timestamptz,error='' WHERE dedupe_key=$1 AND status='cancelled'", [reminderKey, due]);
         await enqueue(q, {
-          key:
-            b.id +
-            ":reminder:" +
-            b.booking_date +
-            ":" +
-            b.start_minute +
-            ":" +
-            channel,
+          key: reminderKey,
           channel,
           recipient: channel === "email" ? c.email : c.phone,
           subject: renderTemplate(reminder.subject, vars),
@@ -186,5 +186,6 @@ export async function enqueueBooking(
           purpose: "reminder",
           scheduledAt: due,
         });
+      }
   }
 }

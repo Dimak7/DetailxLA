@@ -1,3 +1,4 @@
+import { sendBookingConfirmationText, sendBookingPaymentText } from "./booking-communications";
 import {connectSquareAccount,squareAccountScope} from "../integrations/square-reporting";
 import {preserveCompletedJobPay} from "./payroll";
 import {createSquareInvoice,refreshDetailInvoice} from "../integrations/square-invoices";
@@ -453,6 +454,8 @@ const actionSections: Record<string, string> = {
   save_lead: "leads",
   convert_lead: "leads",
   create_booking: "bookings",
+  send_booking_confirmation: "bookings",
+  send_booking_payment_text: "payments",
   update_booking: "my_schedule",
   block_time: "calendar",
   remove_block: "calendar",
@@ -503,6 +506,13 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   if (!section || !access[section]?.includes(user.role))
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
+  if (action === "send_booking_confirmation" || action === "send_booking_payment_text") {
+    if (user.role === "staff") throw new AppError("A manager must send customer messages.", 403);
+    const bookingId = uuid.parse(data.booking_id), requestId = uuid.parse(data.request_id);
+    return action === "send_booking_confirmation"
+      ? sendBookingConfirmationText(bookingId, requestId)
+      : sendBookingPaymentText(bookingId, z.enum(["deposit", "balance"]).parse(data.kind), requestId);
+  }
   if(action==="create_square_invoice")return createSquareInvoice(uuid.parse(data.booking_id));
   if(action==="refresh_detail_invoice")return refreshDetailInvoice(uuid.parse(data.booking_id));
   if(action==="connect_square_account")return connectSquareAccount();

@@ -3,7 +3,32 @@ import { deliver, NotConnected } from "../integrations/providers";
 import { queueCampaign } from "./campaigns";
 import type { Message } from "./types";
 import { randomUUID } from "node:crypto";
+import { enqueueBooking } from "./outbox";
+import { receiptToken } from "./auth";
+import { settings } from "./settings";
+import type { Booking } from "./types";
 export async function processOutbox(limit = 25) {
+  await query(`UPDATE wl.messages m SET status='cancelled',error='Appointment notice is no longer current'
+    FROM wl.bookings b WHERE m.booking_id=b.id AND m.status='queued'
+    AND split_part(m.dedupe_key,':',2) IN ('booking_request','booking_confirmation','booking_rescheduled')
+    AND (b.status IN ('completed','cancelled','no_show') OR
+      ((b.booking_date::date + b.start_minute * interval '1 minute') AT TIME ZONE 'America/Chicago')<=now())`);
+  // Cover upcoming appointments created before reminder scheduling was enabled.
+  // Only backfill appointments whose 48-hour reminder is still in the future.
+  const missingReminders = await query<Booking>(`SELECT b.* FROM wl.bookings b
+    JOIN wl.customers c ON c.id=b.customer_id WHERE c.archived_at IS NULL
+    AND b.status IN ('new','confirmed')
+    AND ((b.booking_date::date + b.start_minute * interval '1 minute') AT TIME ZONE 'America/Chicago') > now()+interval '48 hours'
+    AND NOT EXISTS(SELECT 1 FROM wl.messages m WHERE m.booking_id=b.id AND m.purpose='reminder'
+      AND m.dedupe_key=b.id::text||':reminder:48h:'||b.booking_date||':'||b.start_minute::text||':sms' AND m.status<>'cancelled')
+    ORDER BY b.booking_date,b.start_minute LIMIT 50`);
+  if (missingReminders.length) {
+    const business = await settings();
+    for (const booking of missingReminders) {
+      const token = await receiptToken(booking.id);
+      await transaction(q => enqueueBooking(q, booking, business, token, "booking_request", "backfill", []));
+    }
+  }
   const scheduled = await query<{ id: string }>(
     "SELECT id FROM wl.campaigns WHERE status='scheduled' AND scheduled_at<=now() LIMIT 10",
   );
@@ -69,12 +94,12 @@ export async function processOutbox(limit = 25) {
       }
       if (m.purpose === "reminder" && m.booking_id) {
         const b = (
-          await query<{ status: string }>(
-            "SELECT status FROM wl.bookings WHERE id=$1",
+          await query<{ status: string; upcoming: boolean }>(
+            "SELECT status, ((booking_date::date + start_minute * interval '1 minute') AT TIME ZONE 'America/Chicago') > now() upcoming FROM wl.bookings WHERE id=$1",
             [m.booking_id],
           )
         )[0];
-        if (!b || !["new", "confirmed"].includes(b.status)) {
+        if (!b || !b.upcoming || !["new", "confirmed"].includes(b.status)) {
           await query("UPDATE wl.messages SET status='cancelled' WHERE id=$1", [
             m.id,
           ]);

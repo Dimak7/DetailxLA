@@ -16,7 +16,8 @@ import {
   type Field,
   type RecordData as R,
 } from "./AdminControls";
-import { BookingWizard } from "./BookingWizard";
+import { SalesBookingForm } from "./SalesBookingForm";
+import { JobPhotos } from "./JobPhotos";
 import { MetaLeadForms } from "./MetaLeadForms";
 import { AdsPerformance } from "./AdsPerformance";
 import { marketingStreamLabel } from "@/lib/marketing-streams";
@@ -123,9 +124,19 @@ export function AdminWorkspace({
     scheduleShifts = rows(data.shifts),
     scheduleAppointments = rows(data.appointments),
     staff = user.role === "staff";
+  const newBookingRequested = params.get("new") === "booking";
   useEffect(() => {
-    if (params.get("new") === "booking" && ["bookings", "calendar"].includes(section) && !staff) setCreating(true);
-  }, [params, section, staff]);
+    if (newBookingRequested && ["bookings", "calendar"].includes(section) && !staff) setCreating(true);
+  }, [newBookingRequested, section, staff]);
+  function closeCreating() {
+    setCreating(false);
+    setLead(undefined);
+    if (newBookingRequested) {
+      const next = new URLSearchParams(params.toString());
+      next.delete("new");
+      router.replace(`/admin/${section}${next.size ? "?" + next : ""}`);
+    }
+  }
   const teamOptions = [
     { value: "", label: "Unassigned" },
     ...team
@@ -874,6 +885,8 @@ export function AdminWorkspace({
           : []),
         <>
           <button onClick={() => bookingEdit(r)}>Manage</button>
+          {!staff && !["completed", "cancelled", "no_show"].includes(s(r.status)) && <button disabled={busy} onClick={() => run("send_booking_confirmation", { booking_id: r.id, request_id: crypto.randomUUID() }, "Confirmation text queued. Delivery status is recorded in the customer timeline.")}>Send confirmation text</button>}
+          <JobPhotos bookingId={s(r.id)} reference={s(r.reference)} />
           {!staff && (rows(r.line_items).filter((item) => item.kind === "base_service").length > 1 || rows(r.line_items).some((item) => item.kind === "upsell" || item.quote_pending)) && <button onClick={() => servicePricesEdit(r)}>Service prices</button>}
           {!staff && <button onClick={() => upsellEdit(r)}>Add upsell</button>}
           {!staff && <button onClick={() => discountEdit(r)}>Discount</button>}
@@ -1085,7 +1098,7 @@ export function AdminWorkspace({
             {table(["Date", "Shift", "Break", "Notes"], rows(data.shifts).map((r) => [s(r.shift_date), timeLabel(n(r.start_minute)) + " - " + timeLabel(n(r.end_minute)), n(r.break_minutes) + " min", s(r.notes) || "-"]))}
           </section>
           <section className="paper"><div className="section-heading"><div><p className="eyebrow">ASSIGNED WORK</p><h2>Upcoming appointments</h2></div></div>
-            {table(["When", "Customer", "Vehicle", "Service", "Location", "Status", "Actions"], rows(data.appointments).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))} - {timeLabel(n(r.start_minute) + n(r.duration_minutes))}</small></>, <><strong>{s(r.customer_name)}</strong><small>{s(r.phone)}</small></>, s(r.vehicle) || "Vehicle details pending", <><strong>{s(r.service_name)}</strong><small>{s(r.reference)}{!staff && <> · {money(r.price_cents == null ? null : n(r.price_cents))}</>}</small></>, <><strong>{s(r.location)}</strong><small>{s(r.notes) || "No access notes"}</small></>, status(r.status), <><button onClick={() => bookingEdit(r)}>View job</button>{r.status === "in_progress" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "completed" }, "Job marked complete.")}>Complete job</button> : r.status !== "completed" && r.status !== "cancelled" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "in_progress" }, "Job started.")}>Start job</button> : null}</>]))}
+            {table(["When", "Customer", "Vehicle", "Service", "Location", "Status", "Actions"], rows(data.appointments).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))} - {timeLabel(n(r.start_minute) + n(r.duration_minutes))}</small></>, <><strong>{s(r.customer_name)}</strong><small>{s(r.phone)}</small></>, s(r.vehicle) || "Vehicle details pending", <><strong>{s(r.service_name)}</strong><small>{s(r.reference)}{!staff && <> · {money(r.price_cents == null ? null : n(r.price_cents))}</>}</small></>, <><strong>{s(r.location)}</strong><small>{s(r.notes) || "No access notes"}</small></>, status(r.status), <><button onClick={() => bookingEdit(r)}>View job</button><JobPhotos bookingId={s(r.id)} reference={s(r.reference)} />{r.status === "in_progress" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "completed" }, "Job marked complete.")}>Complete job</button> : r.status !== "completed" && r.status !== "cancelled" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "in_progress" }, "Job started.")}>Start job</button> : null}</>]))}
           </section>
           <section className="paper"><h2>Recent time entries</h2>{table(["Clock in", "Clock out", "Break", "Worked"], rows(data.entries).map((r) => [stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "In progress", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h"]))}</section>
         </>
@@ -1137,6 +1150,31 @@ export function AdminWorkspace({
             {rep.start} through {rep.end} · Central Time. Net sales are completed website appointments; collections include all Square payments and are shown less refunds, before processing fees.
           </p>
           {section === "marketing" && <AdsPerformance report={rep}/>}
+          {section === "dashboard" && <div className="admin-grid dashboard-operations">
+                <section className="paper">
+                  <h2>Today's schedule</h2>
+                  {table(
+                    ["Time", "Customer", "Service", "Detailer", "Status"],
+                    rows(data.today).map((r) => [
+                      timeLabel(n(r.start_minute)),
+                      s(r.customer_name),
+                      s(r.service_name),
+                      s(r.detailer_name) || "Unassigned",
+                      status(r.status),
+                    ]),
+                  )}
+                  <Link
+                    className="text-link"
+                    href={"/admin/calendar?date=" + dateToday()}
+                  >
+                    Open calendar
+                  </Link>
+                </section>
+                <section className="paper">
+                  <h2>Unassigned jobs</h2>
+                  {table(["When", "Customer", "Service", "Action"], rows(data.unassigned).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))}</small></>, s(r.customer_name), s(r.service_name), <Link className="text-link" href="/admin/bookings">Assign detailer</Link>]))}
+                </section>
+          </div>}
           {data.square != null && <SquareRevenue connection={data.square as Awaited<ReturnType<typeof squareRevenueStatus>>} summary={rep.square} />}
           <div className="stats-grid">
             {[
@@ -1220,29 +1258,6 @@ export function AdminWorkspace({
                   <h2>Financial trend</h2>
                   {rep.financial_series.length ? <>{table(["Date", "Revenue", "Expenses", "Net operating profit"], rep.financial_series.map((row) => [s(row.day), money(n(row.revenue)), money(n(row.expenses)), money(n(row.net_operating_profit))]))}<p className="small-note">Revenue is verified payments less refunds. Operating expenses include recorded expenses only; labor is shown separately when time entries exist.</p></> : <div className="empty-state"><p>No financial activity in this period.</p></div>}
                 </section>}
-                <section className="paper">
-                  <h2>Today's schedule</h2>
-                  {table(
-                    ["Time", "Customer", "Service", "Detailer", "Status"],
-                    rows(data.today).map((r) => [
-                      timeLabel(n(r.start_minute)),
-                      s(r.customer_name),
-                      s(r.service_name),
-                      s(r.detailer_name) || "Unassigned",
-                      status(r.status),
-                    ]),
-                  )}
-                  <Link
-                    className="text-link"
-                    href={"/admin/calendar?date=" + dateToday()}
-                  >
-                    Open calendar
-                  </Link>
-                </section>
-                <section className="paper">
-                  <h2>Unassigned jobs</h2>
-                  {table(["When", "Customer", "Service", "Action"], rows(data.unassigned).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))}</small></>, s(r.customer_name), s(r.service_name), <Link className="text-link" href="/admin/bookings">Assign detailer</Link>]))}
-                </section>
                 <section className="paper">
                   <h2>Booking health</h2>
                   {Object.entries(rep.bookings).map(([k, v]) => (
@@ -2273,16 +2288,15 @@ export function AdminWorkspace({
       {creating && (
         <Modal
           title={lead ? "Book for " + lead.name : "Create appointment"}
-          onClose={() => setCreating(false)}
+          onClose={closeCreating}
           wide
         >
-          <BookingWizard
+          <SalesBookingForm
             services={rows(data.services) as unknown as Service[]}
             business={business}
-            admin
             lead={lead}
             onComplete={() => {
-              setCreating(false);
+              closeCreating();
               setNotice("Appointment created.");
               router.refresh();
             }}

@@ -8,6 +8,7 @@ export function JobPayments({ booking }: { booking: RecordData }) {
     [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
     [url, setUrl] = useState(""),
     [createdInvoice, setCreatedInvoice] = useState(false);
   const invoice = booking.square_invoice as RecordData | undefined,
@@ -18,8 +19,10 @@ export function JobPayments({ booking }: { booking: RecordData }) {
   async function save(name: string, kind = "balance") {
     setBusy(true);
     setError("");
+    setNotice("");
     try {
-      const result = await action(name, { booking_id: booking.id, kind });
+      const result = await action(name, { booking_id: booking.id, kind, request_id: crypto.randomUUID() });
+      if (result?.queued) setNotice("Payment text queued for the customer. Check the customer timeline for delivery.");
       if (result?.url) {
         setUrl(String(result.url));
         setCreatedInvoice(name === "create_square_invoice");
@@ -91,6 +94,11 @@ export function JobPayments({ booking }: { booking: RecordData }) {
               releasing the vehicle.
             </p>
           )}
+          <div className="button-row">
+            <button disabled={busy || total === null || paid >= Math.round(Number(total) / 2)} onClick={() => void save("send_booking_payment_text", "deposit")}>Send deposit link by text</button>
+            <button disabled={busy || total === null || !due} onClick={() => void save("send_booking_payment_text", "balance")}>Send balance link by text</button>
+          </div>
+          {notice && <p className="success-message" role="status">{notice}</p>}
           {link ? (
             <>
               <p>

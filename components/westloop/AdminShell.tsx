@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "./AdminControls";
 import { usePathname } from "next/navigation";
 import { Wordmark } from "./PublicShell";
@@ -55,6 +55,15 @@ export function AdminShell({
   const path = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [theme, setTheme] = useState("light");
+  useEffect(() => {
+    try { setTheme(localStorage.getItem("wl-admin-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")); } catch { /* Storage may be disabled. */ }
+  }, []);
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    try { localStorage.setItem("wl-admin-theme", next); } catch { /* Keep this session's choice. */ }
+  }
   const roleLabel = user.role === "staff" ? "Detailer" : user.role[0].toUpperCase() + user.role.slice(1);
   const canSearchBookings = sections.includes("bookings");
   const workspaces = adminNavigation(sections).map((workspace) => ({ ...workspace, label: user.role === "staff" && workspace.target === "bookings" ? "My jobs" : workspace.label }));
@@ -75,11 +84,12 @@ export function AdminShell({
   ];
   const menuActive = !mobileLinks.some((link) => link.active);
   return (
-    <div className="admin-shell">
+    <div className="admin-shell" data-theme={theme}>
       <header className="app-global-bar">
         <Link className="app-brand" href={`/admin/${home}`} aria-label={`${BRAND_NAME} home`}><Wordmark /></Link>
         <span className="app-business-name">{BRAND_NAME.toUpperCase()} <small>Business workspace</small></span>
         <div className="app-global-actions">
+          <button className="admin-theme-toggle" onClick={toggleTheme} aria-label={theme === "dark" ? "Use light mode" : "Use dark mode"} title={theme === "dark" ? "Use light mode" : "Use dark mode"}>{theme === "dark" ? "☀" : "☾"}</button>
           {canSearchBookings && <button className="admin-mobile-search-toggle" aria-label={searchOpen ? "Close search" : "Search bookings"} aria-expanded={searchOpen} aria-controls="admin-mobile-search" onClick={() => setSearchOpen(!searchOpen)}><NavIcon name="search" /></button>}
           {canSearchBookings && <form action="/admin/bookings" className="admin-global-search"><input name="search" aria-label="Search bookings" placeholder="Search" /><button>Search</button></form>}
           {quickLinks.length > 0 && <details className="admin-quick-menu"><summary aria-label="Quick actions">+</summary><div>{quickLinks.map((item) => <Link key={item.section} href={item.href}>{item.label}</Link>)}</div></details>}

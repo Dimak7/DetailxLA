@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: { root: process.cwd() },
   serverExternalPackages: ["pg", "@electric-sql/pglite", "sharp"],
   async headers() {
     return [

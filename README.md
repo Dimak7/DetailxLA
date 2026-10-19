@@ -18,7 +18,7 @@ Connect the existing DetailxLA service to `Dimak7/DetailxLA`, branch `main`. The
 
 Required variables: `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ characters), `ADMIN_SESSION_SECRET` (random 32+ characters), `SETTINGS_ENCRYPTION_KEY` (random 32+ characters). Use the generated Railway URL until a domain is connected. Do not reuse the Chicago database or notification destinations without reviewing them.
 
-For scheduled reminders/campaigns, add a worker service from the same repo, with the same environment and database, and override its start command to `pnpm worker`. Disable the HTTP health check on that worker. Alternatively invoke POST `/api/jobs` with a Bearer `CRON_SECRET` from a trusted scheduler. Immediate booking notifications are also processed after the booking response.
+The Docker start command runs the website and notification worker together through `scripts/start-production.mjs`; either process exiting stops the container so Railway can restart it. The worker processes queued messages every 15 seconds, including appointment reminders scheduled 48 hours before the appointment in America/Chicago. Rescheduling cancels old reminders, and cancelled or past appointments do not receive stale appointment notices. Outside Docker, run `pnpm worker` alongside the website, or invoke POST `/api/jobs` with a Bearer `CRON_SECRET` from a trusted scheduler. Immediate booking notifications are also processed after the booking response. SMS requires a connected Twilio account and an enabled texting number; missing credentials never report successful delivery.
 
 ## Before launch
 1. Sign in at `/admin/login` using the initial owner configuration.

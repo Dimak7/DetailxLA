@@ -8,4 +8,4 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["sh", "-c", "pnpm db:migrate && pnpm start"]
+CMD ["sh", "-c", "pnpm db:migrate && exec node scripts/start-production.mjs"]

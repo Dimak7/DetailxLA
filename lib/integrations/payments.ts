@@ -70,6 +70,7 @@ async function preparePayment(
     throw new AppError("This appointment cannot be paid online.");
   if (b.price_cents == null || awaitingQuoteApproval(b))
     throw new AppError("A quote must be agreed before creating an invoice.");
+  const environment = squareEnvironment(), activeLocation = await secret("square_location_id");
   const payment = await transaction(async (q) => {
     const current = (
       await q<Booking>("SELECT * FROM wl.bookings WHERE id=$1 FOR UPDATE", [
@@ -83,7 +84,6 @@ async function preparePayment(
       throw new AppError("This appointment cannot be paid online.");
     if ((await q("SELECT id FROM wl.booking_line_items WHERE booking_id=$1 AND quote_pending LIMIT 1", [bookingId])).rows.length)
       throw new AppError("An upgrade quote must be agreed before creating an invoice.");
-    const environment = squareEnvironment(), activeLocation = await secret("square_location_id");
     if((await q("SELECT booking_id FROM wl.square_invoices WHERE booking_id=$1 AND environment=$2",[bookingId,environment])).rows.length)throw new AppError("Use this booking’s Square invoice to collect payment.");
     const unclassified = (await q(
       `SELECT id FROM wl.payments WHERE booking_id=$1 AND provider='square'
@@ -111,9 +111,9 @@ async function preparePayment(
       throw new AppError("There is no outstanding amount for this payment.");
     const old = (
       await q<PaymentRow>(
-        `SELECT * FROM wl.payments WHERE booking_id=$1 AND provider=$2 AND status='pending'
+        `SELECT * FROM wl.payments WHERE booking_id=$1 AND provider=$2 AND status='pending' AND kind=$6 AND amount_cents=$4
          AND ($2<>'square' OR (metadata->>'square_environment'=$3 AND amount_cents=$4 AND (metadata->>'square_location_id'=$5 OR checkout_url=''))) ORDER BY created_at LIMIT 1`,
-        [bookingId, provider, environment, owed, activeLocation],
+        [bookingId, provider, environment, owed, activeLocation, kind],
       )
     ).rows[0];
     if (old) return old;

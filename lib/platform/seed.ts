@@ -215,7 +215,7 @@ export async function seed(q: Query) {
       "Hi {{customer_name}},\nYour {{service_name}} appointment is reserved for {{booking_date}} at {{booking_time}} (Chicago time).\nVehicle: {{vehicle}}\nEstimate: {{total}}\n{{booking_url}}",
     ],
     booking_reminder: [
-      "Your appointment is tomorrow",
+      "Your appointment is in two days",
       "Hi {{customer_name}}, we look forward to your {{service_name}} appointment on {{booking_date}} at {{booking_time}}.\n{{booking_url}}",
     ],
     booking_rescheduled: [

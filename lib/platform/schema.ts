@@ -481,4 +481,23 @@ ALTER TABLE wl.customers ADD COLUMN IF NOT EXISTS archived_at timestamptz;
 ALTER TABLE wl.square_customer_history ADD COLUMN IF NOT EXISTS archived_at timestamptz;
 ALTER TABLE wl.square_customer_history ADD COLUMN IF NOT EXISTS archived_customer_id uuid REFERENCES wl.customers(id);
 CREATE INDEX IF NOT EXISTS wl_customer_active ON wl.customers(created_at DESC) WHERE archived_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS wl.booking_photos (
+ id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.bookings(id),
+ stage text NOT NULL CHECK(stage IN ('before','after')), caption text NOT NULL DEFAULT '',
+ content_type text NOT NULL DEFAULT 'image/webp', data bytea NOT NULL,
+ uploaded_by uuid NOT NULL REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS wl_booking_photos_job ON wl.booking_photos(booking_id,created_at);
+WITH migration AS (
+ INSERT INTO wl.migrations(version) VALUES(12) ON CONFLICT DO NOTHING RETURNING version
+), templates AS (
+ UPDATE wl.email_templates SET subject='Your appointment is in two days'
+ WHERE key='booking_reminder' AND subject='Your appointment is tomorrow' AND EXISTS(SELECT 1 FROM migration)
+)
+UPDATE wl.messages SET
+ scheduled_at=CASE WHEN status IN ('queued','failed','skipped') THEN scheduled_at-interval '24 hours' ELSE scheduled_at END,
+ subject=CASE WHEN subject='Your appointment is tomorrow' THEN 'Your appointment is in two days' ELSE subject END,
+ dedupe_key=replace(dedupe_key,':reminder:',':reminder:48h:')
+ WHERE purpose='reminder' AND dedupe_key NOT LIKE '%:reminder:48h:%' AND EXISTS(SELECT 1 FROM migration);
+
 `;
