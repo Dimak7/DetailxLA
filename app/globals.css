@@ -2980,3 +2980,10 @@ td small {
 .admin-shell[data-theme="dark"] :is(.field select,.field textarea,input.control,select.control,textarea.control) { background: #101010; color: var(--ink); border-color: var(--line); }
 .admin-shell[data-theme="dark"] :is(.field>span,.field>label) { color: var(--muted); }
 .admin-shell[data-theme="dark"] .empty-state { background: var(--paper); color: var(--ink); border-color: var(--line); }
+/* Keep mobile cards and workspace controls on the same neutral dark palette. */
+.admin-shell[data-theme="dark"] :is(.toolbar,.admin-mobile-search-toggle,.admin-table-wrap--comparison,.admin-filter-toggle,.staffing-day,.roster-day,.staffing-matrix,.day-timeline,.staff-calendar,.matrix-off,.booking-main,.service-option,.booking-consent,.modal-header button,.schedule-view-tabs button,.day-picker button,.time-grid button) { background: var(--white); color: var(--ink); border-color: var(--line); }
+.admin-shell[data-theme="dark"] .admin-table-wrap--cards .admin-record-row,
+.admin-shell[data-theme="dark"] .admin-payroll-table td:first-child { background: var(--white); color: var(--ink); border-color: var(--line); }
+.admin-shell[data-theme="dark"] :is(.schedule-view-tabs button.active,.day-picker button.active,.time-grid button.selected) { background: var(--sage); color: var(--ink); border-color: var(--muted); }
+.admin-shell[data-theme="dark"] :is(.day-track,.staff-calendar-day) { background: repeating-linear-gradient(to bottom, #151515 0 59px, #333333 60px); }
+.admin-shell[data-theme="dark"] .booking-main { --booking-line: #333333; --booking-text: #f2f2f2; --booking-muted: #ababab; --booking-accent: #e5e5e5; }
