@@ -2932,14 +2932,14 @@ td small {
 /* Team workflow: keep day-to-day operations above financial reporting. */
 .dashboard-operations { margin: 20px 0 28px; }
 .admin-theme-toggle { width: 40px; min-width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); color: var(--ink); font-size: 23px; cursor: pointer; }
-.admin-shell[data-theme="dark"] { --ink: #e6eee9; --paper: #141c19; --white: #1e2923; --muted: #afbeb4; --line: #3a4a40; --sage: #26372c; --gold: #a5d6ba; color-scheme: dark; }
+.admin-shell[data-theme="dark"] { --ink: #f2f2f2; --paper: #080808; --white: #151515; --muted: #ababab; --line: #333333; --sage: #242424; --gold: #e5e5e5; color-scheme: dark; }
 .admin-shell[data-theme="dark"] :is(.app-global-bar,.admin-sidebar,.admin-mobile-nav,.admin-topbar,.paper,.stat,.modal,.app-profile>div,.admin-quick-menu>div,.admin-mobile-menu,.admin-mobile-search) { background: var(--white); color: var(--ink); border-color: var(--line); }
-.admin-shell[data-theme="dark"] :is(input,select,textarea,.admin-global-search input,.admin-global-search button,.admin-quick-menu summary,.app-profile summary,.job-detailer-option,.booking-add-service) { background: #18221c; color: var(--ink); border-color: var(--line); }
+.admin-shell[data-theme="dark"] :is(input,select,textarea,.admin-global-search input,.admin-global-search button,.admin-quick-menu summary,.app-profile summary,.job-detailer-option,.booking-add-service) { background: #101010; color: var(--ink); border-color: var(--line); }
 .admin-shell[data-theme="dark"] :is(th,.filter-tabs a,.role-permissions-grid>div,.job-detailer-option:has(input:checked),.booking-additional-services,.ads-connection-form) { background: var(--sage); color: var(--ink); }
 .admin-shell[data-theme="dark"] :is(td,th,.summary-row,.field input,.field textarea,.field select) { border-color: var(--line); }
 .admin-shell[data-theme="dark"] :is(.admin-sidebar nav a,.admin-mobile-nav a,.admin-mobile-nav button,small,.small-note) { color: var(--muted); }
 .admin-shell[data-theme="dark"] :is(.admin-sidebar nav a.active,.admin-sidebar nav a:hover,.admin-mobile-nav a.active,.admin-mobile-nav button.active) { color: var(--gold); background: var(--sage); border-color: var(--line); }
-.admin-shell[data-theme="dark"] .button { background: #a5d6ba; color: #14261d; border-color: #a5d6ba; }
+.admin-shell[data-theme="dark"] .button { background: #e5e5e5; color: #101010; border-color: #e5e5e5; }
 .admin-shell[data-theme="dark"] :is(.button.outline,.text-link,.link-button) { background: transparent; color: var(--gold); }
 .admin-shell[data-theme="dark"] .modal-backdrop { background: #000a; }
 .admin-shell[data-theme="dark"] :is(.error-message,.error) { color: #ffb5a8; background: #432b26; }
@@ -2977,6 +2977,6 @@ td small {
 @media(max-width: 720px) { .job-photo-columns,.sales-booking-grid { grid-template-columns: minmax(0,1fr); } .sales-booking-section { padding: 16px; } .admin-theme-toggle { width: 34px; min-width: 34px; height: 36px; } }
 .admin-shell[data-theme="dark"] .field input:not([type="checkbox"]):not([type="radio"]),
 .admin-shell[data-theme="dark"] .booking-main .field input:not([type="checkbox"]):not([type="radio"]),
-.admin-shell[data-theme="dark"] :is(.field select,.field textarea,input.control,select.control,textarea.control) { background: #18221c; color: var(--ink); border-color: var(--line); }
+.admin-shell[data-theme="dark"] :is(.field select,.field textarea,input.control,select.control,textarea.control) { background: #101010; color: var(--ink); border-color: var(--line); }
 .admin-shell[data-theme="dark"] :is(.field>span,.field>label) { color: var(--muted); }
 .admin-shell[data-theme="dark"] .empty-state { background: var(--paper); color: var(--ink); border-color: var(--line); }
