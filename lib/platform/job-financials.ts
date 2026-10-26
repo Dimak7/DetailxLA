@@ -35,6 +35,6 @@ export async function jobFinancials(bookingId: string): Promise<JobFinancials | 
     collected_cents: Number(row.collected_cents || 0),
     gross_service_cents: gross,
     net_service_cents: net,
-    outstanding_cents: Math.max(0, net + Number(row.tip_cents) - Number(row.collected_cents)),
+    outstanding_cents: Math.max(0, net - Number(row.collected_cents)),
   };
 }

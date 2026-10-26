@@ -15,6 +15,8 @@ test("financial and inventory operations", async () => {
   try {
     const owner = await sessionFromToken(await login(process.env.ADMIN_EMAIL!, process.env.ADMIN_PASSWORD!, "finance-test"));
     assert.ok(owner);
+    await adminAction("create_expense_directory_entry", { kind: "vendor", name: "Landlord" }, owner);
+    await adminAction("create_expense_directory_entry", { kind: "vendor", name: "Meta" }, owner);
     const expense = await adminAction("save_expense", { expense_date: "2026-09-01", amount_cents: 300000, category: "Rent", vendor: "Landlord", description: "September rent", payment_method: "ACH", funding_source: "Business", payment_account: "Business checking", marketing_stream: "", recurrence: "monthly", recurring_start: "2026-09-01", recurring_end: null, receipt_url: "", notes: "" }, owner) as { id: string };
     assert.ok(expense.id);
     const september = await expenseSummary("2026-09-01", "2026-09-30");

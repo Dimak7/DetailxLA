@@ -266,9 +266,12 @@ test("Square canonical ingestion and bounded sync", async (t) => {
       assert.equal(await createCheckout(invoice.booking), "https://square.link/production-only");
     });
 
-    await check("a previous account's pending checkout is replaced while same-account links are reused", async () => {
+    await check("a previous account's live checkout blocks a replacement until it is closed, while same-account links are reused", async () => {
       const invoice=await localInvoice("previous-account-order");
       await query(`UPDATE wl.payments SET checkout_url='https://square.link/previous-account',metadata=metadata||'{"square_environment":"production","square_location_id":"previous-account-location"}'::jsonb WHERE id=$1`,[invoice.id]);
+      fetchMock.mock.mockImplementation(async()=>new Response('{}',{status:404}));
+      await assert.rejects(()=>createCheckout(invoice.booking),/Square could not close/);
+      await query("UPDATE wl.payments SET status='expired' WHERE id=$1",[invoice.id]);
       fetchMock.mock.mockImplementation(async()=>json({payment_link:{id:"new-account-link",order_id:"new-account-order",url:"https://square.link/current-account"}}));
       assert.equal(await createCheckout(invoice.booking),"https://square.link/current-account");
       const calls=fetchMock.mock.callCount();

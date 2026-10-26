@@ -165,7 +165,7 @@ test("Square revenue reports use the canonical production ledger", async (t) => 
       assert.equal(result.refunds, 2000);
       assert.equal(result.processor_fees, 500);
       assert.equal(result.net_sales, 10000);
-      assert.equal(result.outstanding, 0);
+      assert.equal(result.outstanding, 2000, "refunded service principal leaves a balance; the tip cannot pay for the service");
       assert.equal(result.tips, 1500);
       assert.equal(result.average_order, 10000);
       assert.equal(result.revenue_per_customer, 10000);
@@ -282,7 +282,7 @@ test("Square revenue reports use the canonical production ledger", async (t) => 
       assert.equal(result.processor_fees, 440);
       assert.equal(result.average_order, 10000);
       assert.equal(result.revenue_per_customer, 10000);
-      assert.equal(result.outstanding, 0);
+      assert.equal(result.outstanding, 1000, "Square service principal plus Stripe credit excludes the Square tip");
       assert.deepEqual(result.windows, { today: 16000, week: 16000, month: 16000, year: 16000 });
       assert.deepEqual(result.series, [{ day: today, revenue: 16000 }]);
       assert.equal(result.square.net, 13000);

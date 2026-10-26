@@ -2987,3 +2987,126 @@ td small {
 .admin-shell[data-theme="dark"] :is(.schedule-view-tabs button.active,.day-picker button.active,.time-grid button.selected) { background: var(--sage); color: var(--ink); border-color: var(--muted); }
 .admin-shell[data-theme="dark"] :is(.day-track,.staff-calendar-day) { background: repeating-linear-gradient(to bottom, #151515 0 59px, #333333 60px); }
 .admin-shell[data-theme="dark"] .booking-main { --booking-line: #333333; --booking-text: #f2f2f2; --booking-muted: #ababab; --booking-accent: #e5e5e5; }
+
+/* Workspace controls use paired surface/text colors in both themes. */
+.admin-shell {
+  --admin-control-bg: #fff;
+  --admin-control-text: #26342e;
+  --admin-control-hover: #edf3ed;
+  --admin-primary-bg: #315e4b;
+  --admin-primary-text: #fff;
+  --admin-focus: #63836e;
+}
+.admin-shell[data-theme="dark"] {
+  --admin-control-bg: #222;
+  --admin-control-text: #f2f2f2;
+  --admin-control-hover: #333;
+  --admin-primary-bg: #ededed;
+  --admin-primary-text: #111;
+  --admin-focus: #d7d7d7;
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal,.app-global-bar,.admin-mobile-nav) :is(button,.button) {
+  background: var(--admin-control-bg);
+  color: var(--admin-control-text);
+  border-color: #484848;
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal) .button {
+  background: var(--admin-primary-bg);
+  color: var(--admin-primary-text);
+  border-color: var(--admin-primary-bg);
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal) :is(.button.outline,.link-button,.text-link) {
+  background: transparent;
+  color: var(--ink);
+  border-color: #5e5e5e;
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal,.app-global-bar,.admin-mobile-nav) button:where(:enabled):hover {
+  background: var(--admin-control-hover);
+  color: #fff;
+  border-color: #747474;
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal) .button:where(:not(:disabled)):hover {
+  background: #fff;
+  color: #111;
+  border-color: #fff;
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal) :is(.button.outline,.link-button):where(:not(:disabled)):hover {
+  background: var(--admin-control-hover);
+  color: #fff;
+  border-color: #747474;
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal) .button.button-danger {
+  background: #3b2424;
+  color: #ffd3cd;
+  border-color: #85534d;
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal) .button.button-danger:enabled:hover {
+  background: #512d2d;
+  color: #fff;
+  border-color: #b67b73;
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal,.app-global-bar,.admin-mobile-nav) :is(button,.button):disabled,
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal) .button[aria-disabled="true"] {
+  opacity: 1;
+  background: #282828;
+  color: #a5a5a5;
+  border-color: #414141;
+  cursor: not-allowed;
+}
+.admin-shell[data-theme="dark"] :is(input,select,textarea) {
+  color-scheme: dark;
+  caret-color: #f2f2f2;
+}
+.admin-shell[data-theme="dark"] :is(.field,.booking-main .field) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea) {
+  color-scheme: dark;
+  background: #101010;
+  color: var(--ink);
+  border-color: #484848;
+}
+.admin-shell[data-theme="dark"] select :is(option,optgroup) { background: #151515; color: #f2f2f2; }
+.admin-shell[data-theme="dark"] :is(input,textarea)::placeholder { color: #939393; opacity: 1; }
+.admin-shell[data-theme="dark"] :is(.field,.booking-main .field) :is(input,select,textarea):disabled {
+  background: #252525;
+  color: #a5a5a5;
+  border-color: #414141;
+  opacity: 1;
+}
+.admin-shell[data-theme="dark"] :is(.admin-main,.modal,.app-global-bar,.admin-mobile-nav) :is(button,a,input,select,textarea,summary):focus-visible {
+  outline: 2px solid var(--admin-focus);
+  outline-offset: 3px;
+}
+.admin-shell[data-theme="dark"] :is(.table-scroll,.admin-table-wrap,.booking-review,.availability-day,.employee-pay-preview,.integration-list>div,.staffing-person,.calendar-axis,.calendar-head,.staffing-matrix-head,.day-time-heading,.day-track-heading) {
+  background: var(--white);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.admin-shell[data-theme="dark"] :is(.stat p,.employee-pay-preview small,.booking-review-grid span,.booking-consent,.calendar-times span,.day-time-labels span,.job-detailer-option small) { color: var(--muted); }
+.admin-shell[data-theme="dark"] :is(.booking-review-grid,.booking-consent) :is(strong,small) { color: var(--ink); }
+.admin-shell[data-theme="dark"] tbody tr:hover { background: #202020; }
+.admin-shell[data-theme="dark"] :is(.shift-event,.appointment-event,.staffing-chip,.staffing-more,.staffing-add,.matrix-shift) { background: #242424; color: #f2f2f2; border-color: #555; }
+.admin-shell[data-theme="dark"] :is(.shift-event,.appointment-event,.staffing-chip,.matrix-shift) :is(span,small) { color: #c6c6c6; }
+.admin-shell[data-theme="dark"] :is(.status-pill,.inventory-status) { background: #20392b; border-color: #47785b; color: #c5efd4; }
+.admin-shell[data-theme="dark"] .inventory-status.low_stock { background: #3c321c; border-color: #8b7543; color: #f6dfa8; }
+.admin-shell[data-theme="dark"] .inventory-status.out_of_stock { background: #402821; border-color: #9b6454; color: #ffd2c3; }
+.admin-shell[data-theme="dark"] .crm-tag { background: #222; color: #f2f2f2; }
+.admin-shell[data-theme="dark"] .crm-tag button { color: #f2f2f2; }
+.admin-shell[data-theme="dark"] .editor-remove-confirmation { background: #352525; border-color: #82544d; }
+.admin-shell[data-theme="dark"] .editor-remove-confirmation p { color: #e3c0ba; }
+.admin-shell[data-theme="dark"] .modal-header { background: var(--white); color: var(--ink); }
+.admin-shell[data-theme="dark"] .modal-header :is(h2,h3) { color: var(--ink); }
+.admin-shell[data-theme="dark"] :is(.schedule-view-tabs button.active,.day-picker button.active,.time-grid button.selected,.admin-filter-toggle[aria-expanded="true"]) {
+  background: #e5e5e5;
+  color: #111;
+  border-color: #f2f2f2;
+}
+
+.admin-shell .expense-choice-row { display: flex; align-items: stretch; gap: 8px; }
+.admin-shell .expense-choice-row select, .admin-shell .expense-choice-row input { flex: 1; min-width: 0; }
+.admin-shell .expense-choice-row .button { flex: 0 0 auto; padding-inline: 12px; white-space: nowrap; }
+.admin-shell .expense-new-choice { display: grid; gap: 8px; margin-top: 6px; padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.admin-shell .expense-new-choice > label { color: var(--muted); font-size: 12px; }
+.admin-shell .expense-new-choice small { font-size: 11px; line-height: 1.5; color: var(--muted); }
+@media (max-width: 480px) {
+  .admin-shell .expense-choice-row { flex-wrap: wrap; }
+  .admin-shell .expense-choice-row select, .admin-shell .expense-choice-row input { flex-basis: 100%; }
+}

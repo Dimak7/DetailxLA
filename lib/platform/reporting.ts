@@ -66,7 +66,7 @@ export async function report(params: URLSearchParams) {
       `SELECT COALESCE(SUM(b.price_cents),0)::int net_sales,COALESCE(SUM(b.tip_cents),0)::int tips,
         COALESCE(SUM((SELECT SUM(quantity*unit_price_cents) FROM wl.booking_line_items li WHERE li.booking_id=b.id AND li.kind='upsell')),0)::int upsells,
         COALESCE(SUM((SELECT SUM(amount_cents) FROM wl.booking_discounts d WHERE d.booking_id=b.id)),0)::int discounts,
-        COALESCE(SUM(GREATEST(0,b.price_cents-COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.revenue_payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded')),0))),0)::int outstanding,
+        COALESCE(SUM(GREATEST(0,b.price_cents-COALESCE((SELECT SUM(GREATEST(0,p.amount_cents-p.tip_cents-p.refunded_cents)) FROM wl.revenue_payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded')),0))),0)::int outstanding,
         count(*)::int completed_jobs FROM wl.bookings b WHERE b.status='completed' AND ${activeBookingCustomer} AND (COALESCE(b.completed_at,b.updated_at) AT TIME ZONE 'America/Chicago')::date BETWEEN $1::date AND $2::date`,
       values,
     ),

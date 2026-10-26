@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { adminAction, adminData } from "../lib/platform/admin";
 import { closeDatabase, query } from "../lib/platform/db";
 import { payrollSummary } from "../lib/platform/payroll";
-import type { Session } from "../lib/platform/types";
+import { dateToday, type Session } from "../lib/platform/types";
 
 process.env.PGLITE_PATH = "memory://multi-detailer-booking";
 Object.assign(process.env, { NODE_ENV: "test" });
@@ -44,6 +44,7 @@ test("multiple detailers receive equal automatic shares and each can access the 
     const customerId = randomUUID();
     const vehicleId = randomUUID();
     const bookingId = randomUUID();
+    const bookingDate = dateToday();
     await query(
       "INSERT INTO wl.customers(id,first_name,last_name,email,phone) VALUES($1,'Shared','Job','shared@example.test','+13125550110')",
       [customerId],
@@ -54,8 +55,8 @@ test("multiple detailers receive equal automatic shares and each can access the 
     );
     await query(
       `INSERT INTO wl.bookings(id,request_key,request_hash,reference,customer_id,vehicle_id,service_id,service_name,service_snapshot,booking_date,start_minute,duration_minutes,status,price_cents,tip_cents)
-       VALUES($1,$5,'fixture','WL-SHARED',$2,$3,$4,'Full Detail','{}','2026-10-19',480,120,'confirmed',25000,1001)`,
-      [bookingId, customerId, vehicleId, service, randomUUID()],
+       VALUES($1,$5,'fixture','WL-SHARED',$2,$3,$4,'Full Detail','{}',$6,480,120,'confirmed',25000,1001)`,
+      [bookingId, customerId, vehicleId, service, randomUUID(), bookingDate],
     );
 
     await adminAction(
@@ -103,7 +104,7 @@ test("multiple detailers receive equal automatic shares and each can access the 
     await adminAction("update_booking", { id: bookingId, status: "in_progress" }, secondarySession);
     await adminAction("update_booking", { id: bookingId, status: "completed" }, secondarySession);
 
-    const payroll = await payrollSummary("2026-10-19", "2026-10-19");
+    const payroll = await payrollSummary(bookingDate, bookingDate);
     const tips = staff.map((person) => Number(payroll.find((row) => row.id === person.employeeId)?.tips_cents));
     assert.equal(tips.reduce((total, tip) => total + tip, 0), 1001);
     assert.deepEqual([...tips].sort((a, b) => a - b), [500, 501]);

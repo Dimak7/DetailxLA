@@ -1,3 +1,7 @@
+import { saveJobPricing } from "./job-pricing";
+import { recordJobCashPayment, listUnlinkedSquareJobPayments, linkSquareJobPayment, refreshJobPayments } from "./job-payments";
+import { saveJobCompensation } from "./job-compensation";
+import { expenseDirectory, createExpenseDirectoryEntry, resolveExpenseDirectory } from "./expense-directory";
 import { sendBookingConfirmationText, sendBookingPaymentText } from "./booking-communications";
 import {connectSquareAccount,squareAccountScope} from "../integrations/square-reporting";
 import {preserveCompletedJobPay} from "./payroll";
@@ -178,7 +182,7 @@ export async function adminData(
   if (section === "expenses") {
     const expenseParams=new URLSearchParams(p);if(!expenseParams.get("range"))expenseParams.set("range","year");
     const { start, end } = reportRange(expenseParams);
-    return { start, end, summary: await expenseSummary(start, end), rows: await query("SELECT * FROM wl.expenses WHERE (expense_date BETWEEN $1 AND $2 OR (recurrence<>'one_time' AND COALESCE(recurring_start,expense_date)<=$2 AND COALESCE(recurring_end,$2)>=$1)) AND (vendor||' '||category||' '||description||' '||payment_account||' '||funding_source) ILIKE $3 ORDER BY expense_date DESC,created_at DESC LIMIT 200", [start,end,"%" + search + "%"]) };
+    return { start, end, expenseDirectory: await expenseDirectory(), summary: await expenseSummary(start, end), rows: await query("SELECT * FROM wl.expenses WHERE (expense_date BETWEEN $1 AND $2 OR (recurrence<>'one_time' AND COALESCE(recurring_start,expense_date)<=$2 AND COALESCE(recurring_end,$2)>=$1)) AND (vendor||' '||category||' '||description||' '||payment_account||' '||funding_source) ILIKE $3 ORDER BY expense_date DESC,created_at DESC LIMIT 200", [start,end,"%" + search + "%"]) };
   }
   if (section === "inventory") {
     const selected = p.get("id") || "";
@@ -367,6 +371,7 @@ export async function adminData(
       args.push(user.user_id);
       filters += " AND (b.assigned_to=$" + args.length + " OR EXISTS(SELECT 1 FROM wl.employee_job_assignments assignment JOIN wl.employees assigned_employee ON assigned_employee.id=assignment.employee_id WHERE assignment.booking_id=b.id AND assigned_employee.user_id=$" + args.length + "))";
     }
+    if (p.get("id")) { args.push(uuid.parse(p.get("id"))); filters += " AND b.id=$" + args.length; }
     if (date && section !== "calendar") {
       args.push(date);
       filters += " AND b.booking_date=$" + args.length;
@@ -405,7 +410,7 @@ export async function adminData(
     )[0].total;
     const fields = staff
       ? "b.id,b.reference,b.booking_date,b.start_minute,b.duration_minutes,b.status,b.service_name,b.customer_id,b.notes,b.location,b.assigned_to"
-      : `b.*,EXISTS(SELECT 1 FROM wl.payments pc WHERE pc.booking_id=b.id AND pc.status IN ('pending','paid','partially_refunded','refunded') AND ((pc.provider='square' AND COALESCE(pc.metadata->>'square_environment','production')='${squareEnvironment()}') OR (pc.provider<>'square' AND '${squareEnvironment()}'='production'))) has_checkout,(SELECT row_to_json(si) FROM wl.square_invoices si WHERE si.booking_id=b.id AND si.environment='${squareEnvironment()}') square_invoice,${squareEnvironment()==='sandbox'?"COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.provider='square' AND p.metadata->>'square_environment'='sandbox' AND p.status IN ('paid','partially_refunded','refunded')),0)":"COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded') AND (p.provider<>'square' OR p.metadata->>'square_environment'='production')),0)"} collected_cents,COALESCE((SELECT jsonb_agg(jsonb_build_object('employee_id',a.employee_id,'name',e.name,'pool_share_bps',a.pool_share_bps,'tip_override_cents',a.tip_override_cents)) FROM wl.employee_job_assignments a JOIN wl.employees e ON e.id=a.employee_id WHERE a.booking_id=b.id),'[]'::jsonb) job_assignments,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',li.id,'service_id',li.service_id,'kind',li.kind,'name',li.name,'quantity',li.quantity,'unit_price_cents',li.unit_price_cents,'quote_pending',li.quote_pending) ORDER BY li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items`;
+      : `b.*,EXISTS(SELECT 1 FROM wl.payments pc WHERE pc.booking_id=b.id AND pc.status IN ('pending','paid','partially_refunded','refunded') AND ((pc.provider='square' AND COALESCE(pc.metadata->>'square_environment','production')='${squareEnvironment()}') OR (pc.provider<>'square' AND '${squareEnvironment()}'='production'))) has_checkout,(SELECT row_to_json(si) FROM wl.square_invoices si WHERE si.booking_id=b.id AND si.environment='${squareEnvironment()}' AND si.retired_at IS NULL) square_invoice,${squareEnvironment()==='sandbox'?"COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.provider='square' AND p.metadata->>'square_environment'='sandbox' AND p.status IN ('paid','partially_refunded','refunded')),0)":"COALESCE((SELECT SUM(p.amount_cents-p.refunded_cents) FROM wl.payments p WHERE p.booking_id=b.id AND p.status IN ('paid','partially_refunded','refunded') AND (p.provider<>'square' OR p.metadata->>'square_environment'='production')),0)"} collected_cents,COALESCE((SELECT jsonb_agg(jsonb_build_object('employee_id',a.employee_id,'name',e.name,'pool_share_bps',a.pool_share_bps,'tip_override_cents',a.tip_override_cents,'pay_type',a.pay_type,'pay_value',a.pay_value,'line_pay_rules',a.line_pay_rules,'commission_override_cents',a.commission_override_cents,'notes',a.notes)) FROM wl.employee_job_assignments a JOIN wl.employees e ON e.id=a.employee_id WHERE a.booking_id=b.id),'[]'::jsonb) job_assignments,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',li.id,'service_id',li.service_id,'kind',li.kind,'name',li.name,'quantity',li.quantity,'unit_price_cents',li.unit_price_cents,'quote_pending',li.quote_pending) ORDER BY CASE WHEN li.kind='base_service' THEN 0 ELSE 1 END,li.created_at,li.id) FROM wl.booking_line_items li WHERE li.booking_id=b.id),'[]'::jsonb) line_items,COALESCE((SELECT jsonb_agg(d ORDER BY d.created_at,d.id) FROM wl.booking_discounts d WHERE d.booking_id=b.id),'[]'::jsonb) discounts`;
     args.push(
       section === "calendar" ? 2000 : limit,
       section === "calendar" ? 0 : offset,
@@ -428,8 +433,9 @@ export async function adminData(
       } : {}),
       team,
       employees: staff ? [] : await query(
-        "SELECT e.id employee_id,e.user_id,e.name,e.position,e.phone FROM wl.employees e JOIN wl.users u ON u.id=e.user_id WHERE e.active=true AND u.active=true ORDER BY e.name",
+        "SELECT e.id,e.id employee_id,e.user_id,e.name,e.position,e.phone,e.compensation_model,e.default_commission_bps,e.flat_job_pay_cents FROM wl.employees e JOIN wl.users u ON u.id=e.user_id WHERE e.active=true AND u.active=true ORDER BY e.name",
       ),
+      payRules: staff ? [] : await query("SELECT * FROM wl.employee_pay_rules WHERE active=true ORDER BY updated_at DESC,id DESC"),
       blocks: staff ? [] : await query(
         "SELECT * FROM wl.blocks ORDER BY booking_date DESC LIMIT 200",
       ),
@@ -448,6 +454,13 @@ export async function adminData(
   return { rows: [] };
 }
 const actionSections: Record<string, string> = {
+  save_job_pricing: "bookings",
+  save_job_compensation: "payroll",
+  record_job_cash_payment: "payments",
+  refresh_job_payments: "payments",
+  list_job_square_payments: "payments",
+  link_job_square_payment: "payments",
+  create_expense_directory_entry: "expenses",
   save_service: "services",
   save_customer: "customers",
   add_note: "customers",
@@ -506,6 +519,13 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   if (!section || !access[section]?.includes(user.role))
     throw new AppError("Your role cannot perform this action.", 403);
   const data = z.record(z.string(), z.unknown()).parse(raw);
+  if (action === "save_job_pricing") return saveJobPricing(data, user.user_id);
+  if (action === "save_job_compensation") return saveJobCompensation(data, user.user_id);
+  if (action === "refresh_job_payments") return refreshJobPayments(uuid.parse(data.booking_id), user);
+  if (action === "list_job_square_payments") return listUnlinkedSquareJobPayments(uuid.parse(data.booking_id), user);
+  if (action === "link_job_square_payment") return linkSquareJobPayment(data, user);
+  if (action === "record_job_cash_payment") return recordJobCashPayment(data, user);
+  if (action === "create_expense_directory_entry") return createExpenseDirectoryEntry(data, user);
   if (action === "send_booking_confirmation" || action === "send_booking_payment_text") {
     if (user.role === "staff") throw new AppError("A manager must send customer messages.", 403);
     const bookingId = uuid.parse(data.booking_id), requestId = uuid.parse(data.request_id);
@@ -657,7 +677,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     if (requestedAssignments.reduce((total, assignment) => total + assignment.pool_share_bps, 0) !== 10000) throw new AppError("Employee job splits must total exactly 100%.");
     if (new Set(requestedAssignments.map((assignment) => assignment.employee_id)).size !== requestedAssignments.length) throw new AppError("Each employee can appear only once on a job.");
     await transaction(async q => {
-      const booking=(await q<Row>("SELECT tip_cents FROM wl.bookings WHERE id=$1 FOR UPDATE",[input.booking_id])).rows[0];
+      const booking=(await q<Row>("SELECT tip_cents,tip_recipient_employee_id,booking_date,assigned_to FROM wl.bookings WHERE id=$1 FOR UPDATE",[input.booking_id])).rows[0];
       if (!booking) throw new AppError("Booking not found.",404);
       const employees = (await q<{ id: string; user_id: string | null; active: boolean }>(
         "SELECT id,user_id,active FROM wl.employees WHERE id=ANY($1::uuid[]) FOR UPDATE",
@@ -668,9 +688,12 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       const hasExplicit=requestedAssignments.some((assignment) => assignment.tip_override_cents !== null);
       const explicit=requestedAssignments.reduce((total, assignment) => total + (assignment.tip_override_cents || 0),0);
       if (hasExplicit && explicit !== Number(booking.tip_cents)) throw new AppError("Explicit tip allocations must total the job tip.");
-      const previous = (await q<{ employee_id: string; commission_override_cents: number | null }>(
-        "SELECT employee_id,commission_override_cents FROM wl.employee_job_assignments WHERE booking_id=$1", [input.booking_id],
+      const previous = (await q<{ employee_id: string; commission_override_cents: number | null; pay_type:string; pay_value:number; line_pay_rules:unknown }>(
+        "SELECT employee_id,commission_override_cents,pay_type,pay_value,line_pay_rules FROM wl.employee_job_assignments WHERE booking_id=$1", [input.booking_id],
       )).rows;
+      if (booking.tip_recipient_employee_id && !requestedAssignments.some(a => a.employee_id === booking.tip_recipient_employee_id)) throw new AppError("Use Team & pay to choose the new full-tip recipient.");
+      const affectedIds = [...new Set([...previous.map(a=>a.employee_id),...requestedAssignments.map(a=>a.employee_id)])];
+      if ((await q(`SELECT pp.id FROM wl.pay_periods pp JOIN wl.payroll_records pr ON pr.pay_period_id=pp.id JOIN wl.employees e ON e.id=pr.employee_id WHERE pp.status='paid' AND $1::text BETWEEN pp.start_date AND pp.end_date AND (e.id=ANY($2::uuid[]) OR e.user_id=$3::uuid) LIMIT 1`,[booking.booking_date,affectedIds,booking.assigned_to])).rows.length) throw new AppError("This job belongs to a paid payroll period. Record an adjustment instead.",409);
       const assignments = requestedAssignments.map((assignment) => ({
         ...assignment,
         // Split-only editors omit this field. An explicit null removes an override.
@@ -679,10 +702,12 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
           : assignment.commission_override_cents,
       }));
       await q("DELETE FROM wl.employee_job_assignments WHERE booking_id=$1",[input.booking_id]);
-      for (const assignment of assignments)
-        await q("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps,commission_override_cents,tip_override_cents,notes,assigned_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",[randomUUID(),input.booking_id,assignment.employee_id,assignment.pool_share_bps,assignment.commission_override_cents,assignment.tip_override_cents,assignment.notes,user.user_id]);
+      for (const assignment of assignments) {
+        const old = previous.find(row => row.employee_id === assignment.employee_id);
+        await q("INSERT INTO wl.employee_job_assignments(id,booking_id,employee_id,pool_share_bps,commission_override_cents,tip_override_cents,notes,assigned_by,pay_type,pay_value,line_pay_rules) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)",[randomUUID(),input.booking_id,assignment.employee_id,assignment.pool_share_bps,assignment.commission_override_cents,assignment.tip_override_cents,assignment.notes,user.user_id,old?.pay_type || 'default',old?.pay_value || 0,JSON.stringify(old?.line_pay_rules || [])]);
+      }
       const primaryUserId = employees.find((employee) => employee.id === assignments[0].employee_id)?.user_id || null;
-      await q("UPDATE wl.bookings SET assigned_to=$2,updated_at=now() WHERE id=$1", [input.booking_id, primaryUserId]);
+      await q("UPDATE wl.bookings SET assigned_to=$2,tip_recipient_employee_id=CASE WHEN $3::uuid IS NOT NULL THEN $3::uuid ELSE tip_recipient_employee_id END,updated_at=now() WHERE id=$1", [input.booking_id, primaryUserId, assignments.length===1?assignments[0].employee_id:null]);
       await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,after_data) VALUES($1,$2,'job_assignment',$3,'replaced',$4::jsonb)",[randomUUID(),user.user_id,input.booking_id,JSON.stringify({ ...input, assignments })]);
     });
   }
@@ -735,7 +760,7 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     if (!validDate(expense.expense_date) || (expense.recurring_start && !validDate(expense.recurring_start)) || (expense.recurring_end && !validDate(expense.recurring_end))) throw new AppError("Choose valid expense dates.");
     if (expense.recurring_end && (expense.recurring_start || expense.expense_date) > expense.recurring_end) throw new AppError("Recurring end date must follow its start.");
     const id = expense.id || randomUUID();
-    await transaction(async (q) => { const before = expense.id ? (await q<Row>("SELECT * FROM wl.expenses WHERE id=$1 FOR UPDATE", [id])).rows[0] || {} : {}; await q("INSERT INTO wl.expenses(id,expense_date,amount_cents,category,vendor,description,payment_method,recurrence,recurring_start,recurring_end,receipt_url,notes,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13) ON CONFLICT(id) DO UPDATE SET expense_date=$2,amount_cents=$3,category=$4,vendor=$5,description=$6,payment_method=$7,recurrence=$8,recurring_start=$9,recurring_end=$10,receipt_url=$11,notes=$12,updated_by=$13,updated_at=now()", [id,expense.expense_date,expense.amount_cents,expense.category,expense.vendor,expense.description,expense.payment_method,expense.recurrence,expense.recurrence === "one_time" ? null : expense.recurring_start || expense.expense_date,expense.recurrence === "one_time" ? null : expense.recurring_end,expense.receipt_url,expense.notes,user.user_id]); await q("UPDATE wl.expenses SET funding_source=$2,payment_account=$3,marketing_stream=$4 WHERE id=$1",[id,expense.funding_source,expense.payment_account,expense.marketing_stream]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'expense',$3,$4,$5::jsonb,$6::jsonb)",[randomUUID(),user.user_id,id,expense.id ? "updated" : "created",JSON.stringify(before),JSON.stringify(expense)]); });
+    await transaction(async (q) => { const before = expense.id ? (await q<Row>("SELECT * FROM wl.expenses WHERE id=$1 FOR UPDATE", [id])).rows[0] || {} : {}; Object.assign(expense, await resolveExpenseDirectory(q, expense)); await q("INSERT INTO wl.expenses(id,expense_date,amount_cents,category,vendor,description,payment_method,recurrence,recurring_start,recurring_end,receipt_url,notes,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13) ON CONFLICT(id) DO UPDATE SET expense_date=$2,amount_cents=$3,category=$4,vendor=$5,description=$6,payment_method=$7,recurrence=$8,recurring_start=$9,recurring_end=$10,receipt_url=$11,notes=$12,updated_by=$13,updated_at=now()", [id,expense.expense_date,expense.amount_cents,expense.category,expense.vendor,expense.description,expense.payment_method,expense.recurrence,expense.recurrence === "one_time" ? null : expense.recurring_start || expense.expense_date,expense.recurrence === "one_time" ? null : expense.recurring_end,expense.receipt_url,expense.notes,user.user_id]); await q("UPDATE wl.expenses SET funding_source=$2,payment_account=$3,marketing_stream=$4 WHERE id=$1",[id,expense.funding_source,expense.payment_account,expense.marketing_stream]); await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'expense',$3,$4,$5::jsonb,$6::jsonb)",[randomUUID(),user.user_id,id,expense.id ? "updated" : "created",JSON.stringify(before),JSON.stringify(expense)]); });
     return {id,expense_date:expense.expense_date};
   }
   if (action === "delete_expense") {

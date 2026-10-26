@@ -45,6 +45,8 @@ export type BookingServiceSnapshot = Service & {
 export type BookingSnapshot = BookingServiceSnapshot & {
   selected_services?: BookingServiceSnapshot[];
   requires_quote?: boolean;
+  agreed_total_cents?: number | null;
+  walk_in?: boolean;
 };
 export type BusinessSettings = {
   square_environment?: "sandbox" | "production";

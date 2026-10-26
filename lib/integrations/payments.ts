@@ -7,6 +7,8 @@ import { bookingById } from "../platform/bookings";
 import { enqueue, enqueueBooking } from "../platform/outbox";
 import { metaEvent } from "./providers";
 import type { Booking, BusinessSettings } from "../platform/types";
+import { syncJobSquareTips } from "./square-invoice-ledger";
+import { prepareJobPriceChange, verifiedSquareInvoiceCheckout } from "../platform/job-payments";
 import {
   SQUARE_API_VERSION, squareApiBase, squareEnvironment, retrieveSquarePayment,
   upsertSquarePayment, type SquarePayment, type SquareMoney, type SquareLedgerPayment, type SquareEnvironment,
@@ -31,7 +33,8 @@ type SquareRefund = {
 };
 
 function awaitingQuoteApproval(booking: Booking) {
-  const snapshot = booking.service_snapshot;
+  const snapshot = booking.service_snapshot as Booking["service_snapshot"] & { agreed_total_cents?: number | null };
+  if (typeof snapshot.agreed_total_cents === "number" && snapshot.agreed_total_cents === booking.price_cents) return false;
   return booking.status === "new" && booking.deposit_cents === 0 && (
     snapshot.requires_quote || snapshot.pricing_mode === "quote" || snapshot.slug === "ceramic-coating"
     || snapshot.selected_services?.some((service) => service.pricing_mode === "quote" || service.slug === "ceramic-coating")
@@ -84,7 +87,7 @@ async function preparePayment(
       throw new AppError("This appointment cannot be paid online.");
     if ((await q("SELECT id FROM wl.booking_line_items WHERE booking_id=$1 AND quote_pending LIMIT 1", [bookingId])).rows.length)
       throw new AppError("An upgrade quote must be agreed before creating an invoice.");
-    if((await q("SELECT booking_id FROM wl.square_invoices WHERE booking_id=$1 AND environment=$2",[bookingId,environment])).rows.length)throw new AppError("Use this booking’s Square invoice to collect payment.");
+    if((await q("SELECT booking_id FROM wl.square_invoices WHERE booking_id=$1 AND environment=$2 AND retired_at IS NULL",[bookingId,environment])).rows.length)throw new AppError("Use this booking’s Square invoice to collect payment.");
     const unclassified = (await q(
       `SELECT id FROM wl.payments WHERE booking_id=$1 AND provider='square'
        AND status IN ('paid','partially_refunded','refunded')
@@ -93,7 +96,7 @@ async function preparePayment(
     )).rows;
     if (unclassified.length)
       throw new AppError("Sync Square payments before collecting this appointment balance.");
-    const paid = Number(
+    const paidPrincipal = async () => Number(
       (
         await q<{ amount: number }>(
           `SELECT COALESCE(SUM(amount_cents-refunded_cents),0)::int amount FROM wl.payments
@@ -103,12 +106,22 @@ async function preparePayment(
         )
       ).rows[0].amount,
     );
-    const owed = Math.max(
+    let paid = await paidPrincipal();
+    let owed = Math.max(
       0,
       (kind === "deposit" ? current.deposit_cents : current.price_cents) - paid,
     );
-    if (!owed)
-      throw new AppError("There is no outstanding amount for this payment.");
+    if (provider === "square") {
+      const incompatible = (await q(`SELECT id FROM wl.payments WHERE booking_id=$1 AND provider='square' AND status='pending'
+        AND metadata->>'square_environment'=$2 AND (kind<>$3 OR amount_cents<>$4 OR (checkout_url<>'' AND COALESCE(metadata->>'square_location_id','')<>$5)
+        OR (SELECT count(*) FROM wl.payments duplicates WHERE duplicates.booking_id=$1 AND duplicates.provider='square' AND duplicates.status='pending' AND duplicates.metadata->>'square_environment'=$2)>1) LIMIT 1`, [bookingId, environment, kind, owed, activeLocation])).rows;
+      if (incompatible.length) {
+        await prepareJobPriceChange(q, bookingId);
+        paid = await paidPrincipal();
+        owed = Math.max(0, (kind === "deposit" ? current.deposit_cents : current.price_cents) - paid);
+      }
+    }
+    if (!owed) return null;
     const old = (
       await q<PaymentRow>(
         `SELECT * FROM wl.payments WHERE booking_id=$1 AND provider=$2 AND status='pending' AND kind=$6 AND amount_cents=$4
@@ -125,6 +138,7 @@ async function preparePayment(
       )
     ).rows[0];
   });
+  if (!payment) throw new AppError("There is no outstanding amount for this payment.");
   return { booking: b, payment };
 }
 
@@ -138,22 +152,32 @@ export async function createCheckout(
       "Payments are not connected. Please contact the studio.",
       503,
     );
-  const invoice=(await query<{url:string}>("SELECT url FROM wl.square_invoices WHERE booking_id=$1 AND environment=$2",[bookingId,squareEnvironment()]))[0];
-  if(invoice){if(invoice.url)return invoice.url;throw new AppError("Finish creating this booking's Square invoice from the admin panel.");}
+  const invoice = await verifiedSquareInvoiceCheckout(bookingId);
+  if (invoice) return invoice;
   const prepared = await preparePayment(bookingId, kind, provider);
-  if (prepared.payment.checkout_url) return prepared.payment.checkout_url;
-  return provider === "square"
-    ? createSquareCheckout(prepared.booking, prepared.payment)
-    : createStripeCheckout(prepared.booking, prepared.payment);
+  if (provider !== "square") return prepared.payment.checkout_url || createStripeCheckout(prepared.booking, prepared.payment);
+  // Serialize creating a remote link with job edits and cash collection. A stale
+  // prepare result must never resurrect a link retired while the API was busy.
+  const checkoutToken = await secret("square_access_token"), checkoutLocation = await secret("square_location_id"),
+    checkoutReceipt = await receiptToken(prepared.booking.id), businessName = (await settings()).name;
+  return transaction(async (q) => {
+    const booking = (await q<Booking>("SELECT * FROM wl.bookings WHERE id=$1 FOR UPDATE", [bookingId])).rows[0];
+    if (!booking || booking.price_cents === null || awaitingQuoteApproval(booking) || ["cancelled", "no_show"].includes(booking.status)) throw new AppError("This appointment cannot be paid online.");
+    const current = (await q<PaymentRow>("SELECT * FROM wl.payments WHERE id=$1 FOR UPDATE", [prepared.payment.id])).rows[0];
+    if (current?.status !== "pending") throw new AppError("The job changed while checkout was loading. Refresh and try again.", 409);
+    const credited = (await q<{ paid: number }>(`SELECT COALESCE(SUM(amount_cents-refunded_cents),0)::int paid FROM wl.payments WHERE booking_id=$1 AND status IN ('paid','partially_refunded','refunded') AND (provider<>'square' OR metadata->>'square_environment'=$2)`, [bookingId, squareEnvironment()])).rows[0].paid;
+    const owed = Math.max(0, (kind === "deposit" ? booking.deposit_cents : booking.price_cents) - Number(credited));
+    if (owed !== current.amount_cents || owed === 0) throw new AppError("The remaining balance changed. Refresh the job before opening checkout.", 409);
+    if (current.checkout_url) return current.checkout_url;
+    return createSquareCheckout(prepared.booking, current, q, { token: checkoutToken, locationId: checkoutLocation, receipt: checkoutReceipt, businessName });
+  });
 }
 
-async function createSquareCheckout(b: Booking, p: PaymentRow) {
-  const token = await secret("square_access_token"),
-    locationId = await secret("square_location_id");
+async function createSquareCheckout(b: Booking, p: PaymentRow, q: Query, config: { token: string; locationId: string; receipt: string; businessName: string }) {
+  const { token, locationId, receipt, businessName } = config;
   if (!token || !locationId)
     throw new AppError("Square checkout is not configured.", 503);
-  const receipt = await receiptToken(b.id),
-    returnUrl =
+  const returnUrl =
       siteUrl() +
       "/booking/confirmation?id=" +
       b.id +
@@ -177,13 +201,13 @@ async function createSquareCheckout(b: Booking, p: PaymentRow) {
           reference_id: p.id,
           line_items: [
             {
-              name: checkoutLabel((await settings()).name + " - " + b.service_name),
+              name: checkoutLabel(businessName + " - " + b.service_name),
               quantity: "1",
               base_price_money: { amount: p.amount_cents, currency: "USD" },
             },
           ],
         },
-        checkout_options: { redirect_url: returnUrl },
+        checkout_options: { redirect_url: returnUrl, allow_tipping: p.kind === "balance" },
         pre_populated_data: b.email ? { buyer_email: b.email } : undefined,
         payment_note: "Booking " + b.reference,
       }),
@@ -200,7 +224,7 @@ async function createSquareCheckout(b: Booking, p: PaymentRow) {
       result.errors?.[0]?.detail || "Square payment link could not be created.",
       502,
     );
-  await query(
+  await q(
     "UPDATE wl.payments SET checkout_url=$2,metadata=metadata||$3::jsonb WHERE id=$1",
     [
       p.id,
@@ -509,6 +533,7 @@ async function applySquareInvoiceEvidence(
         refunded_cents=LEAST(amount_cents,GREATEST(refunded_cents,$4::bigint)),processor_fee_cents=GREATEST(0,$5::bigint),
         payment_method=$6,status=CASE WHEN $4::bigint>=amount_cents THEN 'refunded' ELSE 'partially_refunded' END WHERE id=$1`,
       [p.id, payment.payment_id, payment.paid_at, payment.refunded_cents, payment.processor_fee_cents, payment.payment_method]);
+      await syncJobSquareTips(q, p.booking_id, payment.environment);
       return true;
     }
     await completePayment(q, p, business, {
@@ -519,8 +544,10 @@ async function applySquareInvoiceEvidence(
     await q(`UPDATE wl.payments SET refunded_cents=LEAST(amount_cents,GREATEST(refunded_cents,$2::bigint)),
       processor_fee_cents=GREATEST(0,$3::bigint),
       paid_at=COALESCE($4::timestamptz,paid_at),
+      tip_cents=$5,
       status=CASE WHEN $2::bigint>=amount_cents AND $2::bigint>0 THEN 'refunded' WHEN $2::bigint>0 THEN 'partially_refunded' ELSE status END
-      WHERE id=$1`, [p.id, payment.refunded_cents, payment.processor_fee_cents, payment.paid_at]);
+      WHERE id=$1`, [p.id, payment.refunded_cents, payment.processor_fee_cents, payment.paid_at, Math.max(0, Number(payment.tip_cents) - Math.max(0, Number(payment.refunded_cents) - p.amount_cents))]);
+    await syncJobSquareTips(q, p.booking_id, payment.environment);
     return !wasSettled;
   }
   if (["CANCELED", "FAILED"].includes(payment.status)) {

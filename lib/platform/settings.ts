@@ -160,16 +160,14 @@ function encryptionKey() {
     );
   return createHash("sha256").update(key).digest();
 }
-export async function secret(key: string) {
+export async function secret(key: string, q?: Query) {
   const environmentValue = (envKeys[key] || [])
     .map((environmentKey) => process.env[environmentKey])
     .find(Boolean);
   if (environmentValue) return environmentValue;
   const row = (
-    await query<{ ciphertext: string }>(
-      "SELECT ciphertext FROM wl.secrets WHERE key=$1",
-      [key],
-    )
+    q ? (await q<{ ciphertext: string }>("SELECT ciphertext FROM wl.secrets WHERE key=$1", [key])).rows
+      : await query<{ ciphertext: string }>("SELECT ciphertext FROM wl.secrets WHERE key=$1", [key])
   )[0];
   if (row) {
     const [iv, tag, body] = row.ciphertext.split(".");

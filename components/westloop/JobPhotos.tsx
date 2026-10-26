@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "./AdminControls";
 type Photo = { id: string; stage: string; caption: string; created_at: string; uploaded_by: string };
-export function JobPhotos({ bookingId, reference }: { bookingId: string; reference: string }) {
+export function JobPhotos({ bookingId, reference, embedded = false }: { bookingId: string; reference: string; embedded?: boolean }) {
   const [open, setOpen] = useState(false), [photos, setPhotos] = useState<Photo[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState("");
   async function load() {
     const response = await fetch(`/api/bookings/${bookingId}/photos`, { cache: "no-store" });
@@ -27,7 +27,8 @@ export function JobPhotos({ bookingId, reference }: { bookingId: string; referen
     } catch (e) { setError(e instanceof Error ? e.message : "Upload failed."); }
     finally { try { await load(); } catch { /* Preserve upload error. */ } setBusy(false); }
   }
-  return <><button onClick={() => void launch()}>Before / after photos</button>{open && <Modal title={`Job photos · ${reference}`} onClose={() => setOpen(false)} wide>
+  useEffect(() => { if (embedded) { setBusy(true); load().catch(e => setError(e instanceof Error ? e.message : "Could not load photos.")).finally(() => setBusy(false)); } }, [embedded,bookingId]);
+  const content = <>
     <p>Private photos for this appointment. JPEG, PNG or WebP, up to 8 MB each. Choose photos or drag them into a box.</p>
     {error && <p className="error-message" role="alert">{error}</p>}
     {busy && <p role="status">Loading / saving photos…</p>}
@@ -38,5 +39,6 @@ export function JobPhotos({ bookingId, reference }: { bookingId: string; referen
       </label><div className="job-photo-grid">{photos.filter(p => p.stage === stage).map(p => <figure key={p.id}><a href={`/api/booking-photos/${p.id}`} target="_blank" rel="noreferrer"><img src={`/api/booking-photos/${p.id}`} alt={`${stage} photo for ${reference}`} loading="lazy" /></a><figcaption>{p.uploaded_by} · {new Date(p.created_at).toLocaleDateString()}{p.caption && <span>{p.caption}</span>}</figcaption></figure>)}</div>
       {!photos.some(p => p.stage === stage) && <p className="small-note">No {stage} photos yet.</p>}
     </section>)}</div>
-  </Modal>}</>;
+  </>;
+  return embedded ? content : <><button onClick={() => void launch()}>Before / after photos</button>{open && <Modal title={`Job photos · ${reference}`} onClose={() => setOpen(false)} wide>{content}</Modal>}</>;
 }

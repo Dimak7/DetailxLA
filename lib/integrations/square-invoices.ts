@@ -20,6 +20,7 @@ type Invoice = {
   order_id: string;
 };
 type Saved = {
+  retired_at?: string | null;
   booking_id: string;
   environment: string;
   request_id: string;
@@ -114,7 +115,17 @@ export async function createSquareInvoice(bookingId: string) {
       )
     ).rows[0];
   });
-  if (saved.url) return { url: saved.url };
+  if (saved.retired_at) {
+    const { createCheckout } = await import("./payments");
+    return { url: await createCheckout(bookingId, "balance") };
+  }
+  if (saved.url) {
+    const { verifiedSquareInvoiceCheckout } = await import("../platform/job-payments");
+    const url = await verifiedSquareInvoiceCheckout(bookingId);
+    if (url) return { url };
+    const { createCheckout } = await import("./payments");
+    return { url: await createCheckout(bookingId, "balance") };
+  }
   const b = (
     await query<{
       reference: string;

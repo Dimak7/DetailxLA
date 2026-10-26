@@ -1,3 +1,4 @@
+import { expenseDirectorySchema } from "./expense-directory-schema";
 export const schema = `
 CREATE SCHEMA IF NOT EXISTS wl;
 CREATE TABLE IF NOT EXISTS wl.migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());
@@ -153,6 +154,19 @@ CREATE TABLE IF NOT EXISTS wl.employee_pay_rules (
 CREATE TABLE IF NOT EXISTS wl.employee_job_assignments (
  id uuid PRIMARY KEY, booking_id uuid NOT NULL REFERENCES wl.bookings(id), employee_id uuid NOT NULL REFERENCES wl.employees(id), pool_share_bps integer NOT NULL DEFAULT 10000 CHECK(pool_share_bps BETWEEN 0 AND 10000), commission_override_cents integer, notes text NOT NULL DEFAULT '', assigned_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(booking_id,employee_id));
 CREATE INDEX IF NOT EXISTS wl_employee_job_assignments_employee ON wl.employee_job_assignments(employee_id,booking_id);
+ALTER TABLE wl.employee_job_assignments ADD COLUMN IF NOT EXISTS pay_type text NOT NULL DEFAULT 'default' CHECK(pay_type IN ('default','percentage','flat'));
+ALTER TABLE wl.employee_job_assignments ADD COLUMN IF NOT EXISTS pay_value integer NOT NULL DEFAULT 0 CHECK(pay_value>=0);
+ALTER TABLE wl.employee_job_assignments ADD COLUMN IF NOT EXISTS line_pay_rules jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE wl.bookings ADD COLUMN IF NOT EXISTS tip_recipient_employee_id uuid REFERENCES wl.employees(id);
+CREATE TABLE IF NOT EXISTS wl.employee_resources (
+ id uuid PRIMARY KEY, title text NOT NULL,
+ kind text NOT NULL CHECK(kind IN ('training','checklist','contract','document')),
+ url text NOT NULL, description text NOT NULL DEFAULT '', employee_id uuid REFERENCES wl.employees(id),
+ active boolean NOT NULL DEFAULT true, created_by uuid REFERENCES wl.users(id),
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+ CHECK(kind<>'contract' OR employee_id IS NOT NULL));
+CREATE INDEX IF NOT EXISTS wl_employee_resources_audience ON wl.employee_resources(employee_id,active);
+
 CREATE TABLE IF NOT EXISTS wl.payroll_adjustments (
  id uuid PRIMARY KEY, pay_period_id uuid NOT NULL REFERENCES wl.pay_periods(id), employee_id uuid NOT NULL REFERENCES wl.employees(id), kind text NOT NULL CHECK(kind IN ('bonus','deduction','correction')), amount_cents integer NOT NULL, reason text NOT NULL, created_by uuid REFERENCES wl.users(id), created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS wl.crm_tags (id uuid PRIMARY KEY, name text NOT NULL UNIQUE, color text NOT NULL DEFAULT '#c6a66b', created_at timestamptz NOT NULL DEFAULT now());
@@ -180,6 +194,9 @@ ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 
 ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS external_id text NOT NULL DEFAULT '';
 ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS payment_method text NOT NULL DEFAULT '';
 ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS processor_fee_cents integer NOT NULL DEFAULT 0 CHECK(processor_fee_cents >= 0);
+ALTER TABLE wl.payments DROP CONSTRAINT IF EXISTS payments_amount_cents_check;
+ALTER TABLE wl.payments ADD CONSTRAINT payments_amount_cents_check CHECK(amount_cents>=0);
+ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS tip_cents integer NOT NULL DEFAULT 0 CHECK(tip_cents>=0);
 ALTER TABLE wl.payments ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}';
 CREATE UNIQUE INDEX IF NOT EXISTS wl_payment_provider_external_unique ON wl.payments(provider,external_id) WHERE external_id<>'';
 CREATE INDEX IF NOT EXISTS wl_payments_financial_lookup ON wl.payments(status,paid_at,booking_id,customer_id);
@@ -203,6 +220,7 @@ CREATE TABLE IF NOT EXISTS wl.square_invoices (
  request_id text NOT NULL, customer_id text NOT NULL DEFAULT '',order_id text NOT NULL DEFAULT '',invoice_id text NOT NULL DEFAULT '',
  url text NOT NULL DEFAULT '',amount_cents integer NOT NULL CHECK(amount_cents>0),status text NOT NULL DEFAULT 'CREATING',
  updated_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(booking_id,environment));
+ALTER TABLE wl.square_invoices ADD COLUMN IF NOT EXISTS retired_at timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS wl_square_invoice_order ON wl.square_invoices(environment,order_id) WHERE order_id<>'';
 ALTER TABLE wl.bookings ADD COLUMN IF NOT EXISTS manual_tip_cents integer;
 ALTER TABLE wl.bookings ADD COLUMN IF NOT EXISTS square_tip_cents integer NOT NULL DEFAULT 0;
@@ -238,9 +256,9 @@ LEFT JOIN LATERAL (
 WHERE s.environment='production' AND s.currency='USD' AND s.status='COMPLETED'
 AND (NOT EXISTS(SELECT 1 FROM wl.settings cfg WHERE cfg.key='square_account_locations' AND cfg.value ? s.environment) OR s.location_id IN (SELECT jsonb_array_elements_text(cfg.value->s.environment) FROM wl.settings cfg WHERE cfg.key='square_account_locations'))
 UNION ALL
-SELECT p.id::text,p.booking_id,p.customer_id,p.amount_cents::bigint,p.refunded_cents::bigint,
+SELECT p.id::text,p.booking_id,p.customer_id,(p.amount_cents+p.tip_cents)::bigint,p.refunded_cents::bigint,
  p.processor_fee_cents::bigint,p.status,p.provider,p.paid_at,p.created_at,p.checkout_url,p.external_id,
- p.payment_method,p.kind,p.metadata,0::bigint AS tip_cents
+ p.payment_method,p.kind,p.metadata,p.tip_cents::bigint AS tip_cents
 FROM wl.payments p
 WHERE p.provider<>'square' OR (
  p.metadata->>'square_environment'='production'
@@ -261,6 +279,7 @@ CREATE TABLE IF NOT EXISTS wl.expenses (
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS wl_expenses_date ON wl.expenses(expense_date);
 CREATE INDEX IF NOT EXISTS wl_expenses_category_date ON wl.expenses(category,expense_date);
+${expenseDirectorySchema}
 CREATE TABLE IF NOT EXISTS wl.inventory_items (
  id uuid PRIMARY KEY, name text NOT NULL, sku text NOT NULL DEFAULT '', category text NOT NULL DEFAULT 'Other', quantity numeric NOT NULL DEFAULT 0 CHECK(quantity >= 0),
  unit text NOT NULL DEFAULT 'units', unit_cost_cents integer NOT NULL DEFAULT 0 CHECK(unit_cost_cents >= 0), supplier text NOT NULL DEFAULT '', minimum_stock numeric NOT NULL DEFAULT 0 CHECK(minimum_stock >= 0),

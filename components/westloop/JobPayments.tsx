@@ -1,307 +1,67 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Modal, action, type RecordData } from "./AdminControls";
-import { money } from "@/lib/platform/types";
-export function JobPayments({ booking }: { booking: RecordData }) {
-  const router = useRouter(),
-    [open, setOpen] = useState(false),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [notice, setNotice] = useState(""),
-    [url, setUrl] = useState(""),
-    [createdInvoice, setCreatedInvoice] = useState(false);
-  const invoice = booking.square_invoice as RecordData | undefined,
-    total = booking.price_cents == null ? null : Number(booking.price_cents),
-    paid = Number(booking.collected_cents || 0),
-    due = total === null ? null : Math.max(0, total - paid),
-    link = url || String(invoice?.url || "");
-  async function save(name: string, kind = "balance") {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const result = await action(name, { booking_id: booking.id, kind, request_id: crypto.randomUUID() });
-      if (result?.queued) setNotice("Payment text queued for the customer. Check the customer timeline for delivery.");
-      if (result?.url) {
-        setUrl(String(result.url));
-        setCreatedInvoice(name === "create_square_invoice");
-      }
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Payment action failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <>
-      <button onClick={() => setOpen(true)}>Payments</button>
-      {open && (
-        <Modal
-          title={`Payments · ${booking.reference}`}
-          onClose={() => setOpen(false)}
-        >
-          {booking.square_environment==="sandbox"&&<p role="status"><strong>Sandbox invoice — test payments only.</strong></p>}
-          <p>
-            Book by phone → collect 50% deposit → detail the vehicle → collect
-            the remaining balance → hand over the car.
-          </p>
-          <dl className="job-payment-totals">
-            <div>
-              <dt>Agreed service total</dt>
-              <dd>{money(total)}</dd>
-            </div>
-            <div>
-              <dt>Deposit required</dt>
-              <dd>
-                {money(
-                  invoice
-                    ? Math.round(Number(invoice.amount_cents) / 2)
-                    : total === null ? null : Math.round(total / 2),
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt>Service payments collected</dt>
-              <dd>{money(paid)}</dd>
-            </div>
-            <div>
-              <dt>Service balance remaining</dt>
-              <dd>{money(due)}</dd>
-            </div>
-            <div>
-              <dt>Customer tips (separate)</dt>
-              <dd>{money(Number(booking.tip_cents || 0))}</dd>
-            </div>
-          </dl>
-          <p>
-            <strong>
-              {total === null
-                ? "Agree the quote first"
-                : paid === 0
-                  ? "Awaiting deposit"
-                  : due === 0
-                    ? "Service paid in full"
-                    : paid < Math.round(total / 2)
-                      ? "Deposit partially paid"
-                      : "Deposit received · balance due before handover"}
-            </strong>
-          </p>
-          {booking.status === "completed" && Number(due) > 0 && (
-            <p role="status">
-              Detail complete. Collect the remaining service balance before
-              releasing the vehicle.
-            </p>
-          )}
-          <div className="button-row">
-            <button disabled={busy || total === null || paid >= Math.round(Number(total) / 2)} onClick={() => void save("send_booking_payment_text", "deposit")}>Send deposit link by text</button>
-            <button disabled={busy || total === null || !due} onClick={() => void save("send_booking_payment_text", "balance")}>Send balance link by text</button>
-          </div>
-          {notice && <p className="success-message" role="status">{notice}</p>}
-          {link ? (
-            <>
-              <p>
-                <a
-                  className="button"
-                  href={link}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open customer payment page
-                </a>
-              </p>
-              <label>
-                Share this payment link
-                <input
-                  readOnly
-                  value={link}
-                  onFocus={(event) => event.currentTarget.select()}
-                />
-              </label>
-              <p>
-                {invoice || createdInvoice
-                  ? "Use this same invoice for the deposit and final balance. It also appears in Square Invoices. The final payment offers tipping."
-                  : "This booking uses its existing checkout collection flow. Share this secure link to collect the remaining amount."}
-              </p>
-            </>
-          ) : paid > 0 || booking.has_checkout ? (
-            <>
-              <p>
-                This booking already uses the existing checkout collection flow.
-              </p>
-              <button
-                disabled={busy || !due}
-                onClick={() => void save("create_payment")}
-              >
-                Get remaining balance link
-              </button>
-              {paid < Number(booking.deposit_cents) && (
-                <button
-                  disabled={busy}
-                  onClick={() => void save("create_payment", "deposit")}
-                >
-                  Get deposit link
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <p>
-                Create one Square invoice for the whole detail: 50% due now and
-                the rest due on the service date. It does not charge a card or
-                send an email automatically. Share the link with the customer.
-              </p>
-              <p className="small-note">
-                Taking payment in person? Open this invoice by its appointment
-                reference in Square Invoices and collect it on the Square
-                device. Do not start an unrelated custom-amount sale; the
-                invoice order is what matches the payment and tip to this job.
-              </p>
-              <button
-                className="button"
-                disabled={busy || total === null || total < 2}
-                onClick={() => void save("create_square_invoice")}
-              >
-                {busy ? "Connecting to Square…" : "Create 50% deposit invoice"}
-              </button>
-            </>
-          )}
-          {invoice && (
-            <>
-              <p className="small-note">
-                For an in-person balance, open this appointment reference in
-                Square Invoices and take the card payment there. Its payment,
-                tip, fee and refund history will sync to this booking.
-              </p>
-              <button
-                disabled={busy}
-                onClick={() => void save("refresh_detail_invoice")}
-              >
-                Refresh Square payments
-              </button>
-            </>
-          )}
-          {error && <p role="alert">{error}</p>}
-          <p className="small-note">
-            Use Manage to record Confirmed, In progress and Completed as the job
-            progresses. Square controls payment status; marking a detail
-            complete does not mark it paid. Existing checkout payments must
-            finish their current collection flow.
-          </p>
-        </Modal>
-      )}
-    </>
-  );
+import {useCallback,useEffect,useState} from "react";
+import {useRouter} from "next/navigation";
+import {Modal,action,type RecordData as R} from "./AdminControls";
+import {money} from "@/lib/platform/types";
+import styles from "./JobWorkspace.module.css";
+export async function loadJob(id:string){
+ const response=await fetch(`/api/manage?section=bookings&id=${encodeURIComponent(id)}`,{cache:"no-store"});
+ const data=await response.json();if(!response.ok)throw Error(data.error||"Could not refresh this job.");
+ if(!data.rows?.[0])throw Error("This job is unavailable. Refresh the bookings list.");
+ return {...data.rows[0],square_environment:data.squareEnvironment} as R;
 }
-export function JobTipAllocation({
-  booking,
-  employees,
-}: {
-  booking: RecordData;
-  employees: RecordData[];
-}) {
-  const router = useRouter(),
-    [open, setOpen] = useState(false),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
-  function launch() {
-    const existing = Array.isArray(booking.job_assignments)
-      ? (booking.job_assignments as RecordData[])
-      : [];
-    const assigned = employees.find((e) => e.user_id === booking.assigned_to);
-    setSelected(
-      existing.length
-        ? existing.map((a) => String(a.employee_id))
-        : assigned
-          ? [String(assigned.employee_id)]
-          : [],
-    );
-    setError("");
-    setOpen(true);
-  }
-  function toggle(employeeId: string) {
-    setSelected((current) =>
-      current.includes(employeeId)
-        ? current.filter((id) => id !== employeeId)
-        : [...current, employeeId],
-    );
-  }
-  async function save() {
-    setBusy(true);
-    setError("");
-    try {
-      await action("save_job_assignments", {
-        booking_id: booking.id,
-        employee_ids: selected,
-      });
-      setOpen(false);
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not assign detailers.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <>
-      <button onClick={launch}>Assign detailers</button>
-      {open && (
-        <Modal
-          title={`Assign detailers · ${booking.reference}`}
-          onClose={() => setOpen(false)}
-        >
-          <p>
-            Select everyone working on this vehicle. Job credit and tips are
-            divided automatically and evenly across the assigned detailers.
-          </p>
-          <div className="job-detailer-options">
-            {employees.map((employee) => {
-              const id = String(employee.employee_id);
-              return (
-                <label className="job-detailer-option" key={id}>
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(id)}
-                    onChange={() => toggle(id)}
-                  />
-                  <span>
-                    <strong>{String(employee.name)}</strong>
-                    <small>{String(employee.position || "Detailer")}</small>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-          {selected.length > 0 && (
-            <p className="small-note" role="status">
-              {selected.length === 1
-                ? "This detailer receives 100% of the job credit and tip."
-                : `${selected.length} detailers receive an equal ${(
-                    100 / selected.length
-                  ).toFixed(2)}% share. Any rounding cent is assigned consistently.`}
-              {Number(booking.tip_cents || 0) > 0
-                ? ` Current tip: ${money(Number(booking.tip_cents || 0))}.`
-                : ""}
-            </p>
-          )}
-          <div className="button-row">
-            <button
-              className="button"
-              disabled={busy || !selected.length}
-              onClick={() => void save()}
-            >
-              {busy ? "Saving…" : "Save assignments"}
-            </button>
-          </div>
-          {error && <p role="alert">{error}</p>}
-          <p>
-            Square and cash tips appear automatically in Payroll. Tips stay
-            separate from service commission.
-          </p>
-        </Modal>
-      )}
-    </>
-  );
+export function JobPayments({booking,embedded=false}:{booking:R;embedded?:boolean}){
+ const [open,setOpen]=useState(embedded),[current,setCurrent]=useState(booking),[loading,setLoading]=useState(false),[error,setError]=useState("");
+ const refresh=useCallback(async()=>{setLoading(true);setError("");try{setCurrent(await loadJob(String(booking.id)));}catch(e){setError(e instanceof Error?e.message:"Could not refresh payments.");}finally{setLoading(false);}},[booking.id]);
+ useEffect(()=>{if(open)void refresh();},[open,refresh]);
+ const content=loading?<p role="status">Refreshing payments…</p>:error?<p role="alert">{error} <button onClick={()=>void refresh()}>Retry</button></p>:<JobPaymentPanel key={String(current.updated_at)} booking={current} onSaved={()=>void refresh()}/>;
+ return embedded?content:<><button onClick={()=>setOpen(true)}>Collect payment</button>{open&&<Modal title={`Payments · ${booking.reference}`} onClose={()=>setOpen(false)} wide>{content}</Modal>}</>;
+}
+export function JobPaymentPanel({booking,onSaved}:{booking:R;onSaved:()=>void}){
+ const router=useRouter(),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[url,setUrl]=useState(""),[cash,setCash]=useState(""),[tip,setTip]=useState("0"),[cashOpen,setCashOpen]=useState(false),[requestId,setRequestId]=useState(()=>crypto.randomUUID());
+ const invoice=booking.square_invoice as R|undefined,total=booking.price_cents==null?null:Number(booking.price_cents),paid=Number(booking.collected_cents||0),due=total===null?null:Math.max(0,total-paid),deposit=Number(booking.deposit_cents||0),tips=Number(booking.tip_cents||0),depositDue=Math.max(0,deposit-paid);
+ const link=url;
+ const [matches,setMatches]=useState<R[]|null>(null),[selected,setSelected]=useState("");
+ async function findSquare(){if(busy)return;setBusy(true);setError("");try{const result=await action("list_job_square_payments",{booking_id:booking.id});setMatches(result.payments as R[]);setSelected("");}catch(e){setError(e instanceof Error?e.message:"Could not load Square receipts.");}finally{setBusy(false);}}
+ async function matchSquare(){if(busy||!selected)return;setBusy(true);setError("");try{await action("link_job_square_payment",{booking_id:booking.id,payment_id:selected});setMatches(null);router.refresh();onSaved();}catch(e){setError(e instanceof Error?e.message:"Could not match the receipt.");}finally{setBusy(false);}}
+ async function save(name:string,kind="balance"){
+  if(busy)return;setBusy(true);setError("");setNotice("");try{
+   const result=await action(name,{booking_id:booking.id,kind,request_id:crypto.randomUUID()});
+   if(result?.url)setUrl(String(result.url));
+   if(result?.queued)setNotice("Payment text queued. Delivery is recorded in the customer timeline.");
+   if(name==="refresh_job_payments"){onSaved();setNotice("Square payments refreshed.");}
+   router.refresh();
+  }catch(e){setError(e instanceof Error?e.message:"Payment action failed.");}finally{setBusy(false);}
+ }
+ async function recordCash(e:React.FormEvent){e.preventDefault();if(busy)return;setBusy(true);setError("");try{
+  await action("record_job_cash_payment",{booking_id:booking.id,request_id:requestId,amount_cents:Math.round(Number(cash)*100),tip_cents:Math.round(Number(tip)*100)});
+  setRequestId(crypto.randomUUID());setCashOpen(false);setCash("");setTip("0");setNotice("Cash payment recorded. The service balance and tip are updated.");router.refresh();onSaved();
+ }catch(e){setError(e instanceof Error?e.message:"Could not record payment.");}finally{setBusy(false);}}
+ return <div className={styles.workspace}>
+  {booking.square_environment==="sandbox"&&<p role="status"><strong>Square sandbox · test payments only</strong></p>}
+  <div className={styles.metrics}><div className={styles.metric}><span>Agreed service total</span><strong>{money(total)}</strong></div><div className={styles.metric}><span>Service payments received</span><strong>{money(paid)}</strong></div><div className={styles.metric}><span>Service balance remaining</span><strong>{money(due)}</strong></div></div>
+  <dl className={styles.breakdown}><div><dt>Requested deposit · included in total</dt><dd>{money(deposit)}</dd></div><div><dt>Tips recorded · separate from services</dt><dd>{money(tips)}</dd></div></dl>
+  <p className={styles.notice}>{total===null?"Agree all service prices in Services & price before collecting payment.":due===0?"Service paid in full. Tips are tracked separately.":paid>0?`${money(paid)} has been received toward the service. Collect ${money(due)} before handover.`:`Collect ${money(due)} for the service, or take a deposit first.`}</p>
+  {paid>Number(total)&&total!==null&&<p role="status">Payments exceed the agreed service total by {money(paid-total)}. Review the receipts before refunding through the original payment method.</p>}
+  <div className={styles.paymentOptions}>
+   <section className={styles.paymentOption}><div><h3>Card / Square</h3><p className="small-note">Open the secure Square payment page for the customer. Card details are entered in Square.</p></div>
+    {link?<div className={styles.paymentLink}><a className="button" href={link} target="_blank" rel="noopener noreferrer">Open Square payment page</a><label className="field"><span>Customer payment link</span><input readOnly value={link} onFocus={e=>e.currentTarget.select()}/></label>{invoice&&<p className="small-note">This job has an active Square invoice. It tracks the deposit and remaining balance together.</p>}</div>:<div className={styles.actions}><button className="button" disabled={busy||total===null||!due} onClick={()=>void save("create_payment")}>{due===0?"Service paid in full":`Collect ${money(due)}`}</button>{depositDue>0&&depositDue!==due&&<button disabled={busy||total===null} onClick={()=>void save("create_payment","deposit")}>Deposit {money(depositDue)}</button>}</div>}
+    <button disabled={busy} onClick={()=>void save("refresh_job_payments")}>Refresh Square payments</button>
+    <details><summary>Send a payment link</summary><div className={styles.actions}>{depositDue>0&&<button disabled={busy||total===null} onClick={()=>void save("send_booking_payment_text","deposit")}>Text deposit link</button>}<button disabled={busy||total===null||!due} onClick={()=>void save("send_booking_payment_text")}>Text balance link</button></div></details>
+   </section>
+   <section className={styles.paymentOption}><div><h3>Cash received</h3><p className="small-note">Record actual cash collected. Keep the service amount and tip separate.</p></div>
+    {!cashOpen?<button disabled={busy||total===null||booking.square_environment==="sandbox"} onClick={()=>{setCash(String((due||0)/100));setCashOpen(true);}}>Record cash payment</button>:<form className={styles.cashForm} onSubmit={recordCash}>
+     <label className="field"><span>For the service ($)</span><input required type="number" min={0} step="0.01" value={cash} onChange={e=>setCash(e.target.value)}/></label><label className="field"><span>Additional cash tip ($)</span><input required type="number" min={0} step="0.01" value={tip} onChange={e=>setTip(e.target.value)}/></label>
+     <strong>Total cash received: {money(Math.round((Number(cash)+Number(tip))*100))}</strong>
+     <p className="small-note">For a $25 wash and a $75 tip, enter 25 for the service and 75 for the tip. Don’t enter tips already recorded by Square.</p>
+     <div className={styles.actions}><button className="button" disabled={busy}>{busy?"Recording…":"Confirm cash received"}</button><button type="button" disabled={busy} onClick={()=>setCashOpen(false)}>Cancel</button></div>
+    </form>}
+   </section>
+  </div>
+  <section className={styles.section}><div className={styles.sectionHeading}><div><h3>Already paid on your Square reader?</h3><p className="small-note">Match the existing receipt to this job. Its service payment and tip sync once.</p></div><button disabled={busy||total===null} onClick={()=>void findSquare()}>{busy?"Checking…":"Find Square receipt"}</button></div>
+  {matches!==null&&(matches.length?<div className={styles.cashForm}><label className="field"><span>Choose the customer’s receipt</span><select value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Select a Square payment</option>{matches.map(p=><option key={String(p.payment_id)} value={String(p.payment_id)}>{new Date(String(p.paid_at)).toLocaleString("en-US",{timeZone:"America/Chicago",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})} · {money(Number(p.amount_cents))} total · {money(Number(p.tip_cents))} tip · {String(p.payment_method)} · …{String(p.payment_id).slice(-6)}</option>)}</select></label>{selected&&(()=>{const payment=matches.find(p=>p.payment_id===selected)!;return <div className={styles.notice}><p>Apply {money(Number(payment.principal_cents))} to the service and {money(Number(payment.tip_cents))} as the tip.</p>{!!payment.receipt_url&&<a className="text-link" href={String(payment.receipt_url)} target="_blank" rel="noopener noreferrer">Review Square receipt</a>}</div>;})()}<button className="button" disabled={busy||!selected} onClick={()=>void matchSquare()}>Match receipt to this job</button></div>:<p role="status" className="small-note">No unmatched Square receipts found. Check the connected Square account and try again after the payment completes.</p>)}
+  </section>
+  {notice&&<p className="success-message" role="status">{notice}</p>}{error&&<p className="error-message" role="alert">{error}</p>}
+  <p className="small-note">Employee percentages use the full agreed service value after discounts. A deposit reduces the customer’s balance; it does not reduce the employee’s commission.</p>
+ </div>;
 }

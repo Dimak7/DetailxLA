@@ -1,11 +1,24 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { action, type RecordData } from "./AdminControls";
 import { JobPayments } from "./JobPayments";
 import { bookingAddOns, bookingCartSelection, defaultServicePackage, servicePackages, type BookingServiceChoice } from "@/lib/booking-options";
 import { dateToday, money, timeLabel, type Service, type BusinessSettings } from "@/lib/platform/types";
+import styles from "./SalesBookingForm.module.css";
+
 type Contact = { id: string; first_name: string; last_name: string; phone: string; email: string };
 type Vehicle = { id: string; year: number; make: string; model: string; type: string };
+const dollars = (amount: number | null | undefined) => amount == null ? "" : (amount / 100).toFixed(2);
+function cents(value: string) {
+  if (!/^\d+(\.\d{1,2})?$/.test(value.trim())) return null;
+  const amount = Math.round(Number(value) * 100);
+  return Number.isSafeInteger(amount) && amount >= 0 && amount <= 10000000 ? amount : null;
+}
+function chicagoMinute() {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  return Number(parts.find(p => p.type === "hour")?.value) * 60 + Number(parts.find(p => p.type === "minute")?.value);
+}
+
 export function SalesBookingForm({ services, business, lead, onComplete }: {
   services: Service[]; business: BusinessSettings;
   lead?: { id: string; name: string; email: string; phone: string }; onComplete: () => void;
@@ -14,6 +27,7 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
   const [vehicle, setVehicle] = useState({ year: new Date().getFullYear(), make: "", model: "", vehicle_type: "Sedan" });
   const [search, setSearch] = useState(""), [matches, setMatches] = useState<Contact[]>([]), [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [choices, setChoices] = useState<BookingServiceChoice[]>([]), [date, setDate] = useState(dateToday()), [start, setStart] = useState(-1), [slots, setSlots] = useState<Array<{ minute: number; available: boolean }>>([]);
+  const [walkIn, setWalkIn] = useState(!lead), [duration, setDuration] = useState(""), [prices, setPrices] = useState<Record<string, string>>({}), [names, setNames] = useState<Record<string, string>>({}), [discount, setDiscount] = useState("0");
   const [loadingSlots, setLoadingSlots] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notes, setNotes] = useState(""), [agreed, setAgreed] = useState(false), [stream, setStream] = useState("Unassigned"), [saved, setSaved] = useState<RecordData | null>(null);
   const session = useRef(crypto.randomUUID()), request = useRef({ body: "", id: "" });
   const ids = choices.map(c => c.service_id).join(",");
@@ -21,6 +35,20 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
   let selectionError = "";
   try { if (choices.length) selection = bookingCartSelection(services, vehicle.vehicle_type, choices); }
   catch (e) { selectionError = e instanceof Error ? e.message : "Review the selected services and upgrades."; }
+  const durationMinutes = duration === "" ? selection?.durationMinutes || 0 : Number(duration);
+  const validDuration = Number.isInteger(durationMinutes) && durationMinutes >= 30 && durationMinutes <= 720;
+  const selectedPrices = selection?.items.map(item => ({
+    service_id: item.service.id,
+    name: names[item.service.id]?.trim() || undefined,
+    amount_cents: cents(prices[item.service.id] ?? dollars(item.baseCents)),
+    addons: item.selectedAddOns.map(addon => ({ addon_id: addon.id, amount_cents: cents(prices[`${item.service.id}:${addon.id}`] ?? dollars(addon.priceCents)) })),
+  })) || [];
+  const allPriced = selectedPrices.length > 0 && selectedPrices.every(item => item.amount_cents !== null && item.addons.every(addon => addon.amount_cents !== null));
+  const subtotal = selectedPrices.reduce((sum, item) => sum + (item.amount_cents || 0) + item.addons.reduce((sum, addon) => sum + (addon.amount_cents || 0), 0), 0);
+  const discountCents = cents(discount);
+  const validDiscount = discountCents !== null && discountCents <= subtotal;
+  const netTotal = allPriced && validDiscount ? subtotal - discountCents : null;
+
   useEffect(() => {
     if (search.trim().length < 2) { setMatches([]); return; }
     const controller = new AbortController();
@@ -33,13 +61,23 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
     return () => { clearTimeout(timer); controller.abort(); };
   }, [search]);
   useEffect(() => {
-    setStart(-1); setSlots([]);
-    if (!ids || !date) return;
+    setStart(-1); setSlots([]); setLoadingSlots(false);
+    if (!ids || !date || !validDuration) return;
     const controller = new AbortController(); setLoadingSlots(true); setError("");
-    const params = new URLSearchParams({ date }); ids.split(",").forEach(id => params.append("service_id", id));
-    fetch("/api/availability?" + params, { signal: controller.signal }).then(async r => { const d = await r.json(); if (!r.ok) throw Error(d.error); return d; }).then(d => setSlots(d.slots)).catch(e => { if (e.name !== "AbortError") setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoadingSlots(false); });
+    const params = new URLSearchParams({ date, walk_in: String(walkIn), duration_minutes: String(durationMinutes) });
+    ids.split(",").forEach(id => params.append("service_id", id));
+    fetch("/api/admin/booking-availability?" + params, { signal: controller.signal, cache: "no-store" })
+      .then(async r => { const d = await r.json(); if (!r.ok) throw Error(d.error); return d; })
+      .then(d => {
+        setSlots(d.slots);
+        if (walkIn) {
+          const now = Math.floor(chicagoMinute() / 30) * 30;
+          setStart(d.slots.find((slot: { minute: number; available: boolean }) => slot.available && slot.minute >= now)?.minute ?? -1);
+        }
+      }).catch(e => { if (e.name !== "AbortError") setError(e.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoadingSlots(false); });
     return () => controller.abort();
-  }, [ids, date]);
+  }, [ids, date, walkIn, durationMinutes, validDuration]);
   async function chooseCustomer(c: Contact) {
     setContact({ first_name: c.first_name, last_name: c.last_name, email: c.email, phone: c.phone }); setSearch(""); setMatches([]); setVehicles([]);
     try { const r = await fetch(`/api/manage?section=customers&id=${c.id}`); const d = await r.json(); if (r.ok) setVehicles(d.profile?.vehicles || []); } catch { /* Contact can still be booked. */ }
@@ -47,45 +85,69 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
   function toggle(service: Service) {
     setChoices(current => current.some(c => c.service_id === service.id) ? current.filter(c => c.service_id !== service.id) : [...current, { service_id: service.id, service_package: defaultServicePackage(service.slug), addons: [] }]);
   }
-  function changeChoice(id: string, values: Partial<BookingServiceChoice>) { setChoices(current => current.map(c => c.service_id === id ? { ...c, ...values } : c)); }
-  async function submit(e: React.FormEvent) {
+  function changeChoice(id: string, values: Partial<BookingServiceChoice>) {
+    setChoices(current => current.map(c => c.service_id === id ? { ...c, ...values } : c));
+    if (values.service_package !== undefined) setPrices(current => { const next = { ...current }; delete next[id]; return next; });
+  }
+  async function submit(e: FormEvent) {
     e.preventDefault(); setError("");
     if (selectionError) { setError(selectionError); return; }
-    if (!choices.length || !slots.some(s => s.available && s.minute === start) || !agreed) { setError("Choose services, an available time, and confirm the customer's agreement."); return; }
+    if (!allPriced) { setError("Enter the agreed price for every service and selected upgrade."); return; }
+    if (!validDiscount) { setError("Enter a discount no greater than the subtotal."); return; }
+    if (!validDuration || !slots.some(slot => slot.available && slot.minute === start) || !agreed) { setError("Choose an available time and confirm the customer's agreement."); return; }
     setBusy(true);
     try {
-      const base = { ...contact, ...vehicle, services: choices, date, start_minute: start, notes, location: business.address || "Studio", terms: true, marketing_email: false, marketing_sms: false, session_id: session.current, device: "admin", attribution: { source: "Phone", lead_stream: stream, medium: "", campaign: "", gclid: "", gbraid: "", wbraid: "", fbclid: "" }, ...(lead ? { lead_id: lead.id } : {}) };
+      const base = {
+        ...contact, ...vehicle, services: choices, date, start_minute: start, notes, location: business.address || "Studio", terms: true,
+        marketing_email: false, marketing_sms: false, session_id: session.current, device: "admin",
+        attribution: { source: walkIn ? "Walk-in" : "Phone", lead_stream: stream, medium: "", campaign: "", gclid: "", gbraid: "", wbraid: "", fbclid: "" },
+        admin_sale: { walk_in: walkIn, duration_minutes: durationMinutes, prices: selectedPrices, discount_cents: discountCents },
+        ...(lead ? { lead_id: lead.id } : {}),
+      };
       const body = JSON.stringify(base); if (body !== request.current.body) request.current = { body, id: crypto.randomUUID() };
       const result = await action("create_booking", { ...base, request_key: request.current.id });
       setSaved(result.booking as RecordData);
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save appointment."); } finally { setBusy(false); }
   }
-  if (saved) return <div className="sales-booking-success"><h3>Appointment saved · {String(saved.reference)}</h3><p>The booking acknowledgement is queued. Collect the deposit to secure the appointment; quote items need an agreed price first.</p><div className="button-row"><JobPayments booking={{ ...saved, collected_cents: 0, square_environment: business.square_environment }} /><button className="button" onClick={onComplete}>Done — return to bookings</button></div></div>;
+  if (saved) return <div className="sales-booking-success"><h3>{walkIn ? "Walk-in job" : "Appointment"} saved · {String(saved.reference)}</h3><p>Agreed service total: <strong>{money(Number(saved.price_cents))}</strong>.</p><p>Collect by Square or record a cash payment. Add the customer's tip with that payment so it is recorded once.</p><div><JobPayments embedded booking={{ ...saved, collected_cents: 0, square_environment: business.square_environment }} /><button className="button" onClick={onComplete}>Done — return to bookings</button></div></div>;
   return <form className="sales-booking" onSubmit={submit}>
-    <p className="small-note">Phone / walk-in booking · capture the customer, sell the services, reserve a time, then collect the deposit.</p>
+    <div className={styles.mode} aria-label="Booking type"><button type="button" aria-pressed={walkIn} onClick={() => { setWalkIn(true); setDate(dateToday()); }}>Walk-in · customer here now</button><button type="button" aria-pressed={!walkIn} onClick={() => setWalkIn(false)}>Phone / future appointment</button></div>
+    <p className="small-note">Set the actual service prices here. After saving, collect payment and record any tip in Payments.</p>
     {error && <p className="error-message" role="alert">{error}</p>}
     {selectionError && <p className="error-message" role="alert">{selectionError}</p>}
     <div className="sales-booking-grid">
       <section className="sales-booking-section"><h3>1. Customer & vehicle</h3>
         <label className="field"><span>Find an existing customer</span><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, phone or email" /></label>
         {matches.length > 0 && <div className="sales-customer-results">{matches.map(c => <button type="button" key={c.id} onClick={() => void chooseCustomer(c)}>{c.first_name} {c.last_name}<small>{c.phone} · {c.email}</small></button>)}</div>}
-        <div className="sales-field-grid">{([['first_name','First name'],['last_name','Last name'],['phone','Phone'],['email','Email']] as const).map(([key,label]) => <label className="field" key={key}><span>{label}</span><input type={key === "email" ? "email" : key === "phone" ? "tel" : "text"} value={contact[key]} required onChange={e => setContact({ ...contact, [key]: e.target.value })} /></label>)}</div>
+        <div className="sales-field-grid">{([['first_name','First name'],['last_name','Last name'],['phone','Phone'],['email','Email']] as const).map(([key,label]) => <label className="field" key={key}><span>{label}</span><input type={key === "email" ? "email" : key === "phone" ? "tel" : "text"} autoComplete={key === "first_name" ? "given-name" : key === "last_name" ? "family-name" : key === "phone" ? "tel" : "email"} value={contact[key]} required onChange={e => setContact({ ...contact, [key]: e.target.value })} /></label>)}</div>
         {vehicles.length > 0 && <label className="field"><span>Saved vehicle</span><select defaultValue="" onChange={e => { const v = vehicles.find(v => v.id === e.target.value); if (v) setVehicle({ year: v.year, make: v.make, model: v.model, vehicle_type: v.type }); }}><option value="">Choose or enter a new vehicle</option>{vehicles.map(v => <option value={v.id} key={v.id}>{v.year} {v.make} {v.model}</option>)}</select></label>}
         <div className="sales-field-grid"><label className="field"><span>Year</span><input type="number" min={1900} max={new Date().getFullYear()+2} required value={vehicle.year} onChange={e => setVehicle({ ...vehicle, year: Number(e.target.value) })} /></label><label className="field"><span>Vehicle size</span><select value={vehicle.vehicle_type} onChange={e => setVehicle({ ...vehicle, vehicle_type: e.target.value })}>{["Sedan","SUV","Truck"].map(v => <option key={v}>{v}</option>)}</select></label>{([['make','Make'],['model','Model']] as const).map(([key,label]) => <label className="field" key={key}><span>{label}</span><input value={vehicle[key]} required onChange={e => setVehicle({ ...vehicle, [key]: e.target.value })} /></label>)}</div>
       </section>
-      <section className="sales-booking-section"><h3>2. Services & upgrades</h3>
-        <div className="sales-service-list">{services.map(service => { const choice = choices.find(c => c.service_id === service.id); return <div key={service.id} className={choice ? "selected" : ""}><label><input type="checkbox" checked={!!choice} onChange={() => toggle(service)} /><span><strong>{service.name}</strong><small>{service.duration_minutes / 60}h · {service.pricing_mode === "quote" ? "By quote" : money(service.price_cents)}</small></span></label>{choice && <div className="sales-service-options">
+      <section className="sales-booking-section"><h3>2. Services & agreed prices</h3>
+        <p className="small-note">For a $25 car wash, select the closest service, rename the job and enter $25. Upgrades keep their own prices.</p>
+        <div className="sales-service-list">{services.map(service => { const choice = choices.find(c => c.service_id === service.id), item = selection?.items.find(item => item.service.id === service.id); return <div key={service.id} className={choice ? "selected" : ""}><label><input type="checkbox" checked={!!choice} onChange={() => toggle(service)} /><span><strong>{service.name}</strong><small>{service.duration_minutes / 60}h · {service.pricing_mode === "quote" ? "By quote" : money(service.price_cents)}</small></span></label>{choice && <div className="sales-service-options">
           {servicePackages(service.slug).length > 0 && <label className="field"><span>Package</span><select value={choice.service_package} onChange={e => changeChoice(service.id, { service_package: e.target.value })}>{servicePackages(service.slug).map(p => <option value={p.id} key={p.id}>{p.name} · {p.priceCents === null ? "By quote" : money(p.priceCents)}</option>)}</select></label>}
-          {bookingAddOns(service.slug).map(addon => <label className="sales-addon" key={addon.id}><input type="checkbox" checked={choice.addons?.includes(addon.id) || false} onChange={e => changeChoice(service.id, { addons: e.target.checked ? [...(choice.addons || []), addon.id] : choice.addons?.filter(id => id !== addon.id) })} /><span>{addon.name}</span><small>{addon.priceCents === null ? "By quote" : money(addon.priceCents)}</small></label>)}
+          <label className="field"><span>Job name (optional)</span><input value={names[service.id] || ""} maxLength={160} placeholder={service.name} onChange={e => setNames(current => ({ ...current, [service.id]: e.target.value }))} /></label>
+          <label className="field"><span>Agreed service price ($)</span><input type="number" inputMode="decimal" min="0" max="100000" step="0.01" required value={prices[service.id] ?? dollars(item?.baseCents)} placeholder="Enter agreed price" onChange={e => setPrices(current => ({ ...current, [service.id]: e.target.value }))} /></label>
+          {bookingAddOns(service.slug).length > 0 && <details className={styles.upgrades}><summary>Optional upgrades · {choice.addons?.length || 0} selected</summary>{bookingAddOns(service.slug).map(addon => { const selected = choice.addons?.includes(addon.id) || false, key = `${service.id}:${addon.id}`; return <div key={addon.id}><label className="sales-addon"><input type="checkbox" checked={selected} onChange={e => changeChoice(service.id, { addons: e.target.checked ? [...(choice.addons || []), addon.id] : choice.addons?.filter(id => id !== addon.id) })} /><span>{addon.name}</span><small>{addon.priceCents === null ? "By quote" : money(addon.priceCents)}</small></label>{selected && <label className="field"><span>{addon.name} price ($)</span><input type="number" inputMode="decimal" min="0" max="100000" step="0.01" required value={prices[key] ?? dollars(addon.priceCents)} placeholder="Enter agreed price" onChange={e => setPrices(current => ({ ...current, [key]: e.target.value }))} /></label>}</div>; })}</details>}
         </div>}</div>; })}</div>
       </section>
-      <section className="sales-booking-section"><h3>3. Appointment</h3><div className="sales-field-grid"><label className="field"><span>Date</span><input type="date" min={dateToday()} value={date} required onChange={e => setDate(e.target.value)} /></label><label className="field"><span>Available time (Chicago)</span><select value={start} required disabled={loadingSlots || !choices.length} onChange={e => setStart(Number(e.target.value))}><option value={-1}>{loadingSlots ? "Checking schedule…" : "Choose a time"}</option>{slots.filter(s => s.available).map(s => <option value={s.minute} key={s.minute}>{timeLabel(s.minute)}</option>)}</select></label></div>{choices.length > 0 && !loadingSlots && !slots.some(s => s.available) && <p role="status">No available times. Choose another date or a shorter service combination.</p>}
+      <section className="sales-booking-section"><h3>3. {walkIn ? "Today's job" : "Appointment"}</h3><div className="sales-field-grid"><label className="field"><span>Date</span><input type="date" min={dateToday()} max={walkIn ? dateToday() : undefined} value={date} disabled={walkIn} required onChange={e => setDate(e.target.value)} /></label><label className="field"><span>Reserved time (minutes)</span><input type="number" min="30" max="720" step="1" value={duration} placeholder={String(selection?.durationMinutes || 30)} onChange={e => setDuration(e.target.value)} /></label><label className={`field ${styles.time}`}><span>{walkIn ? "Job start time" : "Available time"} (Chicago)</span><select value={start} required disabled={loadingSlots || !choices.length || !validDuration} onChange={e => setStart(Number(e.target.value))}><option value={-1}>{loadingSlots ? "Checking schedule…" : "Choose a time"}</option>{slots.filter(slot => slot.available).map(slot => <option value={slot.minute} key={slot.minute}>{timeLabel(slot.minute)}</option>)}</select></label></div>
+        {choices.length > 0 && !validDuration && <p className="error-message">Reserve between 30 and 720 minutes for this job.</p>}
+        {choices.length > 0 && validDuration && !loadingSlots && !slots.some(slot => slot.available) && <p role="status">No available times. Review the reserved duration or choose another date.</p>}
+        {walkIn && <p className="small-note">Today's earlier times are available for recording a walk-in. Opening hours, blocked times and bay capacity still apply.</p>}
         <label className="field"><span>Customer / access notes</span><textarea value={notes} maxLength={2000} onChange={e => setNotes(e.target.value)} /></label>
         {!lead && <label className="field"><span>Marketing source</span><select value={stream} onChange={e => setStream(e.target.value)}><option value="Unassigned">Organic / direct / unassigned</option><option value="Business Google · 10%">Business Google</option><option value="Business Meta · 10%">Business Meta</option><option value="Dima Google · 25%">Partner Google</option></select></label>}
       </section>
-      <section className="sales-booking-section sales-booking-summary"><h3>Sale summary</h3><p>{choices.length} service{choices.length === 1 ? "" : "s"} · {selection?.items.reduce((sum,item) => sum + item.service.duration_minutes, 0) || 0} minutes</p><strong>{selection?.requiresQuote ? "Quote approval required" : money(selection?.totalCents ?? 0)}</strong>{selection?.requiresQuote && <p>{money(selection.knownCents)} in priced items, plus quoted work.</p>}<p>{selection?.requiresQuote ? "Agree all quoted prices before requesting payment." : "50% deposit, remaining balance after the detail. Open Payments after saving to create and text the customer's secure link."}</p>
-        <label className="sales-agreement"><input type="checkbox" required checked={agreed} onChange={e => setAgreed(e.target.checked)} /><span>Customer agrees to the <a className="text-link" href="/service-rules" target="_blank" rel="noreferrer">service terms</a>, <a className="text-link" href="/privacy-notice" target="_blank" rel="noreferrer">privacy notice</a> and appointment-related texts. This does not enroll them in marketing.</span></label>
-        <button className="button" disabled={busy || loadingSlots || !choices.length || !!selectionError || start < 0}>{busy ? "Saving appointment…" : "Save appointment & collect deposit"}</button>
+      <section className="sales-booking-section sales-booking-summary"><h3>Sale summary</h3><p>{choices.length} service{choices.length === 1 ? "" : "s"} · {durationMinutes || 0} minutes reserved</p>
+        <dl className={styles.totals}><div><dt>Services & upgrades</dt><dd>{allPriced ? money(subtotal) : "Enter all agreed prices"}</dd></div></dl>
+        <label className="field"><span>Discount on services ($)</span><input type="number" inputMode="decimal" min="0" max={subtotal / 100} step="0.01" required value={discount} onChange={e => setDiscount(e.target.value)} /></label>
+        {!validDiscount && <p className="error-message">The discount must be between $0 and the subtotal.</p>}
+        <dl className={styles.totals}><div><dt>Agreed service total</dt><dd><strong>{money(netTotal)}</strong></dd></div></dl>
+        <p>Employee percentage pay uses service prices after discounts. Tips are separate and can be entered when collecting payment.</p>
+        <p>{walkIn ? "Collect the full service balance after saving. Cash payments and Square payments are tracked separately from tips." : "The deposit and remaining balance will be shown in Payments after saving. A deposit reduces what the customer owes; it does not reduce the employee's commission basis."}</p>
+        <label className="sales-agreement"><input type="checkbox" required checked={agreed} onChange={e => setAgreed(e.target.checked)} /><span>Customer agrees to these prices, the <a className="text-link" href="/service-rules" target="_blank" rel="noopener noreferrer">service terms</a>, <a className="text-link" href="/privacy-notice" target="_blank" rel="noopener noreferrer">privacy notice</a> and appointment-related texts. This does not enroll them in marketing.</span></label>
+        <button className="button" disabled={busy || loadingSlots || !allPriced || !validDiscount || !validDuration || !!selectionError || start < 0}>{busy ? "Saving…" : walkIn ? "Save job & collect payment" : "Save appointment & collect payment"}</button>
       </section>
     </div>
   </form>;

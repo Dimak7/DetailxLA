@@ -108,10 +108,7 @@ export function ProfitChart({
               const x = 50 + i * step;
               return (
                 <g key={r.day}>
-                  <title>
-                    {r.day}: revenue {money(r.revenue)}, expenses{" "}
-                    {money(r.expenses)}, result {money(r.profit)}
-                  </title>
+                  <title>{`${r.day}: revenue ${money(r.revenue)}, expenses ${money(r.expenses)}, result ${money(r.profit)}`}</title>
                   <rect
                     x={x + step * 0.12}
                     y={y(r.revenue)}

@@ -26,6 +26,18 @@ const serviceChoiceInput = z.object({
   service_package: z.string().max(80).default(""),
   addons: z.array(z.string().max(80)).max(12).default([]),
 });
+const adminSaleInput = z.object({
+  walk_in: z.boolean(),
+  duration_minutes: z.number().int().min(30).max(720).optional(),
+  prices: z.array(z.object({
+    service_id: z.uuid(),
+    name: z.string().trim().min(2).max(160).optional(),
+    // Base service only; keep upgrades separate for employee compensation.
+    amount_cents: z.number().int().min(0).max(10000000),
+    addons: z.array(z.object({ addon_id: z.string().min(1).max(80), amount_cents: z.number().int().min(0).max(10000000) })).max(12).default([]),
+  })).min(1).max(12),
+  discount_cents: z.number().int().min(0).max(10000000).default(0),
+}).strict();
 export const bookingInput = z.object({
   request_key: z.uuid(),
   service_id: z.uuid().optional(),
@@ -79,6 +91,7 @@ export const bookingInput = z.object({
   }),
   device: z.string().max(100).default(""),
   lead_id: z.uuid().optional(),
+  admin_sale: adminSaleInput.optional(),
 }).superRefine((input, context) => {
   if (!input.services && !input.service_id)
     context.addIssue({ code: "custom", message: "Choose at least one service.", path: ["services"] });
@@ -130,8 +143,10 @@ async function validateSlot(
   service: Pick<Service, "duration_minutes">,
   s: BusinessSettings,
   exclude?: string,
+  walkIn = false,
 ) {
   if (!validDate(date)) throw new AppError("Choose a valid date.");
+  if (walkIn && date !== dateToday()) throw new AppError("Walk-in jobs must be booked for today.");
   const hours = businessHoursForDay(s, new Date(date + "T12:00:00Z").getUTCDay());
   if (hours && service.duration_minutes > minute(hours.close_time) - minute(hours.open_time))
     throw new AppError("These services need more time than this day's opening hours. Choose another day or contact the studio to arrange separate appointments.");
@@ -148,7 +163,7 @@ async function validateSlot(
       [date, start],
     )
   ).rows[0].ok;
-  if (!future || date > dateToday(new Date(Date.now() + 365 * 86400000)))
+  if ((!future && !walkIn) || date > dateToday(new Date(Date.now() + 365 * 86400000)))
     throw new AppError("Choose an appointment within the next year.");
   if (
     !(await free(
@@ -170,6 +185,7 @@ export async function availability(
   date: string,
   serviceId: string | string[],
   exclude?: string,
+  adminOptions?: { walk_in: boolean; duration_minutes?: number },
 ) {
   if (!validDate(date)) throw new AppError("Choose a valid date.");
   const serviceIds = z.array(z.uuid()).min(1).max(12).parse(typeof serviceId === "string" ? [serviceId] : serviceId);
@@ -177,7 +193,9 @@ export async function availability(
   const s = await settings();
   const services = await query<Service>("SELECT * FROM wl.services WHERE id=ANY($1::uuid[]) AND active=true", [serviceIds]);
   if (services.length !== serviceIds.length) throw new AppError("One of your selected services is unavailable.", 404);
-  const service = { duration_minutes: services.reduce((sum, item) => sum + item.duration_minutes, 0) };
+  const options = adminOptions ? z.object({ walk_in: z.boolean(), duration_minutes: z.number().int().min(30).max(720).optional() }).parse(adminOptions) : undefined;
+  if (options?.walk_in && date !== dateToday()) throw new AppError("Walk-in jobs must be booked for today.");
+  const service = { duration_minutes: options?.duration_minutes ?? services.reduce((sum, item) => sum + item.duration_minutes, 0) };
   const slots: Array<{ minute: number; available: boolean }> = [];
   const hours = businessHoursForDay(s, new Date(date + "T12:00:00Z").getUTCDay());
   if (!hours) return slots;
@@ -190,7 +208,7 @@ export async function availability(
     start += 30
   ) {
     try {
-      await validateSlot(q, date, start, service, s, exclude);
+      await validateSlot(q, date, start, service, s, exclude, options?.walk_in);
       slots.push({ minute: start, available: true });
     } catch (e) {
       if (e instanceof AppError)
@@ -202,7 +220,7 @@ export async function availability(
 }
 export async function createBooking(value: unknown, admin = false) {
   const input = bookingInput.parse(value);
-  if (!admin && input.lead_id) throw new AppError("Invalid booking request.");
+  if (!admin && (input.lead_id || input.admin_sale)) throw new AppError("Invalid booking request.");
   const fingerprint = hash(JSON.stringify(input)),
     s = await settings(),
     provider = admin ? null : await paymentProvider();
@@ -234,8 +252,29 @@ export async function createBooking(value: unknown, admin = false) {
     } catch (error) {
       throw new AppError(error instanceof Error ? error.message : "Choose valid booking options.");
     }
+    const sale = input.admin_sale;
+    if (sale) {
+      const ids = sale.prices.map(item => item.service_id);
+      if (new Set(ids).size !== ids.length || ids.length !== choices.length || ids.some(id => !choices.some(choice => choice.service_id === id)))
+        throw new AppError("Enter an agreed price for each selected service exactly once.");
+      const items = selection.items.map(item => {
+        const price = sale.prices.find(price => price.service_id === item.service.id)!;
+        if (new Set(price.addons.map(addon => addon.addon_id)).size !== price.addons.length || price.addons.some(addon => !item.selectedAddOns.some(selected => selected.id === addon.addon_id)))
+          throw new AppError("Enter each selected upgrade price only once.");
+        const selectedAddOns = item.selectedAddOns.map(addon => {
+          const amount = price.addons.find(value => value.addon_id === addon.id)?.amount_cents ?? addon.priceCents;
+          if (amount === null) throw new AppError(`Enter the agreed price for ${addon.name}.`);
+          return { ...addon, priceCents: amount };
+        });
+        const addOnCents = selectedAddOns.reduce((sum, addon) => sum + addon.priceCents, 0);
+        return { ...item, selectedAddOns, baseCents: price.amount_cents, addOnCents, totalCents: price.amount_cents + addOnCents, knownCents: price.amount_cents + addOnCents };
+      });
+      const totalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
+      if (sale.discount_cents > totalCents) throw new AppError("The discount cannot exceed the service and upgrade subtotal.");
+      selection = { ...selection, items, totalCents, knownCents: totalCents, requiresQuote: false, durationMinutes: sale.duration_minutes ?? selection.durationMinutes };
+    }
     const service = selection.items[0].service;
-    await validateSlot(q, input.date, input.start_minute, { duration_minutes: selection.durationMinutes }, s);
+    await validateSlot(q, input.date, input.start_minute, { duration_minutes: selection.durationMinutes }, s, undefined, sale?.walk_in);
     if (
       (s.appointment_mode === "mobile" || s.appointment_mode === "both") &&
       input.location.length < 5
@@ -315,11 +354,12 @@ export async function createBooking(value: unknown, admin = false) {
         ],
       )
     ).rows[0];
-    const price = selection.totalCents,
-      deposit = selection.requiresQuote ? 0 : bookingDepositCents(service, price, s, provider);
-    const itemName = (item: typeof selection.items[number]) => item.selectedPackage
-      ? `${item.service.name} · ${item.selectedPackage.name}`
-      : item.service.name;
+    const price = selection.totalCents === null ? null : selection.totalCents - (sale?.discount_cents || 0),
+      deposit = sale ? (sale.walk_in ? 0 : Math.round((price! * effectiveDepositPercent(s)) / 100)) : selection.requiresQuote ? 0 : bookingDepositCents(service, price, s, provider);
+    const itemName = (item: typeof selection.items[number]) => {
+      const original = item.selectedPackage ? `${item.service.name} · ${item.selectedPackage.name}` : item.service.name;
+      return sale?.prices.find(price => price.service_id === item.service.id)?.name || (sale ? original.replace(/\s*·\s*By Quote$/i, "") : original);
+    };
     const serviceName = selection.items.map(itemName).join(" + ");
     const selectedServices = selection.items.map((item) => ({
       ...item.service,
@@ -332,11 +372,12 @@ export async function createBooking(value: unknown, admin = false) {
       ...selectedServices[0],
       selected_services: selectedServices,
       requires_quote: selection.requiresQuote,
+      ...(sale ? { walk_in: sale.walk_in, agreed_total_cents: price } : {}),
     };
     const booking = (
       await q<Booking>(
-        `INSERT INTO wl.bookings(id,request_key,request_hash,reference,customer_id,vehicle_id,service_id,service_name,service_snapshot,booking_date,start_minute,duration_minutes,buffer_minutes,price_cents,deposit_cents,notes,location,attribution_id,lead_id)
-   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+        `INSERT INTO wl.bookings(id,request_key,request_hash,reference,customer_id,vehicle_id,service_id,service_name,service_snapshot,booking_date,start_minute,duration_minutes,buffer_minutes,price_cents,deposit_cents,notes,location,attribution_id,lead_id,status)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
         [
           id,
           input.request_key,
@@ -357,6 +398,7 @@ export async function createBooking(value: unknown, admin = false) {
           input.location || s.address,
           attributionId,
           input.lead_id || null,
+          sale?.walk_in ? "confirmed" : "new",
         ],
       )
     ).rows[0];
@@ -371,6 +413,8 @@ export async function createBooking(value: unknown, admin = false) {
           [addOn.line_item_id, id, item.service.id, addOn.name, addOn.priceCents ?? 0, addOn.priceCents === null],
         );
     }
+    if (sale?.discount_cents)
+      await q("INSERT INTO wl.booking_discounts(id,booking_id,kind,value,amount_cents,reason) VALUES($1,$2,'fixed',$3,$3,'Agreed at booking')", [randomUUID(), id, sale.discount_cents]);
     const leadId = input.lead_id || null;
     if (leadId) {
       await q("INSERT INTO wl.customer_tags(customer_id,tag_id,created_by) SELECT $1,tag_id,created_by FROM wl.lead_tags WHERE lead_id=$2 ON CONFLICT DO NOTHING",[customerId,leadId]);

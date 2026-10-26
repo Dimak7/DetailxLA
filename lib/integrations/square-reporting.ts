@@ -1,4 +1,4 @@
-import {reconcileDetailInvoice} from "./square-invoice-ledger";
+import {reconcileDetailInvoice,syncJobSquareTips} from "./square-invoice-ledger";
 import { randomUUID } from "node:crypto";
 import { AppError } from "../platform/auth";
 import { query, transaction, type Query } from "../platform/db";
@@ -168,9 +168,12 @@ export async function upsertSquarePayment(q: Query, payment: SquarePayment, envi
     // the signed booking webhook flow.
     await q(`UPDATE wl.payments SET refunded_cents=LEAST(amount_cents,GREATEST(refunded_cents,$2::bigint)),
       processor_fee_cents=GREATEST(0,$3::bigint),
+      tip_cents=$4,
       status=CASE WHEN $2::bigint>=amount_cents AND $2::bigint>0 THEN 'refunded' WHEN $2::bigint>0 THEN 'partially_refunded' ELSE status END
       WHERE id=$1 AND status IN ('paid','partially_refunded','refunded')`,
-    [matches[0].id, saved.refunded_cents, saved.processor_fee_cents]);
+    [matches[0].id, saved.refunded_cents, saved.processor_fee_cents, Math.max(0, Number(saved.tip_cents) - Math.max(0, Number(saved.refunded_cents) - (Number(saved.amount_cents) - Number(saved.tip_cents))))]);
+    const linked = (await q<{ booking_id: string }>("SELECT booking_id FROM wl.payments WHERE id=$1", [matches[0].id])).rows[0];
+    if (linked) await syncJobSquareTips(q, linked.booking_id, environment);
   }
   return saved;
 }

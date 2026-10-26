@@ -69,6 +69,8 @@ test("one full Square invoice collects a deposit and balance, syncs tips/refunds
             public_url: "https://squareup.com/pay-invoice/test",
           },
         });
+      if (path === "/v2/invoices/sq-invoice") return Response.json({ invoice: { id: "sq-invoice", order_id: "sq-order", status: "UNPAID", version: 1, public_url: "https://squareup.com/pay-invoice/test" } });
+      if (path === "/v2/orders/sq-order") return Response.json({ order: { id: "sq-order", location_id: "test-location", tenders: [] } });
       throw new Error("Unexpected Square call " + path);
     };
     assert.match((await createSquareInvoice(booking)).url, /pay-invoice/);
@@ -87,7 +89,7 @@ test("one full Square invoice collects a deposit and balance, syncs tips/refunds
     assert.equal(invoice.payment_requests[1].tipping_enabled, true);
     assert.equal(invoice.delivery_method, "SHARE_MANUALLY");
     await createSquareInvoice(booking);
-    assert.equal(requests.length, 4, "repeated click reuses invoice");
+    assert.equal(requests.length, 6, "repeated click verifies and reuses invoice without creating another");
     const evidence = (id: string, principal: number, tip = 0, refund = 0) => ({
       id,
       order_id: "sq-order",
