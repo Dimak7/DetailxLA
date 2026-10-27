@@ -86,7 +86,7 @@ export function SquareRevenue({ connection, summary }: {
       </button>
     </div>
     <p className="small-note">Card reader, in-person, and online payments are included. Completed USD payments contribute to revenue once, less refunds, using the original payment date.</p>
-    {!configured && <p role="status">Connect a Square access token in Settings to import your payment history.</p>}
+    {!configured && <p role="status">Square payments are not connected yet. Contact your site administrator to complete the connection.</p>}
     {environment === "sandbox" && <p role="status"><strong>Sandbox connection:</strong> test payments are excluded from revenue. Connect production Square credentials to import real collections.</p>}
     {summary && <div className={styles.metrics}>
       {[

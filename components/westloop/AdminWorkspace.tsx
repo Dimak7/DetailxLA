@@ -31,7 +31,6 @@ import { MarketingCommissions } from "./MarketingCommissions";
 import { SquareRevenue } from "./SquareRevenue";
 import SquareCustomerHistory from "./SquareCustomerHistory";
 import { ArchiveCustomer } from "./ArchiveCustomer";
-import { TestDataCleanup } from "./TestDataCleanup";
 import type { squareRevenueStatus } from "@/lib/integrations/square-reporting";
 import {
   money,
@@ -569,136 +568,6 @@ export function AdminWorkspace({
       ],
     );
   }
-  function settingsEdit(group: string) {
-    const b = data.settings as R;
-    const sunday = rows(b.day_hours).find((day) => n(day.weekday) === 0);
-    const groups: Record<string, Field[]> = {
-      Business: [
-        f("name", "Business name"),
-        f("phone", "Business phone"),
-        f("email", "Business email", "email"),
-        f("address", "Street address", "text", { wide: true }),
-        f("hours_label", "Public hours"),
-        f("service_area", "Service area", "textarea", { wide: true }),
-      ],
-      Booking: [
-        f("appointment_mode", "Appointment location", "select", {
-          options: ["shop", "mobile", "both"],
-        }),
-        f("days", "Available weekdays (0=Sun, 6=Sat)", "text", {
-          hint: "Comma separated, e.g. 1,2,3,4,5,6",
-        }),
-        f("open_time", "Monday–Saturday open", "time"),
-        f("close_time", "Monday–Saturday close", "time"),
-        f("sunday_open_time", "Sunday open", "time"),
-        f("sunday_close_time", "Sunday close", "time", { hint: "Sunday appointments must finish by this time. Include 0 in available weekdays to accept Sunday bookings." }),
-        f("booking_capacity", "Cars at the same time", "number", { min: 1, max: 3, hint: "Maximum simultaneous appointments, including cleanup buffers." }),
-        f("buffer_minutes", "Buffer (minutes)", "number"),
-        f("deposit_percent", "Standard detail deposit (%)", "number", {
-          max: 100,
-          hint: "Set a custom percentage. A value of 0 uses the recommended 50% when online payments are connected.",
-        }),
-        f("cancellation_policy", "Cancellation policy", "textarea", {
-          wide: true,
-        }),
-      ],
-      Branding: [
-        f("logo_url", "Logo", "upload"),
-        f("favicon_url", "Favicon", "upload"),
-        f("instagram_url", "Instagram URL", "url"),
-        f("google_review_url", "Google review URL", "url"),
-      ],
-      Tracking: [
-        f("google_tag_id", "Google Tag ID (GT-)"),
-        f("ga4_id", "GA4 measurement (G-)"),
-        f("google_ads_id", "Google Ads ID (AW-)"),
-        f("google_ads_label", "Booking conversion label", "text", {
-          hint: "From Google Ads > Goals > Conversions > booking action > tag setup",
-        }),
-        f("google_ads_phone_label", "Phone conversion label", "text", {
-          hint: "Optional separate Google Ads conversion action for phone clicks",
-        }),
-        f("meta_pixel_id", "Meta Pixel ID"),
-        f("meta_dataset_id", "Meta dataset ID"),
-        f("meta_token", "Meta CAPI access token", "password", {
-          hint: "Leave blank to keep existing secret",
-        }),
-      ],
-      Notifications: [
-        f("email_from", "Verified sender (Resend)"),
-        f("telegram_chat_id", "Telegram chat ID"),
-        f("telegram_thread_id", "Telegram topic ID", "text", {
-          hint: "Optional: send notifications to this group topic. Leave blank for the main chat.",
-        }),
-        f("sms_from", "Twilio phone number"),
-        ...[
-          "email_key",
-          "telegram_token",
-          "telegram_webhook",
-          "sms_account",
-          "sms_token",
-        ].map((k) =>
-          f(k, title(k), "password", {
-            hint: "Leave blank to keep existing secret",
-          }),
-        ),
-      ],
-      Payments: [
-        f("square_access_token", "Square access token", "password", {
-          hint: "Must match the SQUARE_ENVIRONMENT Railway variable. Leave blank to keep the existing token.",
-        }),
-        f("square_location_id", "Square location ID", "password", {
-          hint: "Leave blank to keep the existing location",
-        }),
-        f(
-          "square_webhook_signature_key",
-          "Square webhook signature key",
-          "password",
-          { hint: "Leave blank to keep the existing key" },
-        ),
-        f("stripe_key", "Stripe secret key", "password"),
-        f("stripe_webhook", "Stripe webhook signing secret", "password"),
-      ],
-    };
-    const credentials = [
-      "email_key",
-      "telegram_token",
-      "telegram_webhook",
-      "sms_account",
-      "sms_token",
-      "stripe_key",
-      "stripe_webhook",
-      "square_access_token",
-      "square_location_id",
-      "square_webhook_signature_key",
-      "meta_token",
-    ];
-    edit(
-      group + " settings",
-      "save_settings",
-      { ...b, days: (b.days as number[]).join(","), sunday_open_time: s(sunday?.open_time) || s(b.open_time), sunday_close_time: s(sunday?.close_time) || s(b.close_time) },
-      groups[group],
-      (d) => {
-        const cfg = { ...b, ...d };
-        const secrets: R = {};
-        for (const k of credentials) {
-          if (d[k]) secrets[k] = d[k];
-          delete cfg[k];
-        }
-        cfg.days =
-          typeof d.days === "string"
-            ? s(d.days).split(",").map(Number)
-            : b.days;
-        if (group === "Booking") cfg.day_hours = [
-          ...rows(b.day_hours).filter((day) => n(day.weekday) !== 0),
-          { weekday: 0, open_time: s(d.sunday_open_time), close_time: s(d.sunday_close_time) },
-        ];
-        delete cfg.sunday_open_time;
-        delete cfg.sunday_close_time;
-        return { settings: cfg, credentials: secrets };
-      },
-    );
-  }
   function table(
     headers: string[],
     values: React.ReactNode[][],
@@ -900,9 +769,9 @@ export function AdminWorkspace({
             </div>
             <p className="small-note">Every person uses their own email and password. Detailer accounts are automatically linked to an employee profile so their published shifts, assigned work and time clock appear in My Schedule.</p>
             <div className="role-permissions-grid">
-              <div><strong>Owner</strong><p>Full access to every workspace, settings, integrations, finances and team permissions. Only an owner can create or change another owner.</p></div>
-              <div><strong>Admin</strong><p>Full business access, including settings, finances and account management. Cannot grant or change owner access.</p></div>
-              <div><strong>Manager</strong><p>Runs bookings, customers, employees, schedules, hours, payroll and daily operations. No owner settings or marketing finances.</p></div>
+              <div><strong>Owner</strong><p>Full business access, including finances and team permissions. Only an owner can create or change another owner.</p></div>
+              <div><strong>Admin</strong><p>Full business access, including finances and account management. Cannot grant or change owner access.</p></div>
+              <div><strong>Manager</strong><p>Runs bookings, customers, employees, schedules, hours, payroll and daily operations. No account management or marketing finances.</p></div>
               <div><strong>Detailer</strong><p>My Schedule only: published shifts, assigned work and personal time clock. No customer lists, business calendar, payroll or reports.</p></div>
             </div>
           </section>
@@ -939,7 +808,7 @@ export function AdminWorkspace({
             {scheduleView === "day" && <><div className="day-picker" aria-label="Choose schedule day">{rosterDays.map((day) => <button className={day === selectedScheduleDay ? "active" : ""} key={day} onClick={() => setScheduleDay(day)}>{scheduleDayLabel(day)}</button>)}</div><ScheduleDayTimeline day={selectedScheduleDay} shifts={calendarLayouts.get(selectedScheduleDay) || []} appointments={scheduleAppointments.filter((appointment) => s(appointment.booking_date) === selectedScheduleDay)} startMinute={calendarStartMinute} hours={calendarHours} onShiftEdit={shiftEdit} /></>}
           </section>
           <section className="paper"><div className="section-heading"><div><p className="eyebrow">BOOKING DEMAND</p><h2>Appointments this week</h2></div></div>{table(["Date", "Bookings"], rows(data.workload).map((r) => [s(r.booking_date), s(r.bookings)]))}</section>
-          <section className="paper"><div className="section-heading"><div><p className="eyebrow">PUBLISH STATUS</p><h2>Employee notifications</h2></div></div>{table(["Employee", "Channel", "Status", "Details"], rows(data.notifications).map((r) => [s(r.name), s(r.channel).toUpperCase(), status(r.status), s(r.error) || "Queued for delivery"]))}{!(data.integrations as R | undefined)?.sms && <p className="small-note">SMS is not configured. Add the Twilio account SID, auth token, and sending number in the Notifications section of Settings before publishing a future schedule.</p>}</section>
+          <section className="paper"><div className="section-heading"><div><p className="eyebrow">PUBLISH STATUS</p><h2>Employee notifications</h2></div></div>{table(["Employee", "Channel", "Status", "Details"], rows(data.notifications).map((r) => [s(r.name), s(r.channel).toUpperCase(), status(r.status), s(r.error) || "Queued for delivery"]))}{!(data.integrations as R | undefined)?.sms && <p className="small-note">SMS notifications are not connected yet. Published shifts are still available in each employee’s schedule.</p>}</section>
         </>
       )}
       {section === "hours" && (
@@ -1454,13 +1323,6 @@ export function AdminWorkspace({
                   ]),
                 )}
               </section>
-              <section className="paper">
-                <h2>Integration configuration</h2>
-                <IntegrationStatus value={data.integrations as R} />
-                <Link className="text-link" href="/admin/settings">
-                  Open settings
-                </Link>
-              </section>
             </>
           )}
         </>
@@ -1809,7 +1671,6 @@ export function AdminWorkspace({
         </>
       )}
       {section === "customers" && canArchiveCustomers && <SquareCustomerHistory onImported={refreshCustomers} refreshKey={customerArchiveVersion} />}
-      {section === "settings" && ["owner", "admin"].includes(user.role) && <TestDataCleanup />}
       {section === "leads" && <section className="paper">
         <p className="eyebrow">PHONE ENQUIRIES</p>
         <h2>Record the call. Keep the source accurate.</h2>
@@ -2071,67 +1932,6 @@ export function AdminWorkspace({
             </>,
           ]),
         )}
-      {section === "settings" && (
-        <>
-          <section className="paper">
-            <h2>Business configuration</h2>
-            <div className="integration-list">
-              {[
-                "Business",
-                "Booking",
-                "Branding",
-                "Tracking",
-                "Notifications",
-                "Payments",
-              ].map((g) => (
-                <div key={g}>
-                  <strong>{g}</strong>
-                  <button
-                    className="button outline"
-                    onClick={() => settingsEdit(g)}
-                  >
-                    Configure
-                  </button>
-                </div>
-              ))}
-            </div>
-            <p className="small-note">
-              Credentials are encrypted server-side. Blank password fields keep
-              existing values. Environment variables can also provide
-              configuration. Review all services, contact details and hours
-              before launch.
-            </p>
-          </section>
-          <section className="paper">
-            <div className="section-heading">
-              <h2>Integration readiness</h2>
-              <button
-                className="button outline"
-                disabled={busy}
-                onClick={() =>
-                  void run(
-                    "test_telegram",
-                    {},
-                    "Telegram test notification queued.",
-                  )
-                }
-              >
-                Send Telegram test
-              </button>
-            </div>
-            <IntegrationStatus value={data.integrations as R} />
-          </section>
-          <section className="paper">
-            <div className="section-heading">
-              <div>
-                <h2>Team access</h2>
-                <p className="small-note">Create logins, reset passwords and manage roles from the dedicated Team workspace.</p>
-              </div>
-              <Link className="button outline" href="/admin/team">Manage team access</Link>
-            </div>
-          </section>
-        </>
-      )}
       {!reportMode &&
         [
           "bookings",

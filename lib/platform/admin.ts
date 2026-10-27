@@ -3,7 +3,7 @@ import { recordJobCashPayment, listUnlinkedSquareJobPayments, linkSquareJobPayme
 import { saveJobCompensation } from "./job-compensation";
 import { expenseDirectory, createExpenseDirectoryEntry, resolveExpenseDirectory } from "./expense-directory";
 import { sendBookingConfirmationText, sendBookingPaymentText } from "./booking-communications";
-import {connectSquareAccount,squareAccountScope} from "../integrations/square-reporting";
+import {squareAccountScope} from "../integrations/square-reporting";
 import {preserveCompletedJobPay} from "./payroll";
 import {createSquareInvoice,refreshDetailInvoice} from "../integrations/square-invoices";
 import {squareEnvironment} from "../integrations/square-reporting";
@@ -15,9 +15,7 @@ import { query, transaction, type Query } from "./db";
 import { access, AppError, passwordHash, receiptToken } from "./auth";
 import {
   settings,
-  saveSettings,
   integrationStatus,
-  secret,
   siteUrl,
 } from "./settings";
 import {
@@ -188,15 +186,6 @@ export async function adminData(
     const selected = p.get("id") || "";
     return { summary: await inventorySummary(), rows: await query("SELECT *,CASE WHEN quantity<=0 THEN 'out_of_stock' WHEN quantity<=minimum_stock THEN 'low_stock' ELSE 'in_stock' END stock_status FROM wl.inventory_items WHERE (name||' '||sku||' '||category||' '||supplier) ILIKE $1 ORDER BY active DESC,name LIMIT 300", ["%" + search + "%"]), movements: selected ? await query("SELECT m.*,i.name item_name,u.name user_name FROM wl.inventory_movements m JOIN wl.inventory_items i ON i.id=m.item_id LEFT JOIN wl.users u ON u.id=m.created_by WHERE m.item_id=$1 ORDER BY m.occurred_on DESC,m.created_at DESC LIMIT 100", [selected]) : [] };
   }
-  if (section === "settings")
-    return {
-      settings: await settings(),
-      integrations: await integrationStatus(),
-      team: await query(
-        "SELECT id,name,email,role,active FROM wl.users ORDER BY name",
-      ),
-      templates: await query("SELECT * FROM wl.email_templates ORDER BY key"),
-    };
   if (section === "team")
     return {
       rows: await query(
@@ -536,7 +525,6 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
   }
   if(action==="create_square_invoice")return createSquareInvoice(uuid.parse(data.booking_id));
   if(action==="refresh_detail_invoice")return refreshDetailInvoice(uuid.parse(data.booking_id));
-  if(action==="connect_square_account")return connectSquareAccount();
   if (action === "sync_square_payments") return syncSquarePayments();
   if (action === "save_booking_line_item") {
     if (user.role === "staff")
@@ -1132,28 +1120,6 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
       );
       return { customer_id: cid };
     });
-  }
-  if (action === "save_settings")
-    return saveSettings(
-      data.settings,
-      z.record(z.string(), z.string().max(4096)).parse(data.credentials || {}),
-    );
-  if (action === "test_telegram") {
-    const business = await settings();
-    if (!(await secret("telegram_token")) || !business.telegram_chat_id)
-      throw new AppError(
-        "Connect the Telegram bot token and chat ID before sending a test.",
-      );
-    await transaction((q) =>
-      enqueue(q, {
-        key: "telegram-test:" + randomUUID(),
-        channel: "telegram",
-        recipient: business.telegram_chat_id,
-        subject: "Telegram notifications connected",
-        body:
-          "Booking alerts are ready. New appointment requests will appear here with the customer, vehicle, service, time, estimate, and workspace link.",
-      }),
-    );
   }
   if (action === "save_user") {
     const u = z

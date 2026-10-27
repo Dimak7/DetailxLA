@@ -5,6 +5,7 @@ import { workAsyncStorage, type WorkStore } from "next/dist/server/app-render/wo
 import { GET as manageGet, POST as managePost } from "../app/api/manage/route";
 import { GET as employeeMe } from "../app/api/employee/me/route";
 import { POST as employeeClock } from "../app/api/employee/clock/route";
+import { GET as testDataGet, POST as testDataPost } from "../app/api/admin/test-data/route";
 import { access, AppError, hash, login, sessionFromToken } from "../lib/platform/auth";
 import { adminAction, adminData } from "../lib/platform/admin";
 import { updateBooking } from "../lib/platform/bookings";
@@ -24,8 +25,9 @@ const forbidden = (error: unknown) => error instanceof AppError && error.status 
 const asRows = (value: unknown) => value as Array<Record<string, unknown>>;
 
 test("section permissions match the owner, admin, manager and staff workspaces", () => {
+  assert.deepEqual(access.settings, [], "configuration is unavailable to every dashboard role");
   for (const role of ["owner", "admin"] as const)
-    assert.ok(Object.values(access).every((roles) => roles.includes(role)), `${role} sees every workspace`);
+    assert.ok(Object.entries(access).filter(([section]) => section !== "settings").every(([,roles]) => roles.includes(role)), `${role} sees every operational workspace`);
   assert.deepEqual(Object.keys(access).filter((section) => access[section].includes("manager")).sort(), [
     "bookings", "calendar", "customers", "dashboard", "employees", "gallery", "hours", "leads", "messages",
     "my_schedule", "payments", "payroll", "performance", "reviews", "schedule", "services",
@@ -71,7 +73,21 @@ test("role boundaries are enforced in API responses, employee accounts and assig
     assert.equal((await manageGet(request(staff, "payroll", { ...period, export: "csv" }))).status, 403);
     for (const section of ["settings", "team", "marketing", "analytics", "reports", "expenses", "inventory"])
       assert.equal((await manageGet(request(manager, section))).status, 403, `manager cannot read ${section}`);
-    assert.equal((await manageGet(request(admin, "settings"))).status, 200);
+    const savedSettings = await query("SELECT * FROM wl.settings ORDER BY key");
+    const savedSecrets = await query("SELECT * FROM wl.secrets ORDER BY key");
+    for (const fixture of [owner, admin, manager, staff]) {
+      assert.equal((await manageGet(request(fixture, "settings"))).status, 403, `${fixture.session.role} cannot read configuration`);
+      await assert.rejects(() => adminData("settings", new URLSearchParams(), fixture.session), forbidden);
+      for (const name of ["save_settings", "test_telegram", "connect_square_account"]) {
+        assert.equal((await action(fixture, name, {})).status, 403, `${fixture.session.role} cannot perform ${name}`);
+        await assert.rejects(() => adminAction(name, {}, fixture.session), forbidden);
+      }
+      const cleanupUrl = "https://example.test/api/admin/test-data";
+      assert.equal((await testDataGet(new Request(cleanupUrl, { headers: { Cookie: `wl_session=${fixture.token}` } }))).status, 403);
+      assert.equal((await testDataPost(new Request(cleanupUrl, { method: "POST", headers: { Origin: "https://example.test", Cookie: `wl_session=${fixture.token}`, "Content-Type": "application/json" }, body: JSON.stringify({ action: "archive", data: {} }) }))).status, 403);
+    }
+    assert.deepEqual(await query("SELECT * FROM wl.settings ORDER BY key"), savedSettings);
+    assert.deepEqual(await query("SELECT * FROM wl.secrets ORDER BY key"), savedSecrets);
     assert.equal((await manageGet(request(admin, "team"))).status, 200);
     await query("INSERT INTO wl.ad_spend(id,channel,campaign,spend_date,amount_cents) VALUES($1,'Google Ads','Private campaign',$2,9000)", [randomUUID(), dateToday()]);
     await query("INSERT INTO wl.campaigns(id,name,channel,audience,body) VALUES($1,'Private campaign','email','all','Private campaign copy')", [randomUUID()]);

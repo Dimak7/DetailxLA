@@ -35,7 +35,7 @@ export async function AdminPage({
       data={JSON.parse(JSON.stringify(data))}
       user={user}
       allowedSections={Object.keys(access).filter((key) => access[key].includes(user.role))}
-      business={section === "settings" ? await settings() : publicSettings(await settings())}
+      business={publicSettings(await settings())}
     />
   );
 }

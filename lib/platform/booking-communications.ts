@@ -14,7 +14,7 @@ async function smsRecipient(bookingId: string) {
     throw new AppError("Choose an active appointment to send this text.");
   const business = await settings();
   if (!business.sms_from || !(await secret("sms_account")) || !(await secret("sms_token")))
-    throw new AppError("Connect a Twilio number and credentials in Settings before sending texts.", 503);
+    throw new AppError("Text messaging is not connected. Contact your site administrator.", 503);
   const customer = (await query<{ first_name: string; phone: string; sms_opted_out: boolean }>("SELECT first_name,phone,sms_opted_out FROM wl.customers WHERE id=$1 AND archived_at IS NULL", [b.customer_id]))[0];
   if (!customer?.phone || customer.sms_opted_out || (await query("SELECT id FROM wl.customers WHERE phone=$1 AND sms_opted_out LIMIT 1", [customer.phone])).length)
     throw new AppError("This customer has no phone number or has opted out of texts.");

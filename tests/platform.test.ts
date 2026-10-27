@@ -22,6 +22,7 @@ import { settings, saveSettings, secret } from "../lib/platform/settings";
 import { queueCampaign, optOut } from "../lib/platform/campaigns";
 import { report } from "../lib/platform/reporting";
 import { processOutbox } from "../lib/platform/worker";
+import { enqueue } from "../lib/platform/outbox";
 import { jobFinancials } from "../lib/platform/job-financials";
 import {
   verifyStripeEvent,
@@ -401,7 +402,6 @@ test("Relational platform integration", async (t) => {
         "reviews",
         "gallery",
         "analytics",
-        "settings",
         "team",
         "payments",
         "employees",
@@ -660,13 +660,20 @@ test("Relational platform integration", async (t) => {
         );
       },
     );
-    await t.test("Telegram connection test queues a business alert", async () => {
+    await t.test("configured Telegram delivery still works outside dashboard settings", async () => {
       const business = await settings();
       await saveSettings(
         { ...business, telegram_chat_id: "123456789" },
         { telegram_token: "test-not-a-real-secret" },
       );
-      await adminAction("test_telegram", {}, owner!);
+      await assert.rejects(() => adminAction("test_telegram", {}, owner!), /cannot perform/);
+      await transaction(q => enqueue(q, {
+        key: `telegram-maintenance-test:${randomUUID()}`,
+        channel: "telegram",
+        recipient: "123456789",
+        subject: "Telegram notifications connected",
+        body: "Booking alerts are ready.",
+      }));
       const message = (
         await query<Message>(
           "SELECT * FROM wl.messages WHERE subject='Telegram notifications connected' ORDER BY created_at DESC LIMIT 1",

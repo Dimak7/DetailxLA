@@ -29,7 +29,7 @@ test("booking texts, 48-hour reminders, retries and deposit links follow the app
     assert.equal(reminders.length, 2); assert.ok(reminders.every(r => Number(r.hours) === 48));
     assert.equal((await createBooking(input)).booking.id,b.id);
     assert.equal((await query("SELECT id FROM wl.messages WHERE booking_id=$1 AND purpose='reminder'",[b.id])).length,2);
-    await assert.rejects(sendBookingConfirmationText(b.id,randomUUID()),/Connect a Twilio/);
+    await assert.rejects(sendBookingConfirmationText(b.id,randomUUID()),/Text messaging is not connected/);
     Object.assign(process.env,{TWILIO_ACCOUNT_SID:"AC-test",TWILIO_AUTH_TOKEN:"test-token",SMS_FROM_NUMBER:"+13125550999"});
     const requestId=randomUUID();
     await sendBookingConfirmationText(b.id,requestId); await sendBookingConfirmationText(b.id,requestId);

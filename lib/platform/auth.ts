@@ -115,7 +115,9 @@ export const access: Record<string, Role[]> = {
   reviews: ["owner", "admin", "manager"],
   gallery: ["owner", "admin", "manager"],
   analytics: ["owner", "admin"],
-  settings: ["owner", "admin"],
+  // Configuration is maintained outside the shop workspace. Keep this route
+  // recognized so saved Settings links redirect home, but grant no web role.
+  settings: [],
   team: ["owner", "admin"],
   payments: ["owner", "admin", "manager"],
   employees: ["owner", "admin", "manager"],
