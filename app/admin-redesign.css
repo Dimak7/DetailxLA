@@ -273,9 +273,68 @@
 .admin-redesign .finance-bar-track{height:7px;background:var(--admin-surface-soft);border-radius:99px;}.admin-redesign .finance-bar-track>span{background:var(--gold);border-radius:99px;}.admin-redesign .finance-bar{margin:22px 0;}.admin-redesign .finance-bar>div:first-child{font-size:12px;}
 .admin-shell.admin-redesign .stats-grid{gap:16px;}.admin-shell.admin-redesign .stat{padding:24px;border:0;border-radius:24px;background:var(--admin-surface);box-shadow:none;}.admin-redesign .stat strong{font-size:30px;letter-spacing:-.04em;}.admin-redesign .stat p{font-size:12px;color:var(--muted);}
 .admin-shell.admin-redesign .modal{border:0;background:var(--admin-surface);border-radius:28px;padding:32px;box-shadow:0 30px 120px #001a1840;}.admin-redesign .modal-backdrop{background:#0e211b65;backdrop-filter:blur(8px);}.admin-redesign .modal-header{border:0;padding-bottom:0;margin-bottom:26px;}.admin-redesign .modal-header h2{font-size:27px!important;}.admin-redesign .modal-header>button{min-height:38px!important;font-size:11px!important;padding:10px 18px!important;}
-.admin-shell.admin-redesign .staffing-board{display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:12px;padding:0 0 12px;overflow-x:auto;}.admin-shell.admin-redesign .staffing-day{border:0;border-radius:20px;background:var(--admin-surface-soft);padding:14px;min-height:250px;}.admin-shell.admin-redesign .staffing-day-heading{border:0!important;border-radius:14px!important;background:transparent!important;padding:4px 0 18px!important;display:grid;gap:8px;text-align:left;width:100%;}.admin-redesign .staffing-day-heading strong{font-size:14px;}.admin-redesign .staffing-day-heading span,.admin-redesign .staffing-day-heading small{font-size:10px;color:var(--muted);}
-.admin-shell.admin-redesign .staffing-chip{background:var(--admin-surface)!important;color:var(--ink)!important;border:0!important;border-radius:15px!important;padding:14px!important;width:100%;text-align:left;box-shadow:0 2px 6px #00000004;}.admin-redesign .staffing-chip strong{font-size:12px;}.admin-redesign .staffing-chip span{font-size:10px;color:var(--muted);margin-top:7px;display:block;}.admin-shell.admin-redesign .staffing-add{font-size:11px!important;border:0!important;margin-top:14px;background:var(--admin-selected-bg)!important;color:var(--admin-selected-text)!important;width:100%;padding:12px 8px!important;}
+@media(max-width:760px) {
+ .admin-shell.admin-redesign .schedule-view-tabs {
+  display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); width: 100%;
+ }
+ .admin-shell.admin-redesign .admin-main .schedule-view-tabs button { min-width: 0; padding-inline: 8px; }
+ .admin-shell.admin-redesign .day-picker { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
+ .admin-shell.admin-redesign .admin-main .day-picker button { min-width: 0; padding: 10px 8px; }
+}
+/* Each day owns its content width; names and times stack inside the shift. */
+.admin-shell.admin-redesign .staffing-board {
+ display: grid; grid-template-columns: repeat(7,minmax(176px,1fr)); gap: 12px;
+ padding: 0 0 12px; overflow-x: auto;
+}
+.admin-shell.admin-redesign .staffing-day {
+ grid-template-columns: minmax(0,1fr); grid-template-rows: auto 1fr auto;
+ min-width: 0; border: 0; border-radius: 20px; background: var(--admin-surface-soft);
+ padding: 14px; min-height: 250px;
+}
+.admin-shell.admin-redesign .staffing-chips {
+ grid-template-columns: minmax(0,1fr); min-width: 0; gap: 8px;
+}
+.admin-shell.admin-redesign .staffing-day-heading {
+ border: 0!important; border-radius: 14px!important; background: transparent!important;
+ padding: 4px 0 18px!important; display: grid; grid-template-columns: minmax(0,1fr);
+ gap: 8px; text-align: left; width: 100%; min-width: 0; white-space: normal;
+}
+.admin-redesign .staffing-day-heading strong { font-size: 14px; }
+.admin-redesign .staffing-day-heading span,.admin-redesign .staffing-day-heading small { font-size: 10px; color: var(--muted); }
+.admin-shell.admin-redesign .admin-main .staffing-chip {
+ display: grid; grid-template-columns: minmax(0,1fr); justify-items: start; gap: 6px;
+ min-width: 0; width: 100%; max-width: 100%; white-space: normal;
+ background: var(--admin-surface)!important; color: var(--ink)!important;
+ border: 0!important; border-radius: 15px!important; padding: 12px!important;
+ text-align: left; box-shadow: 0 2px 6px #00000004;
+}
+.admin-shell.admin-redesign .staffing-chip :is(strong,span) {
+ min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere;
+ line-height: 1.5; text-overflow: clip;
+}
+.admin-shell.admin-redesign .staffing-chip strong { font-size: 12px; }
+.admin-shell.admin-redesign .staffing-chip span {
+ font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); margin-top: 0;
+}
+.admin-shell.admin-redesign .admin-main :is(.staffing-add,.staffing-more) {
+ min-width: 0; width: 100%; max-width: 100%; white-space: normal; overflow-wrap: anywhere;
+ min-height: 44px; font-size: 11px!important; padding: 12px 8px!important;
+}
+.admin-shell.admin-redesign .staffing-add {
+ border: 0!important; margin-top: 14px; background: var(--admin-selected-bg)!important;
+ color: var(--admin-selected-text)!important;
+}
 .admin-shell.admin-redesign .staffing-matrix-head{background:var(--admin-surface-soft);border-color:var(--line);padding:18px 14px;font-size:11px;}.admin-shell.admin-redesign .staffing-person{background:var(--admin-surface);padding:20px 14px;border-color:var(--line);}.admin-shell.admin-redesign .matrix-shift{border:5px solid var(--admin-surface)!important;border-radius:20px!important;background:var(--admin-selected-bg)!important;color:var(--admin-selected-text)!important;font-size:11px!important;}.admin-shell.admin-redesign .matrix-off{border:5px solid var(--admin-surface)!important;background:var(--admin-surface-soft)!important;color:var(--muted)!important;border-radius:20px!important;}
+/* Compact schedule controls must not inherit the generic pill-button padding. */
+.admin-shell.admin-redesign .admin-main :is(.matrix-shift,.matrix-off) {
+ min-width: 0; padding: 10px 8px; white-space: normal; overflow-wrap: anywhere;
+ line-height: 1.5; font-variant-numeric: tabular-nums;
+}
+.admin-shell.admin-redesign .staffing-person { min-width: 0; overflow-wrap: anywhere; }
+.admin-shell.admin-redesign .admin-main .shift-event {
+ display: block; min-height: 0; padding: 6px 8px; border-radius: 8px;
+ white-space: normal; overflow-wrap: anywhere;
+}
 .admin-shell.admin-redesign .calendar-grid{gap:13px;border:0;}.admin-shell.admin-redesign .calendar-day{border:0;border-radius:23px;background:var(--admin-surface);padding:20px 16px;min-height:250px;}.admin-shell.admin-redesign .calendar-day>span{font-size:13px;font-weight:650;display:block;margin-bottom:22px;}.admin-shell.admin-redesign .calendar-event{border-radius:17px!important;background:var(--admin-selected-bg)!important;color:var(--admin-selected-text)!important;border:0!important;text-align:left;font-size:11px!important;padding:17px!important;margin-bottom:12px;}.admin-redesign .calendar-event strong{display:block;font-size:12px;margin-bottom:7px;}
 .admin-redesign .role-permissions-grid>div{border:0;border-radius:20px;padding:22px;background:var(--admin-surface-soft);}.admin-redesign .role-permissions-grid p{font-size:12px;line-height:1.7;color:var(--muted);}
 @media(min-width:1500px){.admin-shell.admin-redesign .app-body>.admin-main{padding-inline:44px;}.admin-shell.admin-redesign .app-global-bar{padding-left:262px;}}
@@ -289,7 +348,7 @@
  .admin-redesign .studio-section-bar{align-items:flex-start;gap:15px;flex-wrap:wrap;}.admin-redesign .studio-two-column{grid-template-columns:minmax(0,1fr);gap:17px;}.admin-redesign .studio-number-pair{gap:18px;}.admin-redesign .studio-number-pair strong{font-size:34px;}.admin-redesign .studio-number-pair span{font-size:11px;}
  .admin-shell.admin-redesign .studio-view-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;border-radius:22px;padding:5px;gap:4px;}.admin-shell.admin-redesign .studio-view-switch button{font-size:11px;padding:12px 8px;border-radius:18px;}.admin-redesign .studio-date-control form{display:grid;grid-template-columns:1fr 1fr;}.admin-redesign .studio-date-control form>.field:first-child{grid-column:1/-1;}.admin-redesign .studio-date-control form>button{grid-column:1/-1;}.admin-redesign .studio-source-disclosure>summary{grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:22px 0;}.admin-redesign .studio-source-disclosure>summary>span{grid-column:1;grid-row:2;font-size:11px;}.admin-redesign .studio-source-disclosure>summary>b{grid-column:2;grid-row:1/span 2;font-size:15px;}.admin-redesign .studio-ranked-list>div{gap:10px;}.admin-redesign .studio-ranked-list b{font-size:14px;}.admin-redesign .studio-ranked-list .studio-rank{width:27px;height:27px;flex-basis:27px;font-size:9px;}
  .admin-shell.admin-redesign .table-scroll.admin-table-wrap--cards{padding:0;background:transparent;}.admin-shell.admin-redesign .admin-table-wrap--cards .admin-record-row{border:0;border-radius:24px;padding:20px;background:var(--admin-surface);margin-bottom:14px;box-shadow:0 3px 18px #173c2805;}.admin-shell.admin-redesign .admin-table-wrap--cards .admin-record-cell{padding:10px 0;font-size:13px;border:0;}.admin-shell.admin-redesign .admin-table-wrap--cards .admin-record-main{padding:0 0 16px;font-size:17px;border-bottom:1px solid var(--line);margin-bottom:6px;}.admin-shell.admin-redesign .admin-table-wrap--cards .admin-record-cell:before{font-size:10px;font-weight:500;color:var(--muted);}.admin-shell.admin-redesign .admin-table-wrap--cards .admin-record-actions{border-top:1px solid var(--line);padding-top:16px;margin-top:6px;}.admin-shell.admin-redesign .admin-record-actions-content{gap:8px;}.admin-redesign .paper .admin-table-wrap--cards .admin-record-row{background:var(--admin-surface-soft);box-shadow:none;}
- .admin-redesign .studio-filter-surface{padding:20px;border-radius:24px;}.admin-redesign .studio-filter-surface .field{min-width:0;flex:1 1 120px;}.admin-redesign .studio-filter-surface button{width:100%;}.admin-shell.admin-redesign .modal{padding:25px 20px;border-radius:26px;}.admin-redesign .modal-header h2{font-size:24px!important;}.admin-redesign .admin-secondary-panel>summary{flex-wrap:wrap;gap:7px 12px;}.admin-redesign .admin-secondary-panel>summary small{width:100%;order:2;margin:0;}.admin-redesign .admin-secondary-panel>summary:after{margin-left:auto;}.admin-shell.admin-redesign .staffing-board{grid-template-columns:repeat(7,minmax(170px,1fr));}.admin-shell.admin-redesign .staffing-day{min-height:230px;}.admin-shell.admin-redesign .calendar-scroll[data-view="day"] .calendar-day{min-height:0;}
+ .admin-redesign .studio-filter-surface{padding:20px;border-radius:24px;}.admin-redesign .studio-filter-surface .field{min-width:0;flex:1 1 120px;}.admin-redesign .studio-filter-surface button{width:100%;}.admin-shell.admin-redesign .modal{padding:25px 20px;border-radius:26px;}.admin-redesign .modal-header h2{font-size:24px!important;}.admin-redesign .admin-secondary-panel>summary{flex-wrap:wrap;gap:7px 12px;}.admin-redesign .admin-secondary-panel>summary small{width:100%;order:2;margin:0;}.admin-redesign .admin-secondary-panel>summary:after{margin-left:auto;}.admin-shell.admin-redesign .staffing-board{grid-template-columns:repeat(7,minmax(176px,1fr));}.admin-shell.admin-redesign .staffing-day{min-height:230px;}.admin-shell.admin-redesign .calendar-scroll[data-view="day"] .calendar-day{min-height:0;}
 }
 @media(prefers-reduced-motion:no-preference){.admin-redesign :is(button,.button,.studio-soft-link){transition:box-shadow .15s,transform .15s;}.admin-redesign .button:hover{transform:translateY(-1px);}}
 .admin-shell.admin-redesign .paper.payroll-workspace{background:transparent;padding:0;box-shadow:none;}.admin-redesign .payroll-workspace>.section-heading{padding:0 0 4px;}.admin-redesign .payroll-workspace>.toolbar{background:var(--admin-surface);padding:21px 25px;border-radius:24px;}.admin-redesign .payroll-workspace>.payroll-explanation{padding-inline:4px;}
