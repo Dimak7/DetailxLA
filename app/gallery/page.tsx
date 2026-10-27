@@ -21,7 +21,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-mercedes-interior",
     "title": "A fresh cabin",
-    "caption": "Clean leather, crisp touchpoints and a cabin that feels composed again.",
+    "caption": "Clean leather, crisp touchpoints, and a cabin that feels composed again.",
     "category": "Interior",
     "image_url": "/brand/photos/mercedes-interior.webp",
     "before_url": "",
@@ -41,7 +41,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-interior-cleaning",
     "title": "Interior care",
-    "caption": "Material-appropriate tools reach the seams, textures and everyday touchpoints.",
+    "caption": "Material-appropriate tools reach the seams, textures, and everyday touchpoints.",
     "category": "Interior",
     "image_url": "/brand/photos/interior-cleaning.webp",
     "before_url": "",
@@ -51,7 +51,7 @@ const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-wheel-cleaning",
     "title": "Every spoke",
-    "caption": "A soft detailing brush reaches the spokes, hardware and tighter wheel surfaces.",
+    "caption": "A soft detailing brush reaches the spokes, hardware, and tighter wheel surfaces.",
     "category": "Detail Work",
     "image_url": "/brand/photos/wheel-cleaning.webp",
     "before_url": "",
@@ -93,7 +93,7 @@ export default async function Page() {
           <br />
           <em>is in the details.</em>
         </h1>
-        <p>See the work up close: careful washing, interior touchpoints, wheel details and the final surfaces that make a car feel complete.</p>
+        <p>See the work up close: careful washing, interior touchpoints, wheel details, and the final surfaces that make a car feel complete.</p>
       </section>
       <section className="wrap section no-top">
         <Gallery items={galleryItems} />

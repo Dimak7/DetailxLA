@@ -62,7 +62,7 @@ export function CinematicHero() {
           <em>Care that goes deeper.</em>
         </h1>
         <p className={styles.description}>
-          Expert detailing, paint correction and ceramic protection.
+          Expert detailing, paint correction, and ceramic protection.
           <br /> Bring back the feeling of a car you love to drive.
         </p>
         <div className={styles.actions}>

@@ -14,15 +14,15 @@ export default async function Page() {
         <h1>Service terms.</h1>
         <h2>Appointments & pricing</h2>
         <p>
-          Prices, estimated duration and service inclusions are displayed when
+          Prices, estimated duration, and service inclusions are displayed when
           booking. Starting prices and consultations are not fixed quotes.
-          Vehicle condition, size and additional requests can affect scope.
+          Vehicle condition, size, and additional requests can affect scope.
           Additional charges require your approval before work begins.
         </p>
         <h2>Before your appointment</h2>
         <p>
           Remove valuables and personal items. Tell us about existing damage,
-          aftermarket finishes, delicate materials and any safety concerns.
+          aftermarket finishes, delicate materials, and any safety concerns.
           Access and service location must be agreed before the appointment.
         </p>
         <h2>Cancellations & changes</h2>

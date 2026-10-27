@@ -65,7 +65,7 @@ const catalog = [
     [
       "Full vacuum",
       "Seats and carpets cleaned",
-      "Dashboard, doors and vents",
+      "Dashboard, doors, and vents",
       "Stain treatment",
       "Odor reduction",
     ],

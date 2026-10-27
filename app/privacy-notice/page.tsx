@@ -14,7 +14,7 @@ export default async function Page() {
         <h1>Privacy notice.</h1>
         <p>
           We collect contact details, vehicle information, appointment requests,
-          consent choices and website attribution data to provide our services
+          consent choices, and website attribution data to provide our services
           and understand which channels generate bookings.
         </p>
         <h2>How we use information</h2>

@@ -15,10 +15,10 @@ const benefits = [
 ];
 
 const stages = [
-  { title: "Assess the finish", subtitle: "Understand the paint. Agree the plan.", text: "We review visible marks, previous polishing or repairs, and the areas you care about most. We discuss what can improve, what should remain and the scope of work before starting." },
+  { title: "Assess the finish", subtitle: "Understand the paint. Agree the plan.", text: "We review visible marks, previous polishing or repairs, and the areas you care about most. We discuss what can improve, what should remain, and the scope of work before starting." },
   { title: "Prepare the surface", subtitle: "A clean foundation for careful polishing.", text: "Washing and decontamination remove dirt and bonded contamination as required. This lets us assess the surface clearly and prepare it for machine polishing." },
   { title: "Refine the paint", subtitle: "The right approach, panel by panel.", text: "We select the polishing approach around the paint and agreed scope, inspecting the finish as the work progresses. The aim is a worthwhile improvement while respecting the limits of the surface." },
-  { title: "Review & plan the care", subtitle: "Know your finish. Know what comes next.", text: "We review the finish, discuss any remaining marks and explain the care it needs next. Any additional protection is agreed for your vehicle, so you know how to look after the result." },
+  { title: "Review & plan the care", subtitle: "Know your finish. Know what comes next.", text: "We review the finish, discuss any remaining marks, and explain the care it needs next. Any additional protection is agreed for your vehicle, so you know how to look after the result." },
 ];
 
 // Explain the legacy catalogue labels without replacing custom dashboard inclusions.
@@ -31,10 +31,10 @@ export function PaintCorrection({ service }: { service: Service }) {
   const booking = `/booking?service=${encodeURIComponent(service.id)}`;
   const correctionPackages = servicePackages("paint-correction");
   const questions = [
-    { title: "How long will you need my car?", answer: `The current appointment estimate is ${serviceDuration(service.duration_minutes)}. Vehicle size, paint condition and the agreed correction can change that timing. We confirm drop-off and collection arrangements for your visit.` },
-    { title: "Will every scratch disappear?", answer: "No. Deep scratches, stone chips and failing paint may need repair instead. Removing too much material to chase a mark can be the wrong choice. We explain the realistic improvement after inspecting your paint." },
+    { title: "How long will you need my car?", answer: `The current appointment estimate is ${serviceDuration(service.duration_minutes)}. Vehicle size, paint condition, and the agreed correction can change that timing. We confirm drop-off and collection arrangements for your visit.` },
+    { title: "Will every scratch disappear?", answer: "No. Deep scratches, stone chips, and failing paint may need repair instead. Removing too much material to chase a mark can be the wrong choice. We explain the realistic improvement after inspecting your paint." },
     { title: "Is ceramic coating included?", answer: "Only when it is expressly included in your agreed scope. Correction refines the finish; ceramic coating is a separate protection service. We can discuss both together." },
-    { title: "What should I tell you before booking?", answer: "Share your car’s make, model and the marks that bother you. Mention previous polishing, repainting, coatings, wraps or paint protection film. Photos help start the conversation, but the paint still needs an in-person assessment." },
+    { title: "What should I tell you before booking?", answer: "Share your car’s make, model, and the marks that bother you. Mention previous polishing, repainting, coatings, wraps or paint protection film. Photos help start the conversation, but the paint still needs an in-person assessment." },
   ];
 
 
@@ -71,7 +71,7 @@ export function PaintCorrection({ service }: { service: Service }) {
         <div className={styles.craftCopy}><h3>More than a wash.{" "}<br />A refinement of the paint.</h3><p>A wash removes dirt. Paint correction addresses suitable imperfections in the clear coat through carefully selected machine polishing. Light reflects more clearly, revealing depth that washing alone can’t restore.</p></div>
         <div className={styles.concerns}>{benefits.map((benefit, index) => <article key={benefit.title}><small>0{index + 1}</small><div><h4>{benefit.title}</h4><p>{benefit.text}</p></div></article>)}</div>
       </div>
-      <div className={styles.suitability}><p className={styles.eyebrow}>IS IT RIGHT FOR YOUR CAR?</p><p>A daily driver with wash marks. A used car ready for a refresh. Paint you want to refine before ceramic coating.</p><p>Deep damage may need repair. Matte finishes, wraps and paint protection film need a different care approach—tell us about them before booking.</p></div>
+      <div className={styles.suitability}><p className={styles.eyebrow}>IS IT RIGHT FOR YOUR CAR?</p><p>A daily driver with wash marks. A used car ready for a refresh. Paint you want to refine before ceramic coating.</p><p>Deep damage may need repair. Matte finishes, wraps, and paint protection film need a different care approach—tell us about them before booking.</p></div>
     </section>
 
     <section className={styles.service} id="your-correction" aria-labelledby="service-title">
@@ -89,7 +89,7 @@ export function PaintCorrection({ service }: { service: Service }) {
             </article>
           ))}
         </div>
-        <p className={styles.approachNote}>Correction percentages are targets, not promises. Paint thickness, previous repairs and defect depth determine the safe result.</p>
+        <p className={styles.approachNote}>Correction percentages are targets, not promises. Paint thickness, previous repairs, and defect depth determine the safe result.</p>
       </div>
       <aside className={styles.bookingCard} aria-label="Paint correction service details"><span className={styles.cardTag}>PAINT CORRECTION</span><div className={styles.price}>{servicePrice(service)}</div><p className={styles.duration}>Estimated appointment <strong>{serviceDuration(service.duration_minutes)}</strong></p><ul>{service.includes.map(item => <li key={item}>{bookingInclusionLabels.get(item.trim().toLowerCase()) ?? item}</li>)}</ul><Link href={booking} className="button">Book your correction</Link><p className={styles.cardNote}>{service.pricing_mode === "quote" ? "Your vehicle and paint condition guide your final quote." : "Sedan pricing shown. Vehicle size and paint condition guide your final quote."} Scope agreed before work begins.</p></aside>
     </section>
