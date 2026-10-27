@@ -1,0 +1,9 @@
+.panel { min-width: 0; border: 0; padding: 0; margin: 0; }
+.methods { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; padding: 5px; border-radius: 20px; background: var(--admin-surface-soft,var(--cream)); }
+:global(.admin-shell.admin-redesign[data-theme]) .methods button { min-width: 0; padding: 12px 10px; min-height: 46px; border: 0; border-radius: 16px; background: transparent; color: var(--muted); white-space: normal; }
+:global(.admin-shell.admin-redesign[data-theme]) .methods button[aria-pressed="true"] { background: var(--admin-primary-bg); color: var(--admin-primary-text); }
+.methods button:focus-visible { outline: 2px solid var(--admin-focus); outline-offset: 2px; }
+.compact > div:has(> section) { grid-template-columns: minmax(0,1fr); }
+.help { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.help summary { cursor: pointer; padding: 8px 0; }
+@media(max-width:540px) { .methods { gap: 3px; } :global(.admin-shell.admin-redesign[data-theme]) .methods button { font-size: 11px; padding-inline: 5px; } }

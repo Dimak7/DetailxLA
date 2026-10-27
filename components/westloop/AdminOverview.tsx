@@ -21,6 +21,46 @@ function AttentionIcon({ complete = false }: { complete?: boolean }) {
   return <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="7.5" />{complete ? <path d="m6.5 10 2.3 2.3 4.7-5" /> : <path d="M10 5.8v5.1m0 2.7v.2" strokeLinecap="round" />}</svg>;
 }
 
+type OperationalReport = Pick<Report, "refunds" | "tips" | "average_order" | "revenue_per_customer" | "labor_cost" | "leads" | "customers" | "bookings" | "windows" | "series">;
+function OperationalDetails({ report: rep, period, today }: { report: OperationalReport; period: string; today: string }) {
+  const customerCount = number(rep.customers.total);
+  const groups = [
+    { title: "Payments & earnings", note: period, rows: [
+      { label: "Refunds", value: money(rep.refunds) },
+      { label: "Appointment tips", value: money(rep.tips) },
+      { label: "Average collected per paid appointment", value: money(rep.average_order) },
+      { label: "Collected per linked customer", value: money(rep.revenue_per_customer) },
+      { label: "Estimated hourly wages", value: money(rep.labor_cost) },
+    ] },
+    { title: "Customers & enquiries", note: "New customers and enquiries use the selected period.", rows: [
+      { label: "New enquiries", value: String(rep.leads) },
+      { label: "New customers", value: String(number(rep.customers.new_customers)) },
+      { label: "Customers, all time", value: String(customerCount) },
+      { label: "Returning customers, all time", value: String(number(rep.customers.returning)) },
+      { label: "Repeat customer share", value: customerCount ? `${(number(rep.customers.returning) / customerCount * 100).toFixed(1)}%` : "No customers" },
+    ] },
+    { title: "Booking status", note: "Bookings created in this period, shown by their current status.", rows: Object.entries(rep.bookings).map(([status, count]) => ({ label: status === "total" ? "All bookings" : statusLabels[status] || status.replaceAll("_", " "), value: String(count) })) },
+    { title: "Current collections", note: `Through ${shortDate(today)} · Chicago time`, rows: [["today", "Today"], ["week", "This week"], ["month", "This month"], ["year", "This year"]].map(([key, label]) => ({ label, value: money(number(rep.windows[key])) })) },
+  ];
+  const maxCollection = Math.max(1, ...rep.series.map(row => Math.abs(number(row.revenue))));
+  return <details className={styles.disclosure}>
+    <summary><strong>Business details</strong><span>Payments, customers & visits</span></summary>
+    <div className={styles.operationalDetails}>
+      <div className={styles.operationalGrid}>{groups.map(group => <section key={group.title}>
+        <h3>{group.title}</h3><p>{group.note}</p>
+        <dl>{group.rows.map(row => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>
+      </section>)}</div>
+      <p className={styles.operationalNote}>Appointment tips belong to completed website jobs. Collection averages use linked payments. Hourly wages exclude job commissions and tips; see Employee pay for full earnings.</p>
+      <details className={styles.dailyCollections}><summary>Daily collections · {period}</summary>
+        <p>Verified payments less refunds, by payment date. Days without recorded payments are omitted.</p>
+        {rep.series.length ? <dl>{rep.series.map(row => <div key={text(row.day)}>
+          <dt>{shortDate(text(row.day))}</dt><dd><strong>{money(number(row.revenue))}</strong><span aria-hidden="true" className={number(row.revenue) < 0 ? styles.refundBar : undefined} style={{ width: `${Math.abs(number(row.revenue)) / maxCollection * 100}%` }} /></dd>
+        </div>)}</dl> : <p>No verified payments in this period.</p>}
+      </details>
+    </div>
+  </details>;
+}
+
 export function AdminOverview({ data, user, allowedSections }: { data: RecordData; user: Session; allowedSections: string[] }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -76,7 +116,7 @@ export function AdminOverview({ data, user, allowedSections }: { data: RecordDat
       </section>
       <aside className={styles.attention} id="overview-attention" aria-labelledby="overview-attention-title">
         <h2 id="overview-attention-title">Needs attention</h2><div className={styles.attentionList}>
-          {unassignedCount > 0 && canBook && <details className={styles.assignmentDetails}><summary><AttentionIcon /><span>{unassignedCount} {unassignedCount === 1 ? "job needs" : "jobs need"} a detailer</span></summary><div>{unassigned.slice(0, 3).map(job => <Link key={text(job.id)} href={jobHref(job)} className={styles.unassignedJob}><strong>{text(job.customer_name)}</strong><span>{text(job.booking_date) === today ? "Today" : shortDate(text(job.booking_date))} · {timeLabel(number(job.start_minute))}</span></Link>)}{unassignedCount > 3 && canBook && <Link className={styles.quietLink} href="/admin/bookings?view=upcoming">View all upcoming jobs</Link>}</div></details>}
+          {unassignedCount > 0 && canBook && <details className={styles.assignmentDetails}><summary><AttentionIcon /><span>{unassignedCount} {unassignedCount === 1 ? "job needs" : "jobs need"} a detailer</span></summary><div>{unassigned.map(job => <Link key={text(job.id)} href={jobHref(job)} className={styles.unassignedJob}><strong>{text(job.customer_name)}</strong><span>{text(job.booking_date) === today ? "Today" : shortDate(text(job.booking_date))} · {timeLabel(number(job.start_minute))}</span></Link>)}{unassignedCount > unassigned.length && <Link className={styles.quietLink} href="/admin/bookings">View all bookings</Link>}</div></details>}
           {rep.outstanding > 0 && canBook && canSeePayments && <Link href="/admin/bookings?status=completed" className={styles.attentionAction}><AttentionIcon /><span><strong>{money(rep.outstanding)} to collect</strong><small>Completed work · {period}</small></span></Link>}
           {stockAlerts > 0 && <Link href="/admin/inventory" className={styles.attentionAction}><AttentionIcon /><span><strong>{stockAlerts} {stockAlerts === 1 ? "supply needs" : "supplies need"} restocking</strong></span></Link>}
           {!unassignedCount && !rep.outstanding && !stockAlerts && <div className={styles.caughtUp}><AttentionIcon complete /><span>You’re all caught up.</span></div>}
@@ -92,6 +132,7 @@ export function AdminOverview({ data, user, allowedSections }: { data: RecordDat
       <div className={styles.reportFooter}><span>{period}</span>{canSeeReports && <Link className={styles.quietLink} href={`/admin/reports?from=${rep.start}&to=${rep.end}`}>Reports &amp; exports</Link>}</div>
     </section>}
     {(canSeePayments || canSeeCosts) && <div className={styles.supporting}>
+      {user.role === "manager" && canSeePayments && <OperationalDetails report={rep} period={period} today={today} />}
       {data.square != null && canSeePayments && <details className={styles.disclosure}><summary><strong>Square collections</strong><span>{money(rep.square.net)}</span></summary><div className={styles.disclosureBody}><SquareRevenue connection={data.square as Awaited<ReturnType<typeof squareRevenueStatus>>} summary={rep.square} /></div></details>}
       <details className={styles.disclosure}><summary><strong>About these numbers</strong></summary><div className={styles.definitions}><div><strong>Collected</strong><p>Verified payments received, less refunds. Deposits and tips are included. Processing fees are shown separately.</p></div><div><strong>Still to collect</strong><p>Unpaid service balances for work completed in the selected period. Deposits already paid reduce the balance.</p></div>{canSeeCosts && <div><strong>Operating result</strong><p>Collected revenue minus recorded expenses. Missing expenses affect this number; it is not a complete accounting profit statement.</p></div>}</div></details>
     </div>}
