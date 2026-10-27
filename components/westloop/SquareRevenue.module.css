@@ -45,7 +45,7 @@
 
 @media (max-width: 760px) {
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .panel .metric { padding: 14px 12px; box-shadow: none; background: #f6f9f5; }
+  .panel .metric { min-width: 0; padding: 14px 12px; box-shadow: none; background: var(--sage); color: var(--ink); }
   .panel .metric strong { font-size: 23px; }
   .heading { align-items: stretch; }
   .panel .syncButton { width: 100%; }

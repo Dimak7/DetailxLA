@@ -1,6 +1,10 @@
 .settings { display: grid; gap: 22px; min-width: 0; color: var(--ink); }
 .settings p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
 .settings button { padding: 10px 15px; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+.settings button:not(:global(.button)) { background: var(--admin-control-bg, var(--white)); color: var(--admin-control-text, var(--ink)); cursor: pointer; }
+.settings button:not(:global(.button)):enabled:hover { background: var(--admin-control-hover, var(--sage)); color: var(--admin-control-text, var(--ink)); }
+.settings button:disabled { cursor: not-allowed; }
+.settings :is(button, summary):focus-visible { outline: 2px solid var(--admin-focus, var(--gold)); outline-offset: 3px; }
 .settings label { display: grid; gap: 7px; font-size: 12px; font-weight: 600; }
 .settings input:not([type=checkbox]), .settings select { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--white); font: inherit; font-size: 14px; min-height: 44px; }
 .intro { display: grid; grid-template-columns: minmax(160px, .7fr) 1.3fr; align-items: end; gap: 24px; }
@@ -50,13 +54,13 @@
 .compact small { color: var(--muted); font-size: 11px; }
 .compactRule { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 5px; }
 .compactRule strong { white-space: nowrap; }
-@media (max-width: 680px) {
+@media (max-width: 760px) {
   .intro { grid-template-columns: 1fr; gap: 12px; }
   .standard { padding: 17px; align-items: stretch; flex-wrap: wrap; }
   .standard button { flex-shrink: 0; }
   .customSummary { flex-basis: 100%; max-width: none; order: 2; }
   .columnLabels { display: none; }
-  .serviceRow { grid-template-columns: 1fr 1fr; gap: 14px; }
+  .serviceRow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
   .serviceName { grid-column: 1/-1; }
   .serviceRow > button { grid-column: 1/-1; }
   .mobileLabel { display: block; }

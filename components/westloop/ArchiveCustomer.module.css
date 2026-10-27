@@ -1,6 +1,7 @@
-.trigger { border: 1px solid #dce4dd; background: #fff; color: #315e4e; border-radius: 8px; padding: .55rem .8rem; font: inherit; font-size: .8rem; cursor: pointer; white-space: nowrap; }
-.trigger:hover { background: #f1f5ee; }
-.trigger:focus-visible { outline: 2px solid #315e4e; outline-offset: 3px; }
+.trigger { min-height: 44px; border: 1px solid var(--line); background: var(--admin-control-bg, var(--white)); color: var(--admin-control-text, var(--ink)); border-radius: 8px; padding: .55rem .8rem; font: inherit; font-size: .8rem; cursor: pointer; white-space: nowrap; }
+.trigger:hover { background: var(--admin-control-hover, var(--sage)); color: var(--admin-control-text, var(--ink)); }
+.trigger:focus-visible { outline: 2px solid var(--admin-focus, var(--gold)); outline-offset: 3px; }
 .trigger:disabled { opacity: .6; cursor: wait; }
 .actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1.5rem; }
 .error { color: #9d3c32; }
+:global(.admin-shell[data-theme="dark"]) .error { color: #ffb5a8; }

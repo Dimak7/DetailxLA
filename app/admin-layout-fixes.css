@@ -1,0 +1,219 @@
+/* Keep wide reports inside their own scroll area, never the page viewport. */
+html:has(.admin-shell),
+body:has(.admin-shell) {
+  overscroll-behavior-x: none;
+}
+
+.admin-shell {
+  min-width: 0;
+  max-width: 100%;
+  /* Unlike hidden, clip does not create a new scroll ancestor for the header. */
+  overflow-x: clip;
+}
+
+.admin-shell :is(.app-body, .admin-main, .admin-main > *, .paper, .admin-grid, .stats-grid, .modal, fieldset),
+.admin-shell :is(.admin-grid, .stats-grid, .form-grid, .sales-booking-grid, .sales-field-grid, .job-photo-columns) > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-shell :is(.table-wrap, .table-scroll, .calendar-scroll, .staff-calendar-scroll, .staffing-board-scroll, .day-timeline-scroll, .staffing-board, .workspace-tabs, .filter-tabs) {
+  min-width: 0;
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+}
+
+.admin-shell .table-wrap,
+.admin-shell .table-scroll:not(.admin-table-wrap--cards) {
+  overflow-x: auto;
+}
+
+.admin-shell :is(.section-heading, .admin-heading, .toolbar, .button-row, .editor-actions, .admin-record-actions-content) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-shell :is(.section-heading, .admin-heading, .button-row, .editor-actions) > :is(button, a),
+.admin-shell .admin-record-actions-content > :is(button, a) {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.admin-shell .modal-header h2,
+.admin-shell .admin-mobile-menu nav a,
+.admin-shell .job-detailer-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-shell .job-payment-totals {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+}
+
+.admin-shell .job-detailer-options {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+}
+
+.admin-shell .crm-toolbar > div {
+  min-width: min(220px, 100%);
+}
+
+.admin-shell .crm-toolbar form {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-shell :is(.crm-toolbar, .crm-tag-editor) label {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-shell :is(.crm-toolbar, .crm-record-tags, .lead-outcomes) select {
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  .admin-shell .app-global-actions {
+    flex-shrink: 0;
+  }
+
+  .admin-shell .admin-theme-toggle {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .admin-shell .admin-topbar {
+    flex-wrap: wrap;
+  }
+
+  .admin-shell .admin-topbar strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-shell .admin-mobile-menu nav a {
+    min-height: 64px;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .admin-shell .admin-record-actions-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+    align-items: stretch;
+  }
+
+  .admin-shell .admin-record-actions-content > :is(button, a) {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    line-height: 1.4;
+  }
+
+  .admin-shell .button-row > :is(button, a),
+  .admin-shell .editor-actions > :is(button, a) {
+    min-height: 44px;
+    line-height: 1.4;
+  }
+
+  .admin-shell .schedule-view-tabs button {
+    flex: 1 1 80px;
+  }
+
+  .admin-shell .day-picker button {
+    flex: 1 1 85px;
+  }
+
+  .admin-shell :is(.schedule-view-tabs, .day-picker) button {
+    white-space: normal;
+    line-height: 1.4;
+  }
+
+  .admin-shell .staffing-chip {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .admin-shell .staffing-chip strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-shell .staffing-chip span {
+    margin-left: auto;
+  }
+
+  .admin-shell .calendar-head button {
+    min-height: 44px;
+    padding: 8px;
+    line-height: 1.4;
+  }
+
+  .admin-shell .crm-toolbar form {
+    width: 100%;
+  }
+
+  .admin-shell .crm-toolbar form > label {
+    flex: 1 1 160px;
+  }
+
+  .admin-shell .crm-toolbar select {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .admin-shell .crm-tag-library > div,
+  .admin-shell .crm-tag-library > div > div {
+    flex-wrap: wrap;
+  }
+
+  .admin-shell .crm-tag {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-shell .sales-service-list > div > label > span,
+  .admin-shell .sales-addon > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-shell .sales-addon {
+    min-height: 44px;
+  }
+
+  .admin-shell .sales-addon small {
+    flex-shrink: 0;
+  }
+
+  .admin-shell .sales-customer-results button {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-shell .sales-field-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 380px) {
+  .admin-shell .app-global-bar {
+    gap: 8px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .admin-shell .app-global-actions {
+    gap: 4px;
+  }
+
+  .admin-shell .app-brand .wordmark {
+    font-size: 9px;
+    gap: 8px;
+  }
+}

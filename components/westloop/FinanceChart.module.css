@@ -26,8 +26,9 @@
 .modes button[aria-pressed="true"] { background: var(--ink); color: var(--white); }
 :global(.admin-shell[data-theme="dark"]) .chart .metrics button[aria-pressed="true"] { border-color: var(--chart-line); background: color-mix(in srgb,var(--chart-line) 9%,var(--white)); }
 :global(.admin-shell[data-theme="dark"]) .chart .modes button[aria-pressed="true"] { background: var(--ink); color: var(--white); }
-.plot { position: relative; margin-top: 18px; height: 300px; width: 100%; }
-.plot svg { display: block; width: 100%; height: 100%; overflow: visible; touch-action: pan-y; outline-offset: 4px; }
+.plot { position: relative; margin-top: 18px; height: 300px; width: 100%; min-width: 0; overscroll-behavior-x: contain; }
+/* Horizontal gestures inspect the graph; vertical gestures can still scroll the page. */
+.plot svg { display: block; width: 100%; max-width: 100%; height: 100%; overflow: hidden; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; outline-offset: 4px; }
 .plot svg:focus-visible, .chart button:focus-visible, .data summary:focus-visible { outline: 2px solid var(--chart-line); outline-offset: 4px; }
 .baseline { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 7; opacity: .35; }
 .line { stroke: var(--chart-line); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }

@@ -1,7 +1,8 @@
 .mode { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .mode button { padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
-.mode button[aria-pressed="true"] { border-color: var(--gold); background: var(--sage); color: var(--gold); font-weight: 600; }
-.mode button:focus-visible,.upgrades summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+:global(.admin-shell[data-theme]) .mode button[aria-pressed="true"],
+:global(.admin-shell[data-theme]) .mode button[aria-pressed="true"]:hover { border-color: var(--admin-primary-bg); background: var(--admin-primary-bg); color: var(--admin-primary-text); font-weight: 600; }
+.mode button:focus-visible,.upgrades summary:focus-visible { outline: 2px solid var(--admin-focus, var(--gold)); outline-offset: 3px; }
 .upgrades { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
 .upgrades summary { cursor: pointer; color: var(--ink); font-size: 13px; padding-bottom: 8px; }
 .totals { margin: 16px 0; }

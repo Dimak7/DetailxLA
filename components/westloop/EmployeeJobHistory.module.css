@@ -5,6 +5,10 @@
 .filters label { display: grid; flex: 1 1 140px; gap: 7px; font-size: 12px; font-weight: 600; }
 .filters input, .filters select { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--white); font: inherit; font-size: 14px; min-height: 44px; }
 .history button, .jobFooter a { min-height: 44px; padding: 10px 15px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; font-weight: 600; }
+.history button:not(:global(.button)), .jobFooter a { background: var(--admin-control-bg, var(--white)); color: var(--admin-control-text, var(--ink)); cursor: pointer; }
+.history button:not(:global(.button)):enabled:hover, .jobFooter a:hover { background: var(--admin-control-hover, var(--sage)); color: var(--admin-control-text, var(--ink)); }
+.history button:disabled { cursor: not-allowed; }
+.history :is(button, summary, a):focus-visible { outline: 2px solid var(--admin-focus, var(--gold)); outline-offset: 3px; }
 .period { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; font-weight: 600; }
 .period span { color: var(--muted); font-weight: 400; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -15,6 +19,7 @@
 .jobs { display: grid; gap: 18px; }
 .job { display: grid; gap: 18px; border: 1px solid var(--line); border-radius: 16px; padding: 24px; background: var(--white); min-width: 0; }
 .jobHeading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.jobHeading > div { min-width: 0; overflow-wrap: anywhere; }
 .jobHeading h3 { margin: 8px 0 5px; font-size: 20px; }
 .jobHeading p { font-size: 13px; color: var(--muted); line-height: 1.6; }
 .jobHeading .reference { font-size: 11px; }

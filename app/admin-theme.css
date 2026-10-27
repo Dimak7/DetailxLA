@@ -1,0 +1,404 @@
+/* Shared workspace surfaces and controls. Every fill has a matching text color. */
+.admin-shell {
+  --admin-surface: #ffffff;
+  --admin-surface-soft: #f3f6f1;
+  --admin-surface-hover: #edf2eb;
+  --admin-border: #d7dfd6;
+  --admin-control-bg: #ffffff;
+  --admin-control-text: #26342e;
+  --admin-control-hover: #edf3ed;
+  --admin-control-border: #b8c7bb;
+  --admin-primary-bg: #315e4b;
+  --admin-primary-text: #ffffff;
+  --admin-primary-hover: #244b3b;
+  --admin-secondary-text: #526359;
+  --admin-eyebrow: #805f3c;
+  --admin-disabled-bg: #eef1ed;
+  --admin-disabled-text: #5f6c64;
+  --admin-focus: #315e4b;
+  --admin-selected-bg: #e7f0e7;
+  --admin-selected-text: #244f3b;
+  --admin-selected-border: #9ab69e;
+  --admin-shift-bg: #e9f3e7;
+  --admin-shift-text: #2c5636;
+  --admin-shift-detail: #466849;
+  --admin-shift-border: #a9c3a2;
+  --admin-appointment-bg: #faf1df;
+  --admin-appointment-text: #624b24;
+  --admin-appointment-detail: #785e32;
+  --admin-appointment-border: #d4b97f;
+  --admin-danger-bg: #fff2ee;
+  --admin-danger-text: #963d2d;
+  --admin-danger-border: #d9a99e;
+}
+
+.admin-shell[data-theme="light"] {
+  /* Small captions also sit on tinted metric cards, not only white panels. */
+  --muted: #5f6f66;
+}
+
+.admin-shell[data-theme="dark"] {
+  --admin-surface: #151515;
+  --admin-surface-soft: #222222;
+  --admin-surface-hover: #292929;
+  --admin-border: #3e3e3e;
+  --admin-control-bg: #222222;
+  --admin-control-text: #f2f2f2;
+  --admin-control-hover: #333333;
+  --admin-control-border: #5e5e5e;
+  --admin-primary-bg: #ededed;
+  --admin-primary-text: #111111;
+  --admin-primary-hover: #ffffff;
+  --admin-secondary-text: #b7b7b7;
+  --admin-eyebrow: #d0b18a;
+  --admin-disabled-bg: #292929;
+  --admin-disabled-text: #ababab;
+  --admin-focus: #e3e3e3;
+  --admin-selected-bg: #303830;
+  --admin-selected-text: #e2efdf;
+  --admin-selected-border: #738a70;
+  --admin-shift-bg: #23362a;
+  --admin-shift-text: #dcf0df;
+  --admin-shift-detail: #bdd7c2;
+  --admin-shift-border: #61816a;
+  --admin-appointment-bg: #382f20;
+  --admin-appointment-text: #f6e7c5;
+  --admin-appointment-detail: #decca6;
+  --admin-appointment-border: #927b4d;
+  --admin-danger-bg: #3b2424;
+  --admin-danger-text: #ffd3cd;
+  --admin-danger-border: #a5685f;
+}
+
+.admin-shell[data-theme] .eyebrow {
+  color: var(--admin-eyebrow);
+}
+
+/* Navigation includes links, not just buttons: the More dialog uses these cards. */
+/* Switch text and fill together: cross-fading opposite themes briefly hides labels. */
+.admin-shell :is(button, .button, tbody tr) {
+  transition-property: box-shadow, transform;
+}
+.admin-shell[data-theme] .compact-id {
+  color: var(--admin-secondary-text);
+}
+.admin-shell[data-theme] .admin-mobile-menu nav a {
+  background: var(--admin-surface-soft);
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .admin-mobile-menu nav a:is(:hover, .active) {
+  background: var(--admin-selected-bg);
+  color: var(--admin-selected-text);
+  border-color: var(--admin-selected-border);
+}
+.admin-shell[data-theme] .admin-mobile-menu nav a span {
+  color: var(--admin-secondary-text);
+}
+.admin-shell[data-theme] :is(.admin-quick-menu, .app-profile) > div {
+  background: var(--admin-surface);
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .admin-quick-menu a,
+.admin-shell[data-theme] .app-profile :is(a, button) {
+  background: transparent;
+  color: var(--ink);
+}
+.admin-shell[data-theme] .admin-quick-menu a:hover,
+.admin-shell[data-theme] .app-profile :is(a, button):hover {
+  background: var(--admin-control-hover);
+  color: var(--ink);
+}
+.admin-shell[data-theme] :is(.admin-theme-toggle, .admin-mobile-search-toggle, .admin-quick-menu summary, .app-profile summary),
+.admin-shell[data-theme] :is(.admin-global-search, .admin-mobile-search) button {
+  background: var(--admin-control-bg);
+  color: var(--admin-control-text);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] .admin-mobile-nav :is(a, button) {
+  background: transparent;
+  color: var(--admin-secondary-text);
+  border-color: transparent;
+}
+.admin-shell[data-theme] .admin-mobile-nav :is(a, button).active {
+  background: var(--admin-selected-bg);
+  color: var(--admin-selected-text);
+}
+.admin-shell[data-theme] .admin-main :is(.workspace-tabs, .filter-tabs) a {
+  color: var(--admin-secondary-text);
+}
+.admin-shell[data-theme] .admin-main .filter-tabs a {
+  background: var(--admin-control-bg);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] .admin-main .filter-tabs a.active {
+  background: var(--admin-primary-bg);
+  color: var(--admin-primary-text);
+  border-color: var(--admin-primary-bg);
+}
+.admin-shell[data-theme] .admin-main .workspace-tabs a.active {
+  color: var(--ink);
+  border-color: var(--admin-primary-bg);
+}
+
+/* Shared action buttons. Explicit variants keep secondary and destructive actions distinct. */
+.admin-shell[data-theme] :is(.admin-main, .modal) :is(.button-row, .record-actions, .admin-record-actions-content) > button:where(:not(.button)),
+.admin-shell[data-theme] :is(.admin-main, .modal) td button:where(:not(.button)),
+.admin-shell[data-theme] :is(.admin-main, .modal) .modal-header button,
+.admin-shell[data-theme] :is(.admin-main, .modal) .admin-filter-toggle {
+  background: var(--admin-control-bg);
+  color: var(--admin-control-text);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] .admin-main .tracking-link-actions button {
+  background: var(--admin-control-bg);
+  color: var(--admin-control-text);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] :is(.admin-main, .modal) :is(.button-row, .record-actions, .admin-record-actions-content) > button:where(:not(.button)):enabled:hover,
+.admin-shell[data-theme] :is(.admin-main, .modal) td button:where(:not(.button)):enabled:hover,
+.admin-shell[data-theme] :is(.admin-main, .modal) .modal-header button:enabled:hover {
+  background: var(--admin-control-hover);
+  color: var(--admin-control-text);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] :is(.admin-main, .modal) .button {
+  background: var(--admin-primary-bg);
+  color: var(--admin-primary-text);
+  border-color: var(--admin-primary-bg);
+}
+.admin-shell[data-theme] :is(.admin-main, .modal) .button:where(:not(:disabled, [aria-disabled="true"])):hover {
+  background: var(--admin-primary-hover);
+  color: var(--admin-primary-text);
+  border-color: var(--admin-primary-hover);
+}
+.admin-shell[data-theme] :is(.admin-main, .modal) :is(.button.outline, .link-button, .text-link) {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] :is(.admin-main, .modal) :is(.button.outline, .link-button):where(:not(:disabled, [aria-disabled="true"])):hover {
+  background: var(--admin-control-hover);
+  color: var(--admin-control-text);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] :is(.admin-main, .modal) .button.button-danger {
+  background: var(--admin-danger-bg);
+  color: var(--admin-danger-text);
+  border-color: var(--admin-danger-border);
+}
+.admin-shell[data-theme] :is(.admin-main, .modal) .button.button-danger:enabled:hover {
+  background: var(--admin-danger-bg);
+  color: var(--admin-danger-text);
+  border-color: var(--admin-danger-text);
+}
+.admin-shell[data-theme] :is(.admin-main, .modal, .app-global-bar) :is(button, .button):disabled,
+.admin-shell[data-theme] :is(.admin-main, .modal) .button[aria-disabled="true"] {
+  background: var(--admin-disabled-bg);
+  color: var(--admin-disabled-text);
+  border-color: var(--admin-border);
+  opacity: 1;
+  cursor: not-allowed;
+}
+.admin-shell[data-theme] :is(.admin-main, .modal, .app-global-bar, .admin-mobile-nav) :is(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--admin-focus);
+  outline-offset: 3px;
+}
+
+/* Forms retain native light/dark widgets and readable labels, placeholders and options. */
+.admin-shell[data-theme] :is(.field, .booking-main .field) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+.admin-shell[data-theme] :is(input.control, select.control, textarea.control),
+.admin-shell[data-theme] :is(.admin-global-search, .admin-mobile-search) input,
+.admin-shell[data-theme] :is(.crm-toolbar, .crm-record-tags, .lead-outcomes) select {
+  background: var(--admin-control-bg);
+  color: var(--admin-control-text);
+  border-color: var(--admin-control-border);
+  caret-color: var(--ink);
+}
+.admin-shell[data-theme] .field > :is(span, label) {
+  color: var(--admin-secondary-text);
+}
+.admin-shell[data-theme] :is(input, textarea)::placeholder {
+  color: var(--admin-secondary-text);
+  opacity: 1;
+}
+.admin-shell[data-theme] select :is(option, optgroup) {
+  background: var(--admin-surface);
+  color: var(--ink);
+}
+.admin-shell[data-theme] :is(.field, .booking-main .field) :is(input, select, textarea):disabled {
+  background: var(--admin-disabled-bg);
+  color: var(--admin-disabled-text);
+  border-color: var(--admin-border);
+  -webkit-text-fill-color: var(--admin-disabled-text);
+  opacity: 1;
+}
+
+/* Frozen report columns must use the same theme as the rest of the table. */
+.admin-shell[data-theme] :is(.table-scroll, .admin-table-wrap) {
+  background: var(--admin-surface);
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] :is(.admin-main, .modal) th {
+  background: var(--admin-surface-soft);
+  color: var(--admin-secondary-text);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .admin-table-wrap--comparison th:first-child {
+  background: var(--admin-surface-soft);
+  color: var(--admin-secondary-text);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .admin-table-wrap--comparison td:first-child,
+.admin-shell[data-theme] .admin-payroll-table td:first-child {
+  background: var(--admin-surface);
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .admin-table-wrap--cards .admin-record-row {
+  background: var(--admin-surface);
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .admin-table-wrap--cards .admin-record-cell::before {
+  color: var(--admin-secondary-text);
+}
+.admin-shell[data-theme] .admin-main tbody tr:hover {
+  background: var(--admin-surface-hover);
+}
+.admin-shell[data-theme] .admin-table-wrap--comparison tbody tr:hover td:first-child {
+  background: var(--admin-surface-hover);
+}
+.admin-shell[data-theme] :is(.marketing-commission-review, .ads-connection-form, .role-permissions-grid > div, .availability-day, .employee-pay-preview, .integration-list > div, .booking-review, .booking-additional-services) {
+  background: var(--admin-surface-soft);
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .booking-main .service-option {
+  background: var(--admin-surface);
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .booking-main .service-option:has(input:checked),
+.admin-shell[data-theme] .booking-consent.required {
+  background: var(--admin-selected-bg);
+  color: var(--admin-selected-text);
+  border-color: var(--admin-selected-border);
+}
+.admin-shell[data-theme] .booking-main .service-option :is(p, small, span),
+.admin-shell[data-theme] .booking-consent {
+  color: var(--admin-secondary-text);
+}
+.admin-shell[data-theme] .admin-main :is(.booking-month-nav, .booking-calendar-days) button {
+  background: var(--admin-control-bg);
+  color: var(--admin-control-text);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] .admin-main .booking-calendar-days button[aria-pressed="true"] {
+  background: var(--admin-primary-bg);
+  color: var(--admin-primary-text);
+  border-color: var(--admin-primary-bg);
+}
+.admin-shell[data-theme] .admin-main :is(.booking-month-nav, .booking-calendar-days) button:disabled {
+  background: var(--admin-disabled-bg);
+  color: var(--admin-disabled-text);
+  border-color: var(--admin-border);
+  opacity: 1;
+}
+
+/* Schedule cards and timeline labels remain legible at every responsive layout. */
+.admin-shell[data-theme] :is(.staff-calendar, .staffing-matrix, .day-timeline, .staffing-day, .roster-day) {
+  background: var(--admin-surface);
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] :is(.calendar-axis, .calendar-head, .staffing-matrix-head, .day-time-heading, .day-track-heading, .staffing-person) {
+  background: var(--admin-surface-soft);
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] :is(.calendar-times, .day-time-labels) span {
+  color: var(--admin-secondary-text);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] :is(.staff-calendar-day, .day-track) {
+  background: repeating-linear-gradient(to bottom, var(--admin-surface) 0 59px, var(--admin-border) 60px);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .admin-main .staffing-day-heading,
+.admin-shell[data-theme] .admin-main .calendar-head button {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--admin-border);
+}
+.admin-shell[data-theme] .admin-main .staffing-day-heading:is(:hover, :focus-visible) {
+  background: var(--admin-surface-hover);
+  color: var(--ink);
+}
+.admin-shell[data-theme] .staffing-day-heading :is(span, small),
+.admin-shell[data-theme] .staffing-person small {
+  color: var(--admin-secondary-text);
+}
+.admin-shell[data-theme] .admin-main :is(.shift-event, .staffing-chip, .matrix-shift),
+.admin-shell[data-theme] .admin-main :is(.shift-event, .staffing-chip, .matrix-shift):enabled:hover {
+  background: var(--admin-shift-bg);
+  color: var(--admin-shift-text);
+  border-color: var(--admin-shift-border);
+}
+.admin-shell[data-theme] .admin-main :is(.shift-event, .staffing-chip, .matrix-shift) :is(small, span) {
+  color: var(--admin-shift-detail);
+}
+.admin-shell[data-theme] .admin-main .appointment-event,
+.admin-shell[data-theme] .admin-main .appointment-event:hover {
+  background: var(--admin-appointment-bg);
+  color: var(--admin-appointment-text);
+  border-color: var(--admin-appointment-border);
+}
+.admin-shell[data-theme] .admin-main .appointment-event span {
+  color: var(--admin-appointment-detail);
+}
+.admin-shell[data-theme] .admin-main :is(.staffing-more, .staffing-add, .matrix-off),
+.admin-shell[data-theme] .admin-main :is(.schedule-view-tabs, .day-picker, .time-grid) button {
+  background: var(--admin-control-bg);
+  color: var(--admin-control-text);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] .admin-main :is(.staffing-more, .staffing-add, .matrix-off):enabled:hover,
+.admin-shell[data-theme] .admin-main :is(.schedule-view-tabs, .day-picker, .time-grid) button:enabled:hover {
+  background: var(--admin-control-hover);
+  color: var(--admin-control-text);
+  border-color: var(--admin-control-border);
+}
+.admin-shell[data-theme] .admin-main :is(.schedule-view-tabs, .day-picker) button.active,
+.admin-shell[data-theme] .admin-main .time-grid button.selected,
+.admin-shell[data-theme] .admin-main .admin-filter-toggle[aria-expanded="true"] {
+  background: var(--admin-primary-bg);
+  color: var(--admin-primary-text);
+  border-color: var(--admin-primary-bg);
+}
+.admin-shell[data-theme] .admin-main :is(.schedule-view-tabs, .day-picker) button.active:hover,
+.admin-shell[data-theme] .admin-main .time-grid button.selected:hover {
+  background: var(--admin-primary-hover);
+  color: var(--admin-primary-text);
+  border-color: var(--admin-primary-hover);
+}
+
+@media (max-width: 760px) {
+  .admin-shell[data-theme] .admin-main .workspace-tabs a {
+    background: var(--admin-control-bg);
+    color: var(--admin-secondary-text);
+    border-color: var(--admin-control-border);
+  }
+  .admin-shell[data-theme] .admin-main .workspace-tabs a.active {
+    background: var(--admin-primary-bg);
+    color: var(--admin-primary-text);
+    border-color: var(--admin-primary-bg);
+  }
+  .admin-shell[data-theme] .modal-header {
+    background: var(--admin-surface);
+    color: var(--ink);
+    border-color: var(--admin-border);
+  }
+}

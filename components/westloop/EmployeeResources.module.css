@@ -16,10 +16,11 @@
 .description { font-size: 12px; line-height: 1.65; white-space: pre-line; overflow-wrap: anywhere; margin: 0 0 20px; color: var(--ink); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: auto; }
 .managementActions { display: flex; flex-wrap: wrap; gap: 10px; }
-.managementActions button { min-height: 36px; padding: 6px 10px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
+.managementActions button { min-height: 44px; padding: 8px 12px; color: var(--admin-control-text, var(--ink)); background: var(--admin-control-bg, var(--white)); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
 .openLink { min-height: 42px; }
 .secondary { padding: 11px 16px; min-height: 42px; background: var(--white); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); cursor: pointer; }
-.secondary:hover, .managementActions button:hover { background: var(--paper); }
+.secondary:hover, .managementActions button:hover { background: var(--admin-control-hover, var(--sage)); color: var(--admin-control-text, var(--ink)); }
+.resources :is(button, a):focus-visible, .accessPanel :is(button, a):focus-visible { outline: 2px solid var(--admin-focus, var(--gold)); outline-offset: 3px; }
 .empty { padding: 30px 24px; border: 1px dashed var(--line); border-radius: 12px; background: var(--paper); text-align: center; }
 .empty strong { color: var(--ink); font-size: 14px; }
 .empty p { color: var(--muted); font-size: 12px; line-height: 1.65; max-width: 540px; margin: 8px auto 0; }

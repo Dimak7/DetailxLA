@@ -4,6 +4,8 @@ import { siteUrl } from "@/lib/platform/settings";
 import { BRAND_DESCRIPTION, BRAND_NAME } from "@/lib/brand";
 import "./globals.css";
 import "./ceramics.css";
+import "./admin-theme.css";
+import "./admin-layout-fixes.css";
 const body = Manrope({ subsets: ["latin"], variable: "--font-body" });
 const display = Cormorant_Garamond({
   subsets: ["latin"],
