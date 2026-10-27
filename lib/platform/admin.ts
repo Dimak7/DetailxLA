@@ -349,6 +349,11 @@ export async function adminData(
     const date = p.get("date"),
       status = p.get("status") || "",
       view = p.get("view") || "";
+    // Exact job links and global searches must still find completed/cancelled
+    // work. Only the ordinary booking list defaults to unfinished jobs.
+    const bookingView = status || (archivedBookings ? "archived"
+      : ["active", "all", "upcoming", "past"].includes(view) ? view
+        : view || p.get("id") || search.trim() ? "all" : "active");
     let filters = "";
     const args: unknown[] = ["%" + search + "%"];
     // Keep archived customers out of operational appointment lists without changing
@@ -388,6 +393,8 @@ export async function adminData(
       args.push(status);
       filters += " AND b.status=$" + args.length;
     }
+    if (section === "bookings" && !status && (view === "active" || bookingView === "active"))
+      filters += " AND b.status IN ('new','confirmed','in_progress')";
     if (view === "upcoming")
       filters +=
         " AND b.booking_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND b.status IN ('new','confirmed')";
@@ -412,6 +419,7 @@ export async function adminData(
     return {
       rows,
       archivedBookings,
+      ...(section === "bookings" ? { bookingView } : {}),
       squareEnvironment: squareEnvironment(),
       total: count,
       ...(section === "payments" ? {

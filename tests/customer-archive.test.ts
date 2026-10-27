@@ -105,7 +105,7 @@ test("Bookings separates archived customer appointments without changing payment
     await setCustomerArchived(user, change(dima.id));
     await setCustomerArchived(user, change(moe.id));
 
-    const active = await adminData("bookings", new URLSearchParams(), user);
+    const active = await adminData("bookings", new URLSearchParams("view=all"), user);
     assert.ok("total" in active && "archivedBookings" in active);
     assert.deepEqual((active.rows as Row[]).map(row => row.id), [tony.booking]);
     assert.equal(active.total, 1, "active count must use the same archive filter as the records");
@@ -125,7 +125,7 @@ test("Bookings separates archived customer appointments without changing payment
     assert.ok("total" in wrongDate);
     assert.equal(wrongDate.total, 0);
     const manager = { ...user, role: "manager" as const };
-    assert.deepEqual(((await adminData("bookings", new URLSearchParams(), manager)).rows as Row[]).map(row => row.id), [tony.booking]);
+    assert.deepEqual(((await adminData("bookings", new URLSearchParams("view=all"), manager)).rows as Row[]).map(row => row.id), [tony.booking]);
     await assert.rejects(() => adminData("bookings", new URLSearchParams("archived=1"), manager), /owner|admin|archiv|access/i);
 
     const afterPayments = await adminData("payments", new URLSearchParams(), user);
@@ -139,7 +139,7 @@ test("Bookings separates archived customer appointments without changing payment
     assert.deepEqual((profile.profile?.bookings as Row[]).map(row => row.id), [dima.booking]);
 
     await setCustomerArchived(user, change(dima.id, "restore"));
-    const restored = await adminData("bookings", new URLSearchParams(), user);
+    const restored = await adminData("bookings", new URLSearchParams("view=all"), user);
     assert.ok("total" in restored);
     assert.deepEqual((restored.rows as Row[]).map(row => row.id).sort(), [tony.booking, dima.booking].sort());
     assert.equal(restored.total, 2);

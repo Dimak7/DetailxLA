@@ -76,7 +76,7 @@ test("all fetched unassigned jobs remain available, including in-progress jobs a
   }));
   const html = overview("manager", { unassigned, operations: { unassigned_jobs: 13 } });
   for (const job of unassigned) assert.ok(html.includes(`/admin/bookings?search=${job.reference}`));
-  assert.match(html, /href="\/admin\/bookings">View all bookings/);
+  assert.match(html, /href="\/admin\/bookings\?view=all">View all bookings/);
   assert.doesNotMatch(html, /view=upcoming|View all upcoming jobs/);
   assert.doesNotMatch(overview("manager", { unassigned, operations: { unassigned_jobs: 12 } }), /View all bookings/);
 });
