@@ -39,6 +39,35 @@ export async function enqueue(
 export function renderTemplate(text: string, vars: Record<string, string>) {
   return text.replace(/\{\{([a-z_]+)\}\}/g, (_, key) => vars[key] || "");
 }
+async function telegramBookingRequest(q: Query, b: Booking, s: BusinessSettings, customerName: string) {
+  const paymentState = (await q<{ quote_pending: boolean; collected_cents: number }>(
+    `SELECT EXISTS(SELECT 1 FROM wl.booking_line_items WHERE booking_id=$1 AND quote_pending) quote_pending,
+      COALESCE((SELECT SUM(amount_cents-refunded_cents) FROM wl.payments
+        WHERE booking_id=$1 AND status IN ('paid','partially_refunded','refunded')
+          AND ((provider='square' AND metadata->>'square_environment'=$2)
+            OR (provider<>'square' AND $2='production'))),0)::int collected_cents`,
+    [b.id, s.square_environment || "production"],
+  )).rows[0];
+  // An agreed price can supersede the original catalogue's quote requirement.
+  const needsQuote = b.price_cents === null || paymentState.quote_pending;
+  const collected = Math.max(0, Number(paymentState.collected_cents));
+  const depositDue = Math.max(0, b.deposit_cents - collected);
+  const title = needsQuote ? "Quote request"
+    : b.status === "confirmed" ? "Confirmed appointment"
+    : b.status === "new" ? (depositDue > 0 ? "Booking request · deposit due" : "Booking request")
+    : "Booking update";
+  const status = b.status.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase());
+  const details = [`Booking status: ${status}`];
+  if (needsQuote) details.push("Quote required: confirm the scope and agreed price before collecting payment.");
+  else {
+    details.push(`Agreed service total: ${money(b.price_cents)}`);
+    if (depositDue > 0) details.push(`Deposit due: ${money(depositDue)}`);
+    else if (b.status === "new") details.push(b.deposit_cents > 0 ? "Deposit received; confirmation is pending." : "No deposit required; confirmation is pending.");
+    details.push(`Remaining service balance: ${money(Math.max(0, b.price_cents! - collected))}`);
+  }
+  return { subject: `${title}: ${customerName}`, details: details.join("\n") };
+}
+
 export async function enqueueBooking(
   q: Query,
   b: Booking,
@@ -145,17 +174,22 @@ export async function enqueueBooking(
         [businessKey],
       )
     ).rows[0];
-    if (t)
-      for (const channel of ["email", "telegram"])
+    if (t) {
+      const telegramRequest = event === "booking_request" ? await telegramBookingRequest(q, b, s, vars.customer_name) : null;
+      for (const channel of ["email", "telegram"]) {
+        const requestDetails = channel === "telegram" ? telegramRequest : null;
         await enqueue(q, {
           key: key + ":business:" + channel,
           channel,
           recipient: channel === "email" ? s.email : s.telegram_chat_id,
-          subject: renderTemplate(t.subject, vars),
-          body: renderTemplate(t.body, vars) + "\n\nMarketing stream: " + (a?.lead_stream || "Unassigned"),
+          subject: requestDetails?.subject || renderTemplate(t.subject, vars),
+          body: renderTemplate(t.body, vars) + "\n\nMarketing stream: " + (a?.lead_stream || "Unassigned")
+            + (requestDetails ? "\n\n" + requestDetails.details : ""),
           customerId: b.customer_id,
           bookingId: b.id,
         });
+      }
+    }
   }
   if (["booking_request", "booking_confirmation", "booking_rescheduled"].includes(event)) {
     const reminder = (
