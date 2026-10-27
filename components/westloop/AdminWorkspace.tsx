@@ -3,6 +3,7 @@ import {JobPayments} from "./JobPayments";
 import { JobWorkspace } from "./JobWorkspace";
 import { EmployeeResources, EmployeeAccessLink } from "./EmployeeResources";
 import { EmployeeJobHistory } from "./EmployeeJobHistory";
+import { EmployeePaySettings, PayPlanSummary } from "./EmployeePaySettings";
 import { ExpenseEditor } from "./ExpenseEditor";
 import type { ExpenseDirectory } from "@/lib/platform/expense-directory";
 import {CrmTagLibrary,RecordTags,LeadOutcome} from "./CrmTags";
@@ -45,7 +46,7 @@ import {
   type Service,
 } from "@/lib/platform/types";
 import { layoutOverlappingShifts } from "@/lib/platform/schedule-layout";
-import { compensationModels, compensationEditorValues, compensationEditorPayload, compensationPlanLabel, compensationSample, dateTimeLocalValue } from "@/lib/platform/admin-editor-values";
+import { dateTimeLocalValue } from "@/lib/platform/admin-editor-values";
 import type { report } from "@/lib/platform/reporting";
 type Report = Awaited<ReturnType<typeof report>>;
 type CalendarShift = R & { start_minute: number; end_minute: number };
@@ -104,6 +105,7 @@ export function AdminWorkspace({
   const router = useRouter(),
     params = useSearchParams();
   const [openedJob, setOpenedJob] = useState<R | null>(null);
+  const [paySettings, setPaySettings] = useState<{ employeeId?: string } | null>(null);
   const [employeeHistory, setEmployeeHistory] = useState<{ id: string; name: string; start?: string; end?: string } | null>(null);
   const [expense, setExpense] = useState<R | null>(null);
   const [editor, setEditor] = useState<EditorSpec | null>(null),
@@ -520,63 +522,7 @@ export function AdminWorkspace({
   }
   function compensationEdit(r: R = {}) {
     if (!allowedSections.includes("payroll") || staff) return;
-    const employees = section === "employees" ? list : rows(data.employees);
-    const employee = employees.find((item) => item.id === (r.employee_id || r.id)) || employees[0];
-    if (!employee) {
-      setError("Add an employee before configuring compensation.");
-      return;
-    }
-    setEditor({
-      title: "Employee pay settings",
-      action: "save_employee_compensation",
-      initial: {...compensationEditorValues(employee),preserve_completed:true},
-      description: <p className="small-note">Set this employee’s default plan. Percentage pay uses the final agreed service price, excluding tips. On shared jobs, percentage and flat job pay follow the employee’s allocation. Service rules can replace the default job pay; tips are allocated separately. Keep completed-job commissions checked when giving a raise. Paid payroll records always stay unchanged.</p>,
-      fields: [
-        f("employee_id", "Employee", "select", { options: employees.map((item) => ({ value: s(item.id), label: s(item.name) })) }),
-        f("preserve_completed", "Keep completed-job commissions at their earned amounts", "checkbox", {hint:"Recommended for raises. Applies the new commission to work completed after this change; existing completed-job commission is saved."}),
-        f("compensation_model", "Pay model", "select", { options: compensationModels }),
-        f("hourly_rate_cents", "Hourly rate ($)", "number", { required: true, min: 0, max: 1_000_000, step: 0.01, visibleWhen: (values) => ["hourly", "hourly_commission"].includes(s(values.compensation_model)) }),
-        f("default_commission_bps", "Percentage per completed job (%)", "number", { required: true, min: 0, max: 100, step: 0.01, visibleWhen: (values) => ["commission", "hourly_commission"].includes(s(values.compensation_model)) }),
-        f("flat_job_pay_cents", "Flat amount per completed job ($)", "number", { required: true, min: 0, max: 1_000_000, step: 0.01, visibleWhen: (values) => values.compensation_model === "flat_job" }),
-      ],
-      transform: values=>({...compensationEditorPayload(values),preserve_completed:values.preserve_completed!==false}),
-      selectChanges: (key, value) => {
-        if (key !== "employee_id") return;
-        const selected = employees.find((item) => s(item.id) === value);
-        return selected ? compensationEditorValues(selected) : undefined;
-      },
-      preview: (values) => {
-        const sample = compensationSample(values);
-        return <aside className="employee-pay-preview" aria-live="polite" aria-atomic="true">
-          <strong>Example: a $200 completed service</strong>
-          <p>{money(sample.jobCents)} in job pay{sample.hourlyCents !== null ? `, plus ${money(sample.hourlyCents)} per paid hour.` : "."}</p>
-          <small>Assumes 100% job allocation. A 50% allocation halves the job pay. Tips, service rules and job-level overrides are not included.</small>
-        </aside>;
-      },
-    });
-  }
-  function payRuleEdit(r: R = {}) {
-    if (!allowedSections.includes("payroll") || staff) return;
-    setEditor({
-      title: "Service pay rule",
-      action: "save_pay_rule",
-      initial: { employee_id: rows(data.employees)[0]?.id || "", service_id: "", rule_type: "commission_percent", active: true, ...r, percentage: r.rule_type === "flat_job" ? 0 : n(r.value) / 100, flat_amount: r.rule_type === "flat_job" ? n(r.value) / 100 : 0 },
-      description: <p className="small-note">Replace this employee’s default job pay with a percentage or flat amount for the selected service. Hourly pay still applies when their plan includes it. A specific service rule takes priority over an all-services rule. Saving an active rule replaces the other active rule for the same employee and service.</p>,
-      removeAction: r.id && (r.active === true || r.active === "true") ? {
-        action: "remove_pay_rule",
-        data: { id: r.id },
-        description: "This stops the saved override and recalculates payroll estimates using the employee’s default plan or an active all-services rule. Paid payroll records stay unchanged. The inactive rule can be restored later.",
-      } : undefined,
-      fields: [
-        f("employee_id", "Employee", "select", { required: true, options: rows(data.employees).map((employee) => ({ value: s(employee.id), label: s(employee.name) })) }),
-        f("service_id", "Service", "nullable-select", { options: [{ value: "", label: "All services" }, ...rows(data.services).map((service) => ({ value: s(service.id), label: s(service.name) }))] }),
-        f("rule_type", "Job pay", "select", { options: [{ value: "commission_percent", label: "Percentage per job" }, { value: "flat_job", label: "Flat amount per job" }] }),
-        f("percentage", "Percentage per completed job (%)", "number", { required: true, min: 0, max: 100, step: 0.01, hint: "Based on final service price, excluding tips, then adjusted by the employee’s job allocation.", visibleWhen: (values) => values.rule_type === "commission_percent" }),
-        f("flat_amount", "Flat amount per completed job ($)", "number", { required: true, min: 0, max: 1_000_000, step: 0.01, hint: "Adjusted by the employee’s job allocation. Tips are separate.", visibleWhen: (values) => values.rule_type === "flat_job" }),
-        f("active", "Active rule", "checkbox"),
-      ],
-      transform: (values) => ({ id: values.id, employee_id: values.employee_id, service_id: values.service_id, rule_type: values.rule_type, active: values.active, value: Math.round(n(values.rule_type === "flat_job" ? values.flat_amount : values.percentage) * 100) }),
-    });
+    setPaySettings({ employeeId: s(r.employee_id || r.id) || undefined });
   }
   function movementEdit(item: R) {
     edit("Record movement: " + s(item.name), "record_inventory_movement", { item_id: item.id, movement_type: "purchase", direction: "in", quantity: 1, occurred_on: dateToday(), unit_cost_cents: n(item.unit_cost_cents) / 100, supplier: s(item.supplier), notes: "", create_expense: true, expense_amount_cents: 0 }, [f("movement_type", "Movement type", "select", { options: ["purchase", "usage", "adjustment", "return", "waste", "correction"] }), f("direction", "Direction", "select", { options: [{ value: "in", label: "Add stock" }, { value: "out", label: "Remove stock" }] }), f("quantity", "Quantity", "number", { min: 0.0001, step: 0.0001, required: true }), f("occurred_on", "Date", "date", { required: true }), f("unit_cost_cents", "Unit cost ($)", "money"), f("supplier", "Supplier"), f("create_expense", "Record purchase as operating expense", "checkbox"), f("expense_amount_cents", "Expense amount ($)", "money", { hint: "Leave at zero to calculate quantity x unit cost." }), f("notes", "Notes", "textarea", { wide: true })]);
@@ -934,10 +880,10 @@ export function AdminWorkspace({
         <section className="paper">
           <div className="section-heading"><div><p className="eyebrow">TEAM</p><h2>{list.filter((r) => r.active).length} active employees</h2></div><button className="button" onClick={() => employeeEdit()}>Add employee +</button></div>
           <p className="small-note">Each employee gets a separate login. Detailers see only their own assigned work, schedule and time clock. Managers can add detailers and manage payroll; admins set login access roles. Scheduled hours are separate from actual clocked hours.</p>
-          {table(["Employee", "Position & access", "Phone", "Status", "Default pay plan", "Scheduled this week", "Actions"], list.map((r) => [
+          {table(["Employee", "Position & access", "Phone", "Status", "Pay structure", "Scheduled this week", "Actions"], list.map((r) => [
             <><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>,
             <>{s(r.position)}<small>{!r.user_id ? "Login not linked" : !r.login_active ? "Login disabled" : `${accessRoleLabel(s(r.login_role) || "staff")} access`}</small></>, s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
-            compensationPlanLabel(r), (n(r.scheduled_minutes) / 60).toFixed(1) + "h",
+            <PayPlanSummary employee={r} rules={rows(data.rules)} />, (n(r.scheduled_minutes) / 60).toFixed(1) + "h",
             <>{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit profile</button>}
               {allowedSections.includes("payroll") && !staff && <><button className="button" aria-label={`Work history for ${s(r.name)}`} onClick={() => setEmployeeHistory({ id: s(r.id), name: s(r.name) })}>Work history</button><button aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button></>}{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <EmployeeAccessLink employeeId={s(r.id)} employeeName={s(r.name)} email={s(r.email)} hasLogin={!!r.user_id} disabled={!r.active} />}</>,
           ]))}
@@ -1005,7 +951,7 @@ export function AdminWorkspace({
       )}
       {section === "payroll" && allowedSections.includes("payroll") && !staff && (
         <section className="paper">
-          <div className="section-heading"><div><p className="eyebrow">PAYROLL ESTIMATE</p><h2>Worked hours and estimated gross pay</h2></div><div className="button-row"><button disabled={!rows(data.employees).length} onClick={() => compensationEdit()}>Employee pay settings</button><button disabled={!rows(data.employees).length} onClick={() => payRuleEdit()}>Add service pay rule</button><a className="button" href={`/api/manage?section=payroll&export=csv&start=${encodeURIComponent(s(data.start))}&end=${encodeURIComponent(s(data.end))}`}>Export CSV</a></div></div>
+          <div className="section-heading"><div><p className="eyebrow">PAYROLL ESTIMATE</p><h2>Worked hours and estimated gross pay</h2></div><div className="button-row"><button disabled={!rows(data.employees).length} onClick={() => compensationEdit()}>Manage pay plans</button><a className="button" href={`/api/manage?section=payroll&export=csv&start=${encodeURIComponent(s(data.start))}&end=${encodeURIComponent(s(data.end))}`}>Export CSV</a></div></div>
           <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
           <p className="small-note">Paid hours use completed clock entries when present. If none exist for an employee in this period, scheduled shift hours are used as the payable fallback. Job pay follows each employee’s saved plan or service rule, using the final service price excluding tips and the employee’s share of the job. Tips are allocated separately.</p>
           {table(["Employee", "Scheduled", "Actual", "Paid hours", "Hourly pay", "Attributed service revenue", "Job pay", "Tips", "Adjustments", "Total pay"], list.map((r) => [
@@ -1013,14 +959,11 @@ export function AdminWorkspace({
               <strong>{s(r.name)}</strong>
               <small className="payroll-employee-role">{s(r.position)}</small>
               <small>{s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small>
-              <small className="payroll-employee-plan">Default plan: {compensationPlanLabel(rows(data.employees).find((employee) => employee.id === r.id) || r)}</small>
+              <PayPlanSummary employee={rows(data.employees).find((employee) => employee.id === r.id) || r} rules={rows(data.rules)} />
               {allowedSections.includes("payroll") && !staff && <><button className="link-button employee-pay-action" aria-label={`Work history for ${s(r.name)}`} onClick={() => setEmployeeHistory({ id: s(r.id), name: s(r.name), start: s(data.start), end: s(data.end) })}>Work history</button><button className="link-button employee-pay-action" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button></>}
             </div>,
             (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents)),
           ]), { comparison: true, label: "Employee payroll", className: "admin-payroll-table" })}
-          <h3>Service pay overrides</h3>
-          <p className="small-note">An active rule replaces the default job pay for that service, regardless of pay model. It keeps applicable hourly pay. Specific service rules take priority over all-services rules; an explicit job-level pay override takes priority over both.</p>
-          {table(["Employee", "Service", "Job pay", "Value", "Status", "Action"], rows(data.rules).map((rule) => [s(rule.employee_name), s(rule.service_name) || "All services", rule.rule_type === "commission_percent" ? "Percentage per job" : "Flat amount per job", rule.rule_type === "commission_percent" ? (n(rule.value) / 100).toFixed(2) + "%" : money(n(rule.value)), rule.active === true || rule.active === "true" ? "Active" : "Inactive", <button onClick={() => payRuleEdit(rule)}>Edit rule</button>]))}
         </section>
       )}
       {section === "performance" && (
@@ -2229,6 +2172,7 @@ export function AdminWorkspace({
             )}
           </div>
         )}
+      {paySettings && <EmployeePaySettings employeeId={paySettings.employeeId} onClose={() => setPaySettings(null)} />}
       {employeeHistory && <EmployeeJobHistory employeeId={employeeHistory.id} employeeName={employeeHistory.name} start={employeeHistory.start} end={employeeHistory.end} onClose={() => setEmployeeHistory(null)} />}
       {expense && <ExpenseEditor initial={expense} directory={data.expenseDirectory as ExpenseDirectory} onClose={() => setExpense(null)} />}
       {openedJob && <JobWorkspace booking={openedJob} employees={rows(data.employees)} rules={rows(data.payRules)} services={rows(data.services)} canPay={allowedSections.includes("payroll")} canCollect={allowedSections.includes("payments")} staff={staff} environment={s(data.squareEnvironment)} onClose={() => setOpenedJob(null)} onEditAppointment={(job) => {setOpenedJob(null); bookingEdit(job);}} />}

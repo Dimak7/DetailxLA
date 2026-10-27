@@ -1,3 +1,7 @@
+"use client";
+import { useId, useMemo, useState, type PointerEvent } from "react";
+import { financeChartSeries, financeChartValues, financeChartPosition, nearestFinancePoint, type FinanceChartMetric, type FinanceChartMode, type FinanceChartRow } from "@/lib/platform/finance-chart-series";
+import chartStyles from "./FinanceChart.module.css";
 import { money } from "@/lib/platform/types";
 type Bar = { label: string; amount_cents: number };
 export function SpendBars({ title, items }: { title: string; items: Bar[] }) {
@@ -35,161 +39,89 @@ export function SpendBars({ title, items }: { title: string; items: Bar[] }) {
     </section>
   );
 }
-export function ProfitChart({
-  series,
-}: {
-  series: Array<{
-    day: string;
-    revenue: number;
-    expenses: number;
-    net_operating_profit: number;
-  }>;
-}) {
-  const buckets = new Map<
-    string,
-    { day: string; revenue: number; expenses: number; profit: number }
-  >();
-  for (const row of series) {
-    const key = series.length > 45 ? row.day.slice(0, 7) : row.day;
-    const b = buckets.get(key) || {
-      day: key,
-      revenue: 0,
-      expenses: 0,
-      profit: 0,
-    };
-    b.revenue += Number(row.revenue);
-    b.expenses += Number(row.expenses);
-    b.profit += Number(row.net_operating_profit);
-    buckets.set(key, b);
+const chartMetrics: { key: FinanceChartMetric; label: string }[] = [
+  { key: "net_operating_profit", label: "Operating result" },
+  { key: "revenue", label: "Revenue" },
+  { key: "expenses", label: "Expenses" },
+];
+const compactMoney = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value / 100);
+const chartDate = (value: string, monthly = false) => new Date(`${value}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", ...(!monthly ? { day: "numeric" } : {}), year: "numeric" });
+
+export function ProfitChart({ series }: { series: FinanceChartRow[] }) {
+  const [metric, setMetric] = useState<FinanceChartMetric>("net_operating_profit");
+  const [mode, setMode] = useState<FinanceChartMode>("running");
+  const [active, setActive] = useState<number | null>(null);
+  const gradientId = `financial-area-${useId().replace(/:/g, "")}`;
+  const { points, granularity } = useMemo(() => financeChartSeries(series), [series]);
+  const values = useMemo(() => financeChartValues(points, metric, mode), [points, metric, mode]);
+  const totals = useMemo(() => points.reduce((total, point) => ({
+    revenue: total.revenue + point.revenue,
+    expenses: total.expenses + point.expenses,
+    net_operating_profit: total.net_operating_profit + point.net_operating_profit,
+  }), { revenue: 0, expenses: 0, net_operating_profit: 0 }), [points]);
+  const selected = active === null || !points.length ? null : Math.min(active, points.length - 1);
+  const metricLabel = chartMetrics.find(item => item.key === metric)!.label;
+  const monthly = granularity === "month", bucketLabel = monthly ? "Monthly" : "Daily";
+  const displayed = selected === null ? totals[metric] : values[selected];
+  const resultClass = metric === "expenses" ? chartStyles.expenses : metric === "net_operating_profit" && totals[metric] < 0 ? chartStyles.negative : chartStyles.positive;
+  const low = Math.min(0, ...values), high = Math.max(0, ...values), span = high - low || 1;
+  const width = 1000, left = 8, right = 960, top = 24, bottom = 272;
+  const x = (index: number) => left + financeChartPosition(points, index) * (right - left);
+  const y = (value: number) => high === low ? (top + bottom) / 2 : top + (high + span * .08 - value) / (span * 1.16) * (bottom - top);
+  const line = points.map((_, index) => `${index ? "L" : "M"}${x(index).toFixed(2)},${y(values[index]).toFixed(2)}`).join(" ");
+  const area = points.length > 1 ? `${line} L${x(points.length - 1)},${y(0)} L${x(0)},${y(0)} Z` : "";
+  const first = points[0], last = points[points.length - 1];
+  function scrub(event: PointerEvent<SVGSVGElement>) {
+    const box = event.currentTarget.getBoundingClientRect();
+    const svgX = (event.clientX - box.left) / box.width * width;
+    setActive(nearestFinancePoint(points, (svgX - left) / (right - left)));
   }
-  const data = [...buckets.values()].sort((a, b) => a.day.localeCompare(b.day)),
-    max = Math.max(
-      1,
-      ...data.flatMap((r) => [r.revenue, r.expenses, Math.abs(r.profit)]),
-    ),
-    width = 900,
-    step = 800 / Math.max(1, data.length),
-    y = (v: number) => 160 - (v / max) * 115;
-  return (
-    <section className="paper finance-chart">
-      <p className="eyebrow">MONEY IN / MONEY OUT</p>
-      <h2>Revenue, costs &amp; operating result</h2>
-      <p className="small-note">
-        Verified collections less refunds, compared with recorded expenses.{" "}
-        {series.length > 45 ? "Monthly" : "Daily"} totals. Missing expenses can
-        overstate profit; this is not a full accounting profit statement.
-      </p>
-      {data.length ? (
-        <>
-          <div className="finance-legend">
-            <span>● Collected revenue</span>
-            <span>● Expenses</span>
-            <span>― Operating result</span>
-          </div>
-          <svg
-            viewBox={`0 0 ${width} 330`}
-            role="img"
-            aria-label="Revenue and expense bars with operating result line. Amounts are available in chart data."
-          >
-            <line x1="50" x2="855" y1="160" y2="160" stroke="#cad5d4" />
-            {[max, 0, -max].map((v) => (
-              <text
-                key={v}
-                x="42"
-                y={y(v) + 4}
-                textAnchor="end"
-                fontSize="10"
-                fill="#647571"
-              >
-                {money(v)}
-              </text>
-            ))}
-            {data.map((r, i) => {
-              const x = 50 + i * step;
-              return (
-                <g key={r.day}>
-                  <title>{`${r.day}: revenue ${money(r.revenue)}, expenses ${money(r.expenses)}, result ${money(r.profit)}`}</title>
-                  <rect
-                    x={x + step * 0.12}
-                    y={y(r.revenue)}
-                    width={Math.max(1, step * 0.28)}
-                    height={160 - y(r.revenue)}
-                    rx="2"
-                    fill="#1c7668"
-                  />
-                  <rect
-                    x={x + step * 0.44}
-                    y={y(r.expenses)}
-                    width={Math.max(1, step * 0.28)}
-                    height={160 - y(r.expenses)}
-                    rx="2"
-                    fill="#d1a15e"
-                  />
-                  {(data.length < 10 ||
-                    i % Math.ceil(data.length / 8) === 0) && (
-                    <text
-                      x={x + step * 0.4}
-                      y="307"
-                      textAnchor="middle"
-                      fill="#647571"
-                      fontSize="10"
-                    >
-                      {r.day.slice(5)}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-            <polyline
-              points={data
-                .map((r, i) => `${50 + i * step + step * 0.42},${y(r.profit)}`)
-                .join(" ")}
-              fill="none"
-              stroke="#427aab"
-              strokeWidth="3"
-            />
-            {data.length === 1 && (
-              <circle
-                cx={50 + step * 0.42}
-                cy={y(data[0].profit)}
-                r="4"
-                fill="#427aab"
-              />
-            )}
-          </svg>
-          <details>
-            <summary>View chart data</summary>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Period</th>
-                    <th>Revenue</th>
-                    <th>Expenses</th>
-                    <th>Operating result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((r) => (
-                    <tr key={r.day}>
-                      <td>{r.day}</td>
-                      <td>{money(r.revenue)}</td>
-                      <td>{money(r.expenses)}</td>
-                      <td>{money(r.profit)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        </>
-      ) : (
-        <p className="small-note">
-          Your revenue and expenses will appear here as they are recorded.
-        </p>
-      )}
-    </section>
-  );
+  const caption = selected === null ? "Total for selected report period" : `${mode === "running" ? "Running total through" : monthly ? "Recorded in" : "Recorded on"} ${chartDate(points[selected].day, monthly)}`;
+  return <section className={`paper ${chartStyles.chart} ${resultClass}`} aria-label="Revenue, costs and operating result">
+    <div className={chartStyles.heading}>
+      <div><p className="eyebrow">MONEY IN / MONEY OUT</p><h2>Business performance</h2></div>
+      <span className={chartStyles.period}>{first ? `${chartDate(first.day, monthly)} – ${chartDate(last.day, monthly)}` : "Selected report period"}</span>
+    </div>
+    <div className={chartStyles.metrics} role="group" aria-label="Chart metric">
+      {chartMetrics.map(item => <button type="button" key={item.key} aria-pressed={metric === item.key} onClick={() => { setMetric(item.key); setActive(null); }}><span>{item.label}</span><strong>{money(totals[item.key])}</strong></button>)}
+    </div>
+    {points.length ? <>
+      <div className={chartStyles.readout}>
+        <div><p className={chartStyles.metricLabel}>{metricLabel}</p><strong className={chartStyles.amount}>{money(displayed)}</strong><p className={chartStyles.caption}>{caption}</p></div>
+        <div className={chartStyles.modes} role="group" aria-label="Chart calculation"><button type="button" aria-pressed={mode === "running"} onClick={() => { setMode("running"); setActive(null); }}>Running total</button><button type="button" aria-pressed={mode === "daily"} onClick={() => { setMode("daily"); setActive(null); }}>{bucketLabel}</button></div>
+      </div>
+      <div className={chartStyles.plot}>
+        <svg viewBox={`0 0 ${width} 304`} preserveAspectRatio="none" role="slider" tabIndex={0}
+          aria-label={`${metricLabel}, ${mode === "running" ? "running total" : bucketLabel.toLowerCase() + " totals"}. Use arrow keys to inspect dates.`}
+          aria-valuemin={0} aria-valuemax={Math.max(0, points.length - 1)} aria-valuenow={selected ?? points.length - 1}
+          aria-valuetext={`${chartDate(points[selected ?? points.length - 1].day, monthly)}: ${money(values[selected ?? points.length - 1])}`}
+          onFocus={() => setActive(current => current ?? points.length - 1)} onBlur={() => setActive(null)}
+          onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); scrub(event); }}
+          onPointerMove={scrub} onPointerLeave={event => { if (event.pointerType === "mouse") setActive(null); }} onPointerCancel={() => setActive(null)}
+          onKeyDown={event => {
+            let next = selected ?? points.length - 1;
+            if (event.key === "ArrowLeft" || event.key === "ArrowDown") next--;
+            else if (event.key === "ArrowRight" || event.key === "ArrowUp") next++;
+            else if (event.key === "Home") next = 0;
+            else if (event.key === "End") next = points.length - 1;
+            else return;
+            event.preventDefault(); setActive(Math.max(0, Math.min(points.length - 1, next)));
+          }}>
+          <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-line)" stopOpacity=".18"/><stop offset="100%" stopColor="var(--chart-line)" stopOpacity=".015"/></linearGradient></defs>
+          <line x1={left} x2={right} y1={y(0)} y2={y(0)} className={chartStyles.baseline}/>
+          {area && <path d={area} fill={`url(#${gradientId})`}/>}
+          <path d={line} fill="none" className={chartStyles.line} vectorEffect="non-scaling-stroke"/>
+          {points.length === 1 && <circle cx={x(0)} cy={y(values[0])} r="4" fill="var(--chart-line)"/>}
+          {selected !== null && <g><line x1={x(selected)} x2={x(selected)} y1={12} y2={bottom + 5} className={chartStyles.crosshair}/><circle cx={x(selected)} cy={y(values[selected])} r="6" className={chartStyles.cursor}/></g>}
+        </svg>
+        <div className={`${chartStyles.scale}${high === low ? ` ${chartStyles.flatScale}` : ""}`} aria-hidden="true"><span>{compactMoney(high)}</span>{high !== low && <span>{compactMoney(low)}</span>}</div>
+      </div>
+      <div className={chartStyles.axis}><span>{chartDate(first.day, monthly)}</span><span>{chartDate(last.day, monthly)}</span></div>
+      <p className={chartStyles.hint}>Hover or drag to explore. {mode === "running" ? "Running total starts from zero within this report period." : `${bucketLabel} recorded totals.`}{selected !== null && !points[selected].recorded ? " No recorded activity on this date." : ""}</p>
+      <details className={chartStyles.data}><summary>View chart data</summary><div className="table-wrap"><table><caption>{bucketLabel} amounts for the selected report period. The running line adds these amounts over time.</caption><thead><tr><th>Date</th><th>Revenue</th><th>Expenses</th><th>Operating result</th></tr></thead><tbody>{points.map(point => <tr key={point.day}><td>{chartDate(point.day, monthly)}{!point.recorded && <small>No recorded activity</small>}</td><td>{money(point.revenue)}</td><td>{money(point.expenses)}</td><td>{money(point.net_operating_profit)}</td></tr>)}</tbody></table></div></details>
+    </> : <div className={chartStyles.empty}><strong>No activity in this period</strong><p>Recorded payments and expenses will appear here. Choose another report period to see earlier activity.</p></div>}
+    <p className={chartStyles.note}>Revenue is verified collections less refunds. Operating result is revenue minus recorded expenses; missing expenses can overstate it.</p>
+  </section>;
 }
 export function MarketingCostReturn({
   costs,

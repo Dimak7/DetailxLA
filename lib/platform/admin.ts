@@ -219,6 +219,7 @@ export async function adminData(
          (SELECT min(s.shift_date) FROM wl.employee_shifts s WHERE s.employee_id=e.id AND s.shift_date>=to_char(now() AT TIME ZONE 'America/Chicago','YYYY-MM-DD') AND s.status='scheduled') next_shift
          FROM wl.employees e LEFT JOIN wl.users u ON u.id=e.user_id WHERE u.removed_at IS NULL ORDER BY e.active DESC,e.name`, [week]),
       availability: await query("SELECT * FROM wl.employee_availability ORDER BY employee_id,weekday"),
+      rules: await query("SELECT r.*,e.name employee_name,s.name service_name FROM wl.employee_pay_rules r JOIN wl.employees e ON e.id=r.employee_id LEFT JOIN wl.services s ON s.id=r.service_id ORDER BY r.updated_at DESC,r.id"),
     };
   }
   if (section === "schedule") {
@@ -600,26 +601,42 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     });
   }
   if (action === "save_pay_rule") {
-    const rule = z.object({ id: uuid.optional(), employee_id: uuid, service_id: uuid.nullable(), rule_type: z.enum(["commission_percent","flat_job"]), value: z.number().int().min(0).max(100000000), active: z.boolean().default(true) }).parse(data);
+    const rule = z.object({ id: uuid.optional(), employee_id: uuid, service_id: uuid.nullable(), rule_type: z.enum(["commission_percent","flat_job"]), value: z.number().int().min(0).max(100000000), active: z.boolean().default(true), preserve_completed: z.boolean().default(false) }).parse(data);
     if (rule.rule_type === "commission_percent" && rule.value > 10000)
       throw new AppError("A commission percentage cannot exceed 100%.");
     return transaction(async (q) => {
-      // Serialize per employee because a nullable service scope is not covered
-      // by PostgreSQL's ordinary UNIQUE constraint.
-      if (!(await q("SELECT id FROM wl.employees WHERE id=$1 FOR UPDATE", [rule.employee_id])).rows.length)
+      // Resolve the prior owner before locking. All pay-setting actions lock
+      // employees before rules and completed bookings, including a moved rule.
+      const observed = rule.id ? (await q<Row>("SELECT * FROM wl.employee_pay_rules WHERE id=$1", [rule.id])).rows[0] : undefined;
+      if (rule.id && !observed) throw new AppError("Pay rule not found.", 404);
+      const employeeIds = [...new Set([rule.employee_id, ...(observed ? [String(observed.employee_id)] : [])])].sort();
+      const locked = (await q("SELECT id FROM wl.employees WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE", [employeeIds])).rows;
+      if (locked.length !== employeeIds.length)
         throw new AppError("Employee not found.", 404);
       if (rule.service_id && !(await q("SELECT id FROM wl.services WHERE id=$1", [rule.service_id])).rows.length)
         throw new AppError("Service not found.", 404);
       const previous = rule.id ? (await q<Row>("SELECT * FROM wl.employee_pay_rules WHERE id=$1 FOR UPDATE", [rule.id])).rows[0] : undefined;
       if (rule.id && !previous) throw new AppError("Pay rule not found.", 404);
-      const scope = (await q<{ id: string }>(
-        "SELECT id FROM wl.employee_pay_rules WHERE employee_id=$1 AND service_id IS NOT DISTINCT FROM $2::uuid AND rule_type=$3 ORDER BY updated_at DESC,id LIMIT 1",
+      if (previous && previous.employee_id !== observed?.employee_id)
+        throw new AppError("This pay rule changed while you were editing. Reload pay settings and try again.", 409);
+      const scope = (await q<Row>(
+        "SELECT * FROM wl.employee_pay_rules WHERE employee_id=$1 AND service_id IS NOT DISTINCT FROM $2::uuid AND rule_type=$3 ORDER BY updated_at DESC,id LIMIT 1",
         [rule.employee_id, rule.service_id, rule.rule_type],
       )).rows[0];
       const changedScope = previous && (previous.employee_id !== rule.employee_id || previous.service_id !== rule.service_id || previous.rule_type !== rule.rule_type);
       if (changedScope && scope && scope.id !== rule.id)
         throw new AppError("A pay rule already exists for this employee and service. Edit that rule instead.");
       const id = rule.id || scope?.id || randomUUID();
+      const existing = previous || scope;
+      const replacesActive = rule.active && (await q("SELECT id FROM wl.employee_pay_rules WHERE employee_id=$1 AND service_id IS NOT DISTINCT FROM $2::uuid AND id<>$3 AND active=true LIMIT 1", [rule.employee_id,rule.service_id,id])).rows.length > 0;
+      if (existing && existing.employee_id === rule.employee_id && existing.service_id === rule.service_id && existing.rule_type === rule.rule_type && Number(existing.value) === rule.value && existing.active === rule.active && !replacesActive)
+        return { id };
+      if (rule.preserve_completed) {
+        const affected = new Set<string>();
+        if (existing?.active) affected.add(String(existing.employee_id));
+        if (rule.active) affected.add(rule.employee_id);
+        for (const employeeId of [...affected].sort()) await preserveCompletedJobPay(q,employeeId);
+      }
       // A service has one active job-pay override, regardless of the default model.
       // Retain replaced rules as inactive so the manager can review their history.
       const replaced = rule.active ? (await q<{ id: string }>(
@@ -632,15 +649,21 @@ export async function adminAction(action: string, raw: unknown, user: Session) {
     });
   }
   if (action === "remove_pay_rule") {
-    const input = z.object({ id: uuid }).parse(data);
+    const input = z.object({ id: uuid, preserve_completed: z.boolean().default(false) }).parse(data);
     return transaction(async (q) => {
+      const observed = (await q<Row>("SELECT * FROM wl.employee_pay_rules WHERE id=$1", [input.id])).rows[0];
+      if (!observed) throw new AppError("Pay rule not found.", 404);
+      await q("SELECT id FROM wl.employees WHERE id=$1 FOR UPDATE", [observed.employee_id]);
       const previous = (await q<Row>("SELECT * FROM wl.employee_pay_rules WHERE id=$1 FOR UPDATE", [input.id])).rows[0];
       if (!previous) throw new AppError("Pay rule not found.", 404);
+      if (previous.employee_id !== observed.employee_id)
+        throw new AppError("This pay rule changed while you were editing. Reload pay settings and try again.", 409);
       if (!previous.active) return { id: input.id, active: false };
+      if (input.preserve_completed) await preserveCompletedJobPay(q,String(previous.employee_id));
       // Keep the rule and its audit history so it can be restored. Paid payroll
       // snapshots are separate records and must not be changed by rate edits.
       const removed = (await q<Row>("UPDATE wl.employee_pay_rules SET active=false,updated_at=now() WHERE id=$1 RETURNING *", [input.id])).rows[0];
-      await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'employee_pay_rule',$3,'removed',$4::jsonb,$5::jsonb)", [randomUUID(),user.user_id,input.id,JSON.stringify(previous),JSON.stringify(removed)]);
+      await q("INSERT INTO wl.audit_logs(id,actor_id,entity_type,entity_id,action,before_data,after_data) VALUES($1,$2,'employee_pay_rule',$3,'removed',$4::jsonb,$5::jsonb)", [randomUUID(),user.user_id,input.id,JSON.stringify(previous),JSON.stringify({ ...removed, preserve_completed: input.preserve_completed })]);
       return { id: input.id, active: false };
     });
   }
