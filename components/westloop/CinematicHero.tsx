@@ -57,7 +57,7 @@ export function CinematicHero() {
           CHICAGO’S WEST LOOP · AUTO DETAILING STUDIO
         </p>
         <h1>
-          A finish that turns heads.
+          A finish that turns heads
           <br />
           <em>Care that goes deeper.</em>
         </h1>
