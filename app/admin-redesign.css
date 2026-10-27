@@ -331,7 +331,7 @@
  line-height: 1.5; font-variant-numeric: tabular-nums;
 }
 .admin-shell.admin-redesign .staffing-person { min-width: 0; overflow-wrap: anywhere; }
-.admin-shell.admin-redesign .admin-main .shift-event {
+.admin-shell.admin-redesign .admin-main .day-track .shift-event {
  display: block; min-height: 0; padding: 6px 8px; border-radius: 8px;
  white-space: normal; overflow-wrap: anywhere;
 }
