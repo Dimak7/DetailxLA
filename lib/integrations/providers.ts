@@ -30,6 +30,7 @@ function escape(value: string) {
   );
 }
 export async function deliver(m: Message) {
+  if (process.env.ADMIN_PREVIEW === "true") throw new NotConnected("Local preview: messages are not sent.");
   const s = await settings();
   if (!m.recipient) throw new NotConnected("Recipient is not configured.");
   if (m.channel === "email") {

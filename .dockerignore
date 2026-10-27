@@ -1,5 +1,6 @@
 .git
 .next
+.local-preview
 node_modules
 data
 artifacts

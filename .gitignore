@@ -17,3 +17,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Isolated local interface previews and sample databases
+.local-preview/

@@ -1,0 +1,30 @@
+.collection{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;min-width:0;margin:22px 0 30px}
+.card{display:flex;flex-direction:column;gap:22px;min-width:0;padding:26px;background:var(--admin-surface);border-radius:26px;color:var(--ink);box-shadow:0 3px 22px #173c2811;}
+.top{display:flex;align-items:center;gap:13px;position:relative;flex-wrap:wrap}
+.avatar{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border-radius:50%;color:var(--admin-selected-text);background:var(--admin-selected-bg);font-size:15px;font-weight:700;letter-spacing:-.03em}
+.identity{flex:1;min-width:120px}
+:global(.admin-shell.admin-redesign) .identity h2{font-size:18px;line-height:1.3;letter-spacing:-.045em;margin:0;font-weight:750;overflow-wrap:anywhere}
+.identity p{font-size:12px;color:var(--muted);margin:5px 0 0;line-height:1.6;overflow-wrap:anywhere}
+.badge{margin-left:auto;max-width:100%;font-size:11px}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 16px;margin:0;padding-top:19px;border-top:1px solid var(--line)}
+.facts div{min-width:0}.facts dt{font-size:11px;color:var(--muted);margin-bottom:7px}.facts dd{margin:0;font-size:14px;font-weight:650;overflow-wrap:anywhere;line-height:1.5}
+.facts dd small{display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:3px}
+.content{font-size:12px;color:var(--muted);line-height:1.7;min-width:0;overflow-wrap:anywhere}
+.content p{margin:6px 0}.content summary{cursor:pointer;color:var(--ink);padding:8px 0;font-weight:550}.content details+details{margin-top:6px}
+.actions{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:2px}
+:global(.admin-shell.admin-redesign) .actions :is(button,.button,.text-link){border:0;border-radius:99px;background:var(--admin-selected-bg);color:var(--admin-selected-text);font-size:12px;min-height:40px;padding:11px 17px;line-height:1.5;text-decoration:none;text-align:center;}
+:global(.admin-shell.admin-redesign) .actions .button{background:var(--admin-primary-bg);color:var(--admin-primary-text)}
+:global(.admin-shell.admin-redesign) .actions .button-row{display:contents}
+.actions>details{flex:1}.actions :global(.employee-row-actions){display:contents}
+.services .avatar,.stock .avatar{border-radius:15px;font-size:24px;font-weight:400}
+.services .facts dd{font-size:23px;letter-spacing:-.04em}
+.leads .facts{gap:14px}.leads .actions{padding-top:12px}
+.snapshot{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:0 0 25px}
+.snapshot>div{min-width:0;padding:24px;background:var(--admin-surface);border-radius:24px;display:flex;flex-direction:column;gap:8px;box-shadow:0 3px 22px #173c2808}
+.snapshot span{font-size:12px;color:var(--muted)}.snapshot strong{font-size:32px;line-height:1.2;letter-spacing:-.05em;font-weight:750}.snapshot small{font-size:11px;color:var(--muted);line-height:1.5}
+.empty{display:grid;justify-items:center;text-align:center;padding:58px 24px;background:var(--admin-surface);border-radius:26px}.empty>span{font-size:32px;color:var(--gold)}.empty h2{margin:15px 0 0}.empty p{color:var(--muted);font-size:13px}
+@media(min-width:1550px){.people{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:1200px){.collection{grid-template-columns:repeat(2,minmax(0,1fr))}.snapshot>div{padding:20px}.snapshot strong{font-size:27px}}
+@media(max-width:760px){.collection{grid-template-columns:minmax(0,1fr);gap:14px;margin-top:18px}.card{padding:23px;gap:20px;border-radius:24px}.snapshot{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.snapshot>div{border-radius:22px;padding:20px 17px}.snapshot strong{font-size:28px}.snapshot span{font-size:11px}.snapshot small{font-size:10px}.actions{gap:8px}.top{gap:12px}.avatar{width:44px;height:44px;flex-basis:44px}.identity{min-width:100px}}
+@media(prefers-reduced-motion:no-preference){.card{transition:box-shadow .2s}.card:hover{box-shadow:0 8px 28px #173c2814}}
+@media(max-width:760px){.snapshot>div{padding:16px 17px;gap:6px}.snapshot strong{font-size:clamp(20px,6vw,26px)}.snapshot small{display:none}.snapshot{gap:10px;margin-bottom:23px}.snapshot span{line-height:1.45}}

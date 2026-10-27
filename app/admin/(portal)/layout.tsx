@@ -12,13 +12,16 @@ export default async function Layout({
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
   const user = await sessionFromToken(
-    (await cookies()).get(sessionCookie)?.value || "",
+    cookieStore.get(sessionCookie)?.value || "",
   );
   if (!user) redirect("/admin/login");
+  const savedTheme = cookieStore.get("wl-admin-theme")?.value;
   return (
     <AdminShell
       user={user}
+      initialTheme={savedTheme === "light" || savedTheme === "dark" ? savedTheme : undefined}
       sections={Object.keys(access).filter((k) =>
         access[k].includes(user.role),
       )}

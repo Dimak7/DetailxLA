@@ -2,9 +2,9 @@
 .chart.positive { --chart-line: #07835a; }
 .chart.negative { --chart-line: #cd4b41; }
 .chart.expenses { --chart-line: #936919; }
-:global(.admin-shell[data-theme="dark"]) .chart.positive { --chart-line: #20d58a; }
-:global(.admin-shell[data-theme="dark"]) .chart.negative { --chart-line: #f47a70; }
-:global(.admin-shell[data-theme="dark"]) .chart.expenses { --chart-line: #e6b66c; }
+:global(.admin-shell[data-theme="dark"]) .chart.positive { --chart-line: var(--admin-chart-positive, #20d58a); }
+:global(.admin-shell[data-theme="dark"]) .chart.negative { --chart-line: var(--admin-chart-negative, #f47a70); }
+:global(.admin-shell[data-theme="dark"]) .chart.expenses { --chart-line: var(--admin-chart-expenses, #e6b66c); }
 .heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .heading h2 { font-size: 23px; margin: 10px 0 0; }
 .heading :global(.eyebrow) { margin-bottom: 0; }

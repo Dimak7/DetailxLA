@@ -156,7 +156,7 @@ export async function adminData(
         "SELECT c.*,(SELECT count(*)::int FROM wl.messages m WHERE m.campaign_id=c.id AND m.status='sent') sent,(SELECT count(*)::int FROM wl.messages m WHERE m.campaign_id=c.id AND m.status IN ('failed','uncertain')) failed FROM wl.campaigns c ORDER BY created_at DESC LIMIT 100",
       ),
       today: await query(
-        "SELECT b.id,b.reference,b.service_name,b.start_minute,b.duration_minutes,b.status,b.assigned_to,c.first_name||' '||c.last_name customer_name,u.name detailer_name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id LEFT JOIN wl.users u ON u.id=b.assigned_to WHERE booking_date=$1 AND c.archived_at IS NULL ORDER BY start_minute",
+        "SELECT b.id,b.reference,b.service_name,b.start_minute,b.duration_minutes,b.status,b.assigned_to,c.first_name||' '||c.last_name customer_name,v.year||' '||v.make||' '||v.model vehicle_label,COALESCE((SELECT string_agg(e.name, ', ' ORDER BY e.name) FROM wl.employee_job_assignments a JOIN wl.employees e ON e.id=a.employee_id WHERE a.booking_id=b.id),u.name) detailer_name FROM wl.bookings b JOIN wl.customers c ON c.id=b.customer_id LEFT JOIN wl.vehicles v ON v.id=b.vehicle_id LEFT JOIN wl.users u ON u.id=b.assigned_to WHERE booking_date=$1 AND c.archived_at IS NULL ORDER BY start_minute",
         [(await import("./types")).dateToday()],
       ),
       operations: (await query(

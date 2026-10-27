@@ -161,6 +161,8 @@ function encryptionKey() {
   return createHash("sha256").update(key).digest();
 }
 export async function secret(key: string, q?: Query) {
+  // The isolated interface preview never connects to external accounts.
+  if (process.env.ADMIN_PREVIEW === "true") return "";
   const environmentValue = (envKeys[key] || [])
     .map((environmentKey) => process.env[environmentKey])
     .find(Boolean);

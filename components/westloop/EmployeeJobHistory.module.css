@@ -1,58 +1,84 @@
 .history { display: grid; gap: 24px; color: var(--ink); min-width: 0; }
 .history p { margin: 0; }
-.intro, .note { color: var(--muted); font-size: 13px; line-height: 1.65; }
-.filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
-.filters label { display: grid; flex: 1 1 140px; gap: 7px; font-size: 12px; font-weight: 600; }
-.filters input, .filters select { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--white); font: inherit; font-size: 14px; min-height: 44px; }
-.history button, .jobFooter a { min-height: 44px; padding: 10px 15px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; font-weight: 600; }
-.history button:not(:global(.button)), .jobFooter a { background: var(--admin-control-bg, var(--white)); color: var(--admin-control-text, var(--ink)); cursor: pointer; }
-.history button:not(:global(.button)):enabled:hover, .jobFooter a:hover { background: var(--admin-control-hover, var(--sage)); color: var(--admin-control-text, var(--ink)); }
-.history button:disabled { cursor: not-allowed; }
+.intro, .note { color: var(--muted); font-size: 13px; line-height: 1.7; }
+.filters { display: flex; align-items: end; flex-wrap: wrap; gap: 13px; padding: 21px; border-radius: 24px; background: var(--admin-surface-soft, var(--cream)); }
+.filters label { display: grid; flex: 1 1 140px; min-width: 0; gap: 8px; font-size: 12px; font-weight: 500; color: var(--muted); }
+:global(.admin-shell.admin-redesign[data-theme]) .filters input, :global(.admin-shell.admin-redesign[data-theme]) .filters select { width: 100%; min-width: 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); border-radius: 13px; color: var(--ink); background: var(--admin-surface, #fff); font: inherit; font-size: 14px; min-height: 46px; box-shadow: none; }
+:global(.admin-shell.admin-redesign[data-theme]) .history button, :global(.admin-shell.admin-redesign[data-theme]) .jobFooter a { min-height: 44px; padding: 11px 20px; border: 0; border-radius: 99px; font-size: 12px; font-weight: 550; }
+:global(.admin-shell.admin-redesign[data-theme]) .history button:not(:global(.button)), :global(.admin-shell.admin-redesign[data-theme]) .jobFooter a { background: var(--admin-selected-bg, #e9f3ef); color: var(--admin-selected-text, var(--ink)); cursor: pointer; }
+:global(.admin-shell.admin-redesign[data-theme]) .history button:not(:global(.button)):enabled:hover, :global(.admin-shell.admin-redesign[data-theme]) .jobFooter a:hover { background: var(--admin-control-hover, var(--admin-selected-bg)); color: var(--ink); }
+.history button:disabled { cursor: not-allowed; opacity: .6; }
 .history :is(button, summary, a):focus-visible { outline: 2px solid var(--admin-focus, var(--gold)); outline-offset: 3px; }
-.period { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; font-weight: 600; }
-.period span { color: var(--muted); font-weight: 400; }
+.period { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; font-weight: 600; letter-spacing: -.02em; }
+.period span { color: var(--muted); font-size: 11px; font-weight: 400; letter-spacing: 0; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.metrics > div { display: grid; gap: 12px; padding: 20px; background: var(--white); border: 1px solid var(--line); border-radius: 14px; }
-.metrics span, .jobTotals span { font-size: 12px; color: var(--muted); }
-.metrics strong { font-size: clamp(22px, 3vw, 30px); letter-spacing: -.04em; }
+.metrics > div { display: grid; gap: 14px; padding: 23px; background: var(--admin-surface-soft, var(--cream)); border: 0; border-radius: 24px; min-width: 0; }
+.metrics > div:last-child { background: var(--admin-selected-bg, #e9f3ef); color: var(--admin-selected-text, var(--ink)); }
+.metrics > div:last-child span { color: inherit; }
+.metrics span, .jobTotals span { font-size: 11px; line-height: 1.5; color: var(--muted); }
+.metrics strong { font-size: clamp(24px, 3vw, 32px); font-weight: 600; letter-spacing: -.05em; line-height: 1.2; white-space: nowrap; overflow-wrap: normal; font-variant-numeric: tabular-nums; }
 .pending { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .jobs { display: grid; gap: 18px; }
-.job { display: grid; gap: 18px; border: 1px solid var(--line); border-radius: 16px; padding: 24px; background: var(--white); min-width: 0; }
-.jobHeading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.job { display: grid; gap: 21px; border: 0; border-radius: 27px; padding: 27px; background: var(--admin-surface-soft, var(--cream)); min-width: 0; }
+.jobHeading { display: flex; justify-content: space-between; align-items: start; gap: 14px; }
 .jobHeading > div { min-width: 0; overflow-wrap: anywhere; }
-.jobHeading h3 { margin: 8px 0 5px; font-size: 20px; }
+.jobHeading h3 { margin: 10px 0 5px; font-size: 24px; font-weight: 600; letter-spacing: -.045em; }
 .jobHeading p { font-size: 13px; color: var(--muted); line-height: 1.6; }
-.jobHeading .reference { font-size: 11px; }
-.service { font-size: 14px; font-weight: 600; }
-.jobTotals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding-block: 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.jobTotals > div { display: grid; gap: 8px; }
-.jobTotals strong { font-size: 18px; }
-.breakdown { min-width: 0; }
-.breakdown summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 8px 0; min-height: 36px; }
-.breakdown > .note { margin: 12px 0; }
-.lines { display: grid; gap: 0; margin-top: 8px; }
-.line { display: flex; justify-content: space-between; gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.jobHeading .reference { font-size: 10px; }
+:global(.admin-shell.admin-redesign[data-theme]) .jobHeading :global(.status-pill) { padding: 7px 11px; border: 0; border-radius: 99px; background: var(--admin-selected-bg, #e9f3ef); color: var(--admin-selected-text, var(--ink)); font-size: 10px; font-weight: 500; white-space: normal; flex-shrink: 0; }
+.service { font-size: 14px; font-weight: 550; }
+.jobTotals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; border: 0; padding: 0; }
+.jobTotals > div { display: grid; align-content: space-between; gap: 10px; padding: 17px; min-width: 0; border-radius: 18px; background: var(--admin-surface, #fff); }
+.jobTotals > div:last-child { background: var(--admin-selected-bg, #e9f3ef); color: var(--admin-selected-text, var(--ink)); }
+.jobTotals > div:last-child span { color: inherit; }
+.jobTotals strong { font-size: 22px; font-weight: 600; letter-spacing: -.04em; line-height: 1.25; white-space: nowrap; overflow-wrap: normal; font-variant-numeric: tabular-nums; }
+.breakdown { min-width: 0; padding: 0 2px; }
+.breakdown summary { cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 500; padding: 10px 0; min-height: 40px; }
+.breakdown > .note { margin: 11px 0; }
+.lines { display: grid; gap: 8px; margin-top: 10px; }
+.line { display: flex; justify-content: space-between; gap: 18px; padding: 17px; border: 0; border-radius: 17px; background: var(--admin-surface, #fff); }
 .line > div { display: grid; gap: 6px; font-size: 13px; min-width: 0; }
 .line > div:last-child { text-align: right; }
-.line span { color: var(--muted); font-size: 12px; }
-.jobFooter { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.jobFooter a { display: inline-flex; align-items: center; color: var(--ink); text-decoration: none; }
-.jobFooter span { color: var(--muted); font-size: 11px; text-align: right; }
+.line strong { font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.line > div:last-child strong { white-space: normal; overflow-wrap: normal; font-variant-numeric: tabular-nums; }
+.line span { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.jobFooter { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.jobFooter a { display: inline-flex; align-items: center; text-decoration: none; }
+.jobFooter span { color: var(--muted); font-size: 10px; line-height: 1.5; text-align: right; }
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
-.empty { padding: 30px 18px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 14px; font-size: 14px; line-height: 1.7; }
-.empty h3 { color: var(--ink); margin-bottom: 10px; }
-@media (max-width: 600px) {
-  .history { gap: 18px; }
-  .metrics, .jobTotals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .metrics > div { padding: 15px; gap: 8px; }
-  .job { padding: 16px; }
+.pagination > span { color: var(--muted); line-height: 1.5; text-align: center; }
+.empty { padding: 48px 24px; text-align: center; color: var(--muted); border: 0; border-radius: 25px; background: var(--admin-surface-soft, var(--cream)); font-size: 13px; line-height: 1.7; }
+.empty h3 { color: var(--ink); margin: 0 0 10px; font-size: 21px; font-weight: 600; letter-spacing: -.035em; }
+@media (max-width: 700px) {
+  .history { gap: 21px; }
+  .metrics, .jobTotals { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .metrics > div { padding: 21px; gap: 11px; border-radius: 22px; }
+  .metrics strong { font-size: clamp(22px, 5.5vw, 28px); }
+  .job { padding: 22px; border-radius: 24px; gap: 18px; }
   .jobHeading { flex-wrap: wrap; }
-  .jobFooter { align-items: stretch; flex-direction: column; }
+  .jobHeading h3 { font-size: 23px; }
+  .jobTotals > div { padding: 17px; }
+  .jobFooter { align-items: stretch; flex-direction: column; gap: 12px; }
   .jobFooter a { justify-content: center; }
   .jobFooter span { text-align: left; }
+  .filters { padding: 19px; }
+  .filters label { flex-basis: calc(50% - 8px); }
   .filters label:last-of-type { flex-basis: 100%; }
-  .filters input, .filters select { font-size: 16px; }
+  :global(.admin-shell.admin-redesign[data-theme]) .filters input, :global(.admin-shell.admin-redesign[data-theme]) .filters select { font-size: 16px; padding-inline: 11px; }
   .filters button { flex: 1; }
-  .line { gap: 12px; }
+  .line { gap: 12px; padding: 15px; }
   .line > div { flex: 1; }
+}
+@media (max-width: 370px) {
+  .metrics, .jobTotals { grid-template-columns: minmax(0, 1fr); }
+  .job { padding: 19px; }
+  .jobTotals > div { padding: 14px; }
+  .jobTotals strong { font-size: 20px; }
+  .metrics > div { padding: 17px; }
+  :global(.admin-shell.admin-redesign[data-theme]) .pagination button { padding-inline: 14px; }
+}
+@media (min-width: 371px) and (max-width: 420px) {
+  .metrics > div { padding: 18px; }
+  .jobTotals > div { padding: 14px; }
+  .jobTotals strong { font-size: 18px; }
 }

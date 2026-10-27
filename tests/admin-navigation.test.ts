@@ -16,7 +16,7 @@ test("each role can reach its permitted workspaces without forbidden default lin
       assert.ok(workspace.sections.every((section) => allowed.includes(section)));
     }
     if (role === "manager") {
-      assert.equal(navigation.find((workspace) => workspace.label === "Operations")?.target, "payments");
+      assert.equal(navigation.find((workspace) => workspace.label === "Money")?.target, "payments");
       assert.equal(navigation.find((workspace) => workspace.label === "Growth"), undefined);
     }
     if (role === "staff") {
@@ -24,4 +24,12 @@ test("each role can reach its permitted workspaces without forbidden default lin
       assert.equal(navigation[0].label, "My schedule");
     }
   }
+});
+
+ test("each section appears in one navigation group and Schedule stays with the team", () => {
+  const navigation = adminNavigation(Object.keys(access));
+  const sections = navigation.flatMap(workspace => workspace.sections);
+  assert.equal(new Set(sections).size, sections.length);
+  assert.ok(navigation.find(workspace => workspace.label === "Team")?.sections.includes("schedule"));
+  assert.ok(!navigation.find(workspace => workspace.label === "Bookings")?.sections.includes("schedule"));
 });
