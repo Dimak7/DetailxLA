@@ -130,6 +130,16 @@ export function AdminWorkspace({
   const canArchiveCustomers = ["owner", "admin"].includes(user.role);
   const archivedCustomers = params.get("archived") === "1";
   const archivedBookings = section === "bookings" && Boolean(data.archivedBookings);
+  const bookingView = s(data.bookingView) || (archivedBookings ? "archived" : params.get("status") || params.get("view") || (params.get("search") || params.get("id") ? "all" : "active"));
+  function bookingViewHref(view: string) {
+    const query = new URLSearchParams(params.toString());
+    for (const key of ["id", "page", "status", "view", "archived", "new"]) query.delete(key);
+    if (view === "today") { query.set("date", dateToday()); query.set("view", "active"); }
+    else if (["active", "all", "upcoming", "past"].includes(view)) query.set("view", view);
+    else if (view === "archived") query.set("archived", "1");
+    else query.set("status", view);
+    return `/admin/bookings?${query}`;
+  }
   function refreshCustomers() {
     setCustomerArchiveVersion(version => version + 1);
     router.refresh();
@@ -948,9 +958,16 @@ export function AdminWorkspace({
           >
             Search &amp; filters
           </button>
-          <form id="admin-record-filters" className={`toolbar admin-filter-panel${recordFiltersOpen ? " is-open" : ""}`}>
+          <form key={params.toString()} id="admin-record-filters" className={`toolbar admin-filter-panel${recordFiltersOpen ? " is-open" : ""}`}>
             {section === "payments" && <input type="hidden" name="payment_view" value={paymentView} />}
             {((section === "customers" && archivedCustomers) || archivedBookings) && <input type="hidden" name="archived" value="1" />}
+            {section === "bookings" && <>
+              {params.get("status") && <input type="hidden" name="status" value={params.get("status")!} />}
+              {!archivedBookings && <input type="hidden" name="view" value={params.get("view") || (bookingView === "active" ? "active" : "all")} />}
+              <label className="field"><span>View</span><select aria-label="Booking view" value={bookingView} onChange={event => router.push(bookingViewHref(event.target.value))}>
+                <option value="active">Active bookings</option><option value="confirmed">Confirmed only</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="all">All bookings</option><option value="today">Today · active</option><option value="upcoming">Upcoming</option><option value="past">Past appointments</option><option value="new">New requests</option><option value="in_progress">In progress</option><option value="no_show">No-shows</option>{canArchiveCustomers && <option value="archived">Archived customer appointments</option>}
+              </select></label>
+            </>}
             <label className="field">
               <span>{section === "payments" ? "Search website appointments" : "Search records"}</span>
               <input
@@ -969,7 +986,7 @@ export function AdminWorkspace({
                     defaultValue={params.get("date") || ""}
                   />
                 </label>
-                <label className="field">
+                {section !== "bookings" && <label className="field">
                   <span>{section === "payments" ? "Appointment status" : "Status"}</span>
                   <select
                     name="status"
@@ -980,7 +997,7 @@ export function AdminWorkspace({
                       <option key={x}>{x}</option>
                     ))}
                   </select>
-                </label>
+                </label>}
               </>
             )}
             <button className="button">Filter</button>
@@ -993,13 +1010,11 @@ export function AdminWorkspace({
       {section === "bookings" && (
         <>
           <div className="booking-viewbar">
-            <label><span>Show</span><select aria-label="Booking view" value={archivedBookings ? "archived" : params.get("status") || (params.get("date") === dateToday() ? "today" : params.get("view") || "all")} onChange={event => {
-              const view = event.target.value;
-              const query = view === "all" ? "" : view === "today" ? `?date=${dateToday()}` : ["upcoming", "past"].includes(view) ? `?view=${view}` : view === "archived" ? "?archived=1" : `?status=${view}`;
-              router.push(`/admin/bookings${query}`);
-            }}><option value="all">All bookings</option><option value="today">Today</option><option value="upcoming">Upcoming</option><option value="past">Past appointments</option><option value="new">New</option><option value="confirmed">Booked</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="no_show">No-shows</option>{canArchiveCustomers && <option value="archived">Archived customer appointments</option>}</select></label>
+            <nav className="booking-status-tabs" aria-label="Booking status views">{[["active", "Active"], ["confirmed", "Confirmed"], ["completed", "Completed"], ["cancelled", "Cancelled"], ["all", "All bookings"]].map(([view, label]) => <Link key={view} href={bookingViewHref(view)} aria-current={bookingView === view ? "page" : undefined}>{label}</Link>)}</nav>
             <span>{s(data.total)} {n(data.total) === 1 ? "booking" : "bookings"}</span>
           </div>
+          {bookingView === "active" && <p className="small-note booking-view-note">New requests, confirmed appointments and work in progress. Completed, cancelled and no-show bookings are kept in their own views.</p>}
+          {bookingView === "cancelled" && <p className="small-note booking-view-note">Cancelled appointments are kept here with their payment history.</p>}
           {archivedBookings && <p className="small-note">Appointments for archived customers. Payment history remains available in Payments. Restore a customer from Customers → Archived records to return their appointments to the main list.</p>}
           {bookingsTable(list)}
           <p className="small-note">

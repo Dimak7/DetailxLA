@@ -147,14 +147,22 @@
 .admin-shell.admin-redesign[data-theme] .workspace-tabs a { background: transparent; color: var(--muted); border: 0; box-shadow: none; border-radius: 99px; }
 .admin-shell.admin-redesign[data-theme] .workspace-tabs a.active { background: var(--admin-primary-bg); color: var(--admin-primary-text); border: 0; }
 .admin-shell.admin-redesign .booking-viewbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin: 18px 0; color: var(--muted); font-size: 12px; }
-.admin-redesign .booking-viewbar label { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.admin-redesign .booking-viewbar select { width: auto; max-width: 245px; }
+.admin-redesign .booking-status-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 5px; min-width: 0; border-radius: 28px; background: var(--admin-surface); }
+.admin-shell.admin-redesign[data-theme] .booking-status-tabs a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 11px 19px; border-radius: 99px; color: var(--muted); background: transparent; text-decoration: none; font-size: 12px; font-weight: 550; line-height: 1.4; }
+.admin-shell.admin-redesign[data-theme] .booking-status-tabs a:hover { color: var(--ink); background: var(--admin-surface-soft); }
+.admin-shell.admin-redesign[data-theme] .booking-status-tabs a[aria-current="page"] { color: var(--admin-primary-text); background: var(--admin-primary-bg); }
+.admin-shell.admin-redesign .booking-view-note { margin: -4px 0 20px; max-width: 760px; }
 .admin-redesign .admin-secondary-panel > summary { display: flex; align-items: center; gap: 12px; }
 .admin-redesign .admin-secondary-panel > summary::before { content: none; }
 .admin-redesign .admin-secondary-panel[open] > summary::before { content: none; }
 .admin-redesign .admin-secondary-panel > summary::-webkit-details-marker { display: none; }
 .admin-redesign .admin-secondary-panel > summary > small { margin-left: auto; font-size: 11px; font-weight: 400; }
-@media(max-width:760px) { .admin-redesign .booking-viewbar select { max-width: 225px; } .admin-redesign .booking-viewbar > span { white-space: nowrap; font-size: 11px; } }
+@media(max-width:760px) {
+  .admin-shell.admin-redesign .booking-viewbar { flex-wrap: wrap; gap: 10px; }
+  .admin-redesign .booking-status-tabs { width: 100%; }
+  .admin-shell.admin-redesign[data-theme] .booking-status-tabs a { flex: 1 0 90px; padding: 11px 13px; }
+  .admin-redesign .booking-viewbar > span { white-space: nowrap; font-size: 11px; }
+}
 
 @media(max-width:760px) {
   .admin-redesign .payroll-workspace .toolbar { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
