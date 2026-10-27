@@ -1,5 +1,12 @@
 "use client";
-import {JobPayments} from "./JobPayments";
+import { StudioReports } from "./StudioReports";
+import { StudioCollection, StudioSnapshot } from "./StudioCollection";
+import { AdminOverview } from "./AdminOverview";
+import { GrowthWorkspace } from "./GrowthWorkspace";
+import { BookingList } from "./BookingList";
+import { PayrollList } from "./PayrollList";
+import { StaffWorkspace } from "./StaffWorkspace";
+import { adminNavigation, adminSectionLabels } from "@/lib/platform/admin-navigation";
 import { JobWorkspace } from "./JobWorkspace";
 import { EmployeeResources, EmployeeAccessLink } from "./EmployeeResources";
 import { EmployeeJobHistory } from "./EmployeeJobHistory";
@@ -81,13 +88,6 @@ const stamp = (v: unknown) =>
 const accessRoleLabel = (role: unknown) =>
   s(role) === "staff" ? "Detailer" : title(s(role));
 function crmTagRows(value:unknown):CrmTag[]{return rows(value).map(t=>({id:s(t.id),name:s(t.name),color:s(t.color),archived_at:t.archived_at?s(t.archived_at):null}));}
-const workspaceSections = [
-  { name: "Bookings", items: ["calendar", "bookings", "schedule", "services"] },
-  { name: "CRM", items: ["customers", "leads", "reviews"] },
-  { name: "Team", items: ["team", "employees", "schedule", "hours", "payroll", "performance", "my_schedule"] },
-  { name: "Marketing", items: ["marketing"] },
-  { name: "Operations", items: ["inventory", "expenses", "payments", "reports", "analytics"] },
-];
 export function AdminWorkspace({
   section,
   data,
@@ -107,6 +107,14 @@ export function AdminWorkspace({
   const [paySettings, setPaySettings] = useState<{ employeeId?: string } | null>(null);
   const [employeeHistory, setEmployeeHistory] = useState<{ id: string; name: string; start?: string; end?: string } | null>(null);
   const [expense, setExpense] = useState<R | null>(null);
+  const requestedPaymentView = params.get("payment_view");
+  const paymentView = ["square", "website", "collect"].includes(requestedPaymentView || "") ? requestedPaymentView! : "square";
+  function setPaymentView(view: string) {
+    const next = new URLSearchParams(params.toString());
+    next.set("payment_view", view);
+    router.push(`/admin/payments?${next}`, { scroll: false });
+  }
+  const [expenseView, setExpenseView] = useState("records");
   const [editor, setEditor] = useState<EditorSpec | null>(null),
     [creating, setCreating] = useState(false),
     [lead, setLead] = useState<
@@ -623,57 +631,7 @@ export function AdminWorkspace({
     );
   }
   function bookingsTable(values: R[]) {
-    return table(
-      [
-        "Appointment",
-        "Customer / vehicle",
-        "Date & time",
-        ...(!staff ? ["Assignment"] : []),
-        "Status",
-        ...(!staff ? ["Job total"] : []),
-        "Actions",
-      ],
-      values.map((r) => [
-        <>
-          <strong>{s(r.reference)}</strong>
-          <small>{s(r.service_name)}</small>
-        </>,
-        <>
-          {!staff ? (
-            <Link
-              className="text-link"
-              href={"/admin/customers?id=" + s(r.customer_id) + (archivedBookings ? "&archived=1" : "")}
-            >
-              {s(r.customer_name)}
-            </Link>
-          ) : (
-            s(r.customer_name)
-          )}
-          <small>{s(r.vehicle)}</small>
-          <small>{s(r.phone)}</small>
-        </>,
-        <>
-          {s(r.booking_date)}
-          <small>
-            {timeLabel(n(r.start_minute))} CT · {n(r.duration_minutes) / 60}h
-          </small>
-        </>,
-        !staff ? (() => {
-          const assignedNames = rows(r.job_assignments).map((assignment) => s(assignment.name)).filter(Boolean);
-          const fallback = s(scheduleEmployees.find((e) => s(e.user_id) === s(r.assigned_to))?.name);
-          const names = assignedNames.length ? assignedNames : fallback ? [fallback] : [];
-          return names.length ? <><strong>{names.join(", ")}</strong><small>{names.length} detailer{names.length === 1 ? "" : "s"} assigned</small></> : <><strong>Unassigned</strong><small>Assign detailers</small></>;
-        })() : null,
-        status(r.status),
-        ...(!staff
-          ? [<><strong>{money(r.price_cents == null ? null : n(r.price_cents))}</strong><small>{n(r.tip_cents) ? "Tip " + money(n(r.tip_cents)) : "No tip recorded"}</small><small>Collected {money(n(r.collected_cents))} · Due {money(r.price_cents==null?null:Math.max(0,n(r.price_cents)-n(r.collected_cents)))}</small></>]
-          : []),
-        <>
-          <button className="button" onClick={() => setOpenedJob(r)}>Open job</button>
-          {!staff && allowedSections.includes("payments") && <JobPayments booking={{...r,square_environment:data.squareEnvironment}}/>}
-        </>,
-      ].filter((cell) => cell !== null)),
-    );
+    return <BookingList records={values} employees={scheduleEmployees} staff={staff} canCollect={!staff && allowedSections.includes("payments")} canViewCustomers={allowedSections.includes("customers")} archived={archivedBookings} squareEnvironment={s(data.squareEnvironment)} onOpen={setOpenedJob} />;
   }
   const profile = data.profile as {
     customer: R;
@@ -685,535 +643,8 @@ export function AdminWorkspace({
   const reportMode = !!rep;
   const canViewExpenses = allowedSections.includes("expenses");
   const canViewGrowthReports = allowedSections.includes("analytics") || allowedSections.includes("marketing");
-  const workspace = workspaceSections.find((group) => group.items.includes(section));
-  return (
-    <>
-      <div className="admin-heading">
-        <div>
-          <h1>{title(section)}</h1>
-          <p>
-            {section === "dashboard"
-              ? "Your business, at a glance."
-              : section === "marketing"
-                ? "Connect the first click to verified revenue."
-                : "One connected workspace. Real business records."}
-          </p>
-        </div>
-        {["bookings", "calendar"].includes(section) && !staff && (
-          <button
-            className="button"
-            onClick={() => {
-              setLead(undefined);
-              setCreating(true);
-            }}
-          >
-            New appointment +
-          </button>
-        )}
-        {section === "services" && (
-          <button className="button" onClick={() => serviceEdit()}>
-            Add service +
-          </button>
-        )}
-        {section === "leads" && (
-          <button className="button" onClick={() => leadEdit()}>
-            Add lead +
-          </button>
-        )}
-        {section === "gallery" && (
-          <button className="button" onClick={() => galleryEdit()}>
-            Add photos +
-          </button>
-        )}
-        {section === "marketing" && (
-          <button className="button" onClick={() => campaignEdit()}>
-            Create campaign +
-          </button>
-        )}
-        {section === "expenses" && <button className="button" onClick={() => expenseEdit()}>Add expense +</button>}
-        {section === "inventory" && <button className="button" onClick={() => inventoryEdit()}>Add inventory item +</button>}
-      </div>
-      {workspace && <nav className="workspace-tabs" aria-label={workspace.name + " sections"}>{workspace.items.filter((item) => allowedSections.includes(item)).map((item) => <Link className={item === section ? "active" : ""} href={"/admin/" + item} key={item}>{title(item)}</Link>)}</nav>}
-      {section === "marketing" && <MarketingCommissions />}
-      {notice && (
-        <div className="success-message" role="status">
-          {notice}
-        </div>
-      )}
-      {error && (
-        <div className="error-message" role="alert">
-          {error}
-        </div>
-      )}
-      {section === "employees" && (
-        <section className="paper">
-          <div className="section-heading"><div><p className="eyebrow">TEAM</p><h2>{list.filter((r) => r.active).length} active employees</h2></div><button className="button" onClick={() => employeeEdit()}>Add employee +</button></div>
-          <p className="small-note">Each employee gets a separate login. Detailers see only their own assigned work, schedule and time clock. Managers can add detailers and manage payroll; admins set login access roles. Scheduled hours are separate from actual clocked hours.</p>
-          {table(["Employee", "Position & access", "Phone", "Status", "Pay structure", "Scheduled this week", "Actions"], list.map((r) => [
-            <><strong>{s(r.name)}</strong><small>{s(r.email)}</small></>,
-            <>{s(r.position)}<small>{!r.user_id ? "Login not linked" : !r.login_active ? "Login disabled" : `${accessRoleLabel(s(r.login_role) || "staff")} access`}</small></>, s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
-            <PayPlanSummary employee={r} rules={rows(data.rules)} />, (n(r.scheduled_minutes) / 60).toFixed(1) + "h",
-            <>{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit profile</button>}
-              {allowedSections.includes("payroll") && !staff && <><button className="button" aria-label={`Work history for ${s(r.name)}`} onClick={() => setEmployeeHistory({ id: s(r.id), name: s(r.name) })}>Work history</button><button aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button></>}{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <EmployeeAccessLink employeeId={s(r.id)} employeeName={s(r.name)} email={s(r.email)} hasLogin={!!r.user_id} disabled={!r.active} />}</>,
-          ]))}
-        </section>
-      )}
-      {section === "employees" && <EmployeeResources manage />}
-      {section === "my_schedule" && <EmployeeResources />}
-      {section === "team" && (
-        <>
-          <section className="paper">
-            <div className="section-heading">
-              <div><p className="eyebrow">ACCESS CONTROL</p><h2>Team logins &amp; roles</h2></div>
-              <button className="button" onClick={() => teamEdit()}>Create login +</button>
-            </div>
-            <p className="small-note">Every person uses their own email and password. Detailer accounts are automatically linked to an employee profile so their published shifts, assigned work and time clock appear in My Schedule.</p>
-            <div className="role-permissions-grid">
-              <div><strong>Owner</strong><p>Full business access, including finances and team permissions. Only an owner can create or change another owner.</p></div>
-              <div><strong>Admin</strong><p>Full business access, including finances and account management. Cannot grant or change owner access.</p></div>
-              <div><strong>Manager</strong><p>Runs bookings, customers, employees, schedules, hours, payroll and daily operations. No account management or marketing finances.</p></div>
-              <div><strong>Detailer</strong><p>My Schedule only: published shifts, assigned work and personal time clock. No customer lists, business calendar, payroll or reports.</p></div>
-            </div>
-          </section>
-          <section className="paper">
-            <div className="section-heading"><div><p className="eyebrow">AUTHORIZED USERS</p><h2>{list.filter((member) => member.active).length} active logins</h2></div><Link className="text-link" href={params.get("removed")==="1"?"/admin/team":"/admin/team?removed=1"}>{params.get("removed")==="1"?"Hide removed people":"Show removed people"}</Link></div>
-            {table(
-              ["Team member", "Role", "Employee profile", "Status", "Action"],
-              list.map((member) => [
-                <><strong>{s(member.name)}</strong><small>{s(member.email)}</small></>,
-                accessRoleLabel(member.role),
-                member.employee_id ? <><strong>{s(member.position) || "Employee"}</strong><small>{s(member.phone) || "Phone not set"}</small></> : s(member.role) === "staff" ? "Profile missing" : "Not required",
-                status(member.removed_at?"removed":member.active ? "active" : "disabled"),
-                (user.role === "owner" || member.role !== "owner") ? <>{!member.removed_at&&<button onClick={() => teamEdit(member)}>Edit access</button>}{member.id!==user.user_id&&<RemoveTeamMember id={s(member.id)} name={s(member.name)} removed={!!member.removed_at}/>}</> : "Owner only",
-              ]),
-            )}
-          </section>
-        </>
-      )}
-      {section === "schedule" && (
-        <>
-          <section className="paper">
-            <div className="section-heading"><div><p className="eyebrow">WEEKLY ROSTER</p><h2>Schedule week of {s(data.week)}</h2></div><div className="button-row"><button className="button" disabled={busy || !scheduleEmployees.length} onClick={() => run("generate_schedule", { week: s(data.week), start_minute: 540, end_minute: 1020 }, "Draft shifts created from availability.")}>Generate week</button><button disabled={busy} onClick={() => run("publish_schedule", { week: s(data.week) }, "Schedule published. Notification status is recorded below.")}>Publish schedule</button><button onClick={() => shiftEdit()} disabled={!scheduleEmployees.length}>Add shift +</button></div></div>
-            <form className="toolbar"><label className="field"><span>Week starts</span><input name="week" type="date" defaultValue={s(data.week)} /></label><button className="button">Load week</button></form>
-            <div className="schedule-view-tabs" role="tablist" aria-label="Schedule view">
-              {(["week", "staff", "day"] as const).map((view) => <button className={scheduleView === view ? "active" : ""} key={view} onClick={() => setScheduleView(view)} role="tab" aria-selected={scheduleView === view}>{title(view)}</button>)}
-            </div>
-            {scheduleView === "week" && <div className="staffing-board" aria-label="Weekly staffing board">
-              {rosterDays.map((day) => { const shifts = scheduleShifts.filter((shift) => s(shift.shift_date) === day && s(shift.status) === "scheduled"); const target = n(rows(data.staffing).find((item) => s(item.staffing_date) === day)?.required_staff); const jobs = rows(data.workload).find((item) => s(item.booking_date) === day); const visible = shifts.slice(0, 7); return <article className="staffing-day" key={day}><button className="staffing-day-heading" onClick={() => { setScheduleDay(day); setScheduleView("day"); }}><strong>{scheduleDayLabel(day)}</strong><span>{target ? `Staff ${shifts.length}/${target} ${shifts.length >= target ? "Ready" : "Needs staff"}` : `${shifts.length} staff scheduled`}</span><small>{s(jobs?.bookings) || "0"} appointments</small></button><div className="staffing-chips">{visible.map((shift) => <button className="staffing-chip" key={s(shift.id)} onClick={() => shiftEdit(shift)}><strong>{s(shift.name)}</strong><span>{timeLabel(n(shift.start_minute))} - {timeLabel(n(shift.end_minute))}</span></button>)}{shifts.length > visible.length && <button className="staffing-more" onClick={() => { setScheduleDay(day); setScheduleView("day"); }}>+ {shifts.length - visible.length} more</button>}</div><button className="staffing-add" onClick={() => shiftEdit({ shift_date: day, start_minute: 540, end_minute: 1020 })}>+ Add worker</button></article>})}
-            </div>}
-            {scheduleView === "staff" && <div className="staffing-board-scroll"><div className="staffing-matrix">
-              <div className="staffing-matrix-head">Employee</div>{rosterDays.map((day) => <div className="staffing-matrix-head" key={day}>{scheduleDayLabel(day)}</div>)}
-              {scheduleEmployees.map((employee) => <Fragment key={s(employee.id)}><div className="staffing-person"><strong>{s(employee.name)}</strong><small>{s(employee.position)}</small></div>{rosterDays.map((day) => { const shift = scheduleShifts.find((item) => s(item.employee_id) === s(employee.id) && s(item.shift_date) === day && s(item.status) === "scheduled"); const available = employeeAvailability.find((item) => s(item.employee_id) === s(employee.id) && n(item.weekday) === new Date(day + "T12:00:00Z").getUTCDay()); return <button className={shift ? "matrix-shift" : "matrix-off"} key={day} onClick={() => shift ? shiftEdit(shift) : shiftEdit({ employee_id: employee.id, shift_date: day, start_minute: available?.available ? n(available.start_minute) : 540, end_minute: available?.available ? n(available.end_minute) : 1020 })}>{shift ? `${timeLabel(n(shift.start_minute))} - ${timeLabel(n(shift.end_minute))}` : "Off"}</button>})}</Fragment>)}
-            </div></div>}
-            {scheduleView === "day" && <><div className="day-picker" aria-label="Choose schedule day">{rosterDays.map((day) => <button className={day === selectedScheduleDay ? "active" : ""} key={day} onClick={() => setScheduleDay(day)}>{scheduleDayLabel(day)}</button>)}</div><ScheduleDayTimeline day={selectedScheduleDay} shifts={calendarLayouts.get(selectedScheduleDay) || []} appointments={scheduleAppointments.filter((appointment) => s(appointment.booking_date) === selectedScheduleDay)} startMinute={calendarStartMinute} hours={calendarHours} onShiftEdit={shiftEdit} /></>}
-          </section>
-          <section className="paper"><div className="section-heading"><div><p className="eyebrow">BOOKING DEMAND</p><h2>Appointments this week</h2></div></div>{table(["Date", "Bookings"], rows(data.workload).map((r) => [s(r.booking_date), s(r.bookings)]))}</section>
-          <section className="paper"><div className="section-heading"><div><p className="eyebrow">PUBLISH STATUS</p><h2>Employee notifications</h2></div></div>{table(["Employee", "Channel", "Status", "Details"], rows(data.notifications).map((r) => [s(r.name), s(r.channel).toUpperCase(), status(r.status), s(r.error) || "Queued for delivery"]))}{!(data.integrations as R | undefined)?.sms && <p className="small-note">SMS notifications are not connected yet. Published shifts are still available in each employee’s schedule.</p>}</section>
-        </>
-      )}
-      {section === "hours" && (
-        <section className="paper">
-          <div className="section-heading"><div><p className="eyebrow">TIME REVIEW</p><h2>Actual worked hours</h2></div></div>
-          <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Load hours</button></form>
-          {table(["Employee", "Clock in", "Clock out", "Break", "Worked", "Approval"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "Currently clocked in", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h", r.approved ? "Approved" : <button disabled={busy || !r.clock_out} onClick={() => run("approve_time", { id: r.id }, "Time entry approved.")}>Approve</button>]))}
-        </section>
-      )}
-      {section === "payroll" && allowedSections.includes("payroll") && !staff && (
-        <section className="paper">
-          <div className="section-heading"><div><p className="eyebrow">PAYROLL ESTIMATE</p><h2>Worked hours and estimated gross pay</h2></div><div className="button-row"><button disabled={!rows(data.employees).length} onClick={() => compensationEdit()}>Manage pay plans</button><a className="button" href={`/api/manage?section=payroll&export=csv&start=${encodeURIComponent(s(data.start))}&end=${encodeURIComponent(s(data.end))}`}>Export CSV</a></div></div>
-          <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
-          <p className="small-note">Paid hours use completed clock entries when present. If none exist for an employee in this period, scheduled shift hours are used as the payable fallback. Job pay follows each employee’s saved plan or service rule, using the final service price excluding tips and the employee’s share of the job. Tips are allocated separately.</p>
-          {table(["Employee", "Scheduled", "Actual", "Paid hours", "Hourly pay", "Attributed service revenue", "Job pay", "Tips", "Adjustments", "Total pay"], list.map((r) => [
-            <div className="payroll-employee">
-              <strong>{s(r.name)}</strong>
-              <small className="payroll-employee-role">{s(r.position)}</small>
-              <small>{s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small>
-              <PayPlanSummary employee={rows(data.employees).find((employee) => employee.id === r.id) || r} rules={rows(data.rules)} />
-              {allowedSections.includes("payroll") && !staff && <><button className="link-button employee-pay-action" aria-label={`Work history for ${s(r.name)}`} onClick={() => setEmployeeHistory({ id: s(r.id), name: s(r.name), start: s(data.start), end: s(data.end) })}>Work history</button><button className="link-button employee-pay-action" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button></>}
-            </div>,
-            (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents)),
-          ]), { comparison: true, label: "Employee payroll", className: "admin-payroll-table" })}
-        </section>
-      )}
-      {section === "performance" && (
-        <section className="paper">
-          <div className="section-heading"><div><p className="eyebrow">EMPLOYEE PERFORMANCE</p><h2>Factual production metrics</h2></div></div>
-          <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
-          <p className="small-note">Metrics are derived from completed jobs, attributed revenue, allocated tips, and completed clock entries. They are operational facts, not employee scores.</p>
-          {table(["Employee", "Paid hours", "Completed jobs", "Revenue attributed", "Commission", "Tips", "Hourly pay", "Total pay", "Revenue / hour", "Average job"], list.map((r) => {
-            const hours = n(r.minutes) / 60, jobs = n(r.jobs_completed), revenue = n(r.attributed_revenue);
-            return [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small><button className="link-button employee-pay-action" aria-label={`Work history for ${s(r.name)}`} onClick={() => setEmployeeHistory({ id: s(r.id), name: s(r.name), start: s(data.start), end: s(data.end) })}>Work history</button></>, hours.toFixed(2) + "h", s(jobs), money(revenue), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.hourly_earnings_cents)), money(n(r.total_earnings_cents)), hours ? money(Math.round(revenue / hours)) : "No paid hours", jobs ? money(Math.round(revenue / jobs)) : "No completed jobs"];
-          }), { comparison: true, label: "Employee performance" })}
-        </section>
-      )}
-      {section === "my_schedule" && !data.employee && (
-        <section className="paper empty-state">
-          <p className="eyebrow">EMPLOYEE WORKSPACE</p>
-          <h2>This login is not linked to a detailer profile.</h2>
-          <p>Your manager can open Employees, edit your profile with the same login email, and enable Active employee. Your published shifts, assigned jobs and time clock will then appear here.</p>
-          {user.role !== "staff" && <Link className="button" href="/admin/employees">Open employees</Link>}
-        </section>
-      )}
-      {section === "my_schedule" && !!data.employee && (
-        <>
-          <section className="paper"><div className="section-heading"><div><p className="eyebrow">MY WORKSPACE</p><h2>{s((data.employee as R | undefined)?.name)}'s schedule</h2></div></div>
-            {(() => { const active = rows(data.entries).find((entry) => !entry.clock_out); return <div className="button-row">{!active ? <button className="button" disabled={busy} onClick={() => clock("in")}>Clock in</button> : <><button disabled={busy || Boolean(active.break_started_at)} onClick={() => clock("break_start")}>Start break</button><button disabled={busy || !active.break_started_at} onClick={() => clock("break_end")}>End break</button><button className="button" disabled={busy || Boolean(active.break_started_at)} onClick={() => clock("out")}>Clock out</button></>}</div>; })()}
-            {table(["Date", "Shift", "Break", "Notes"], rows(data.shifts).map((r) => [s(r.shift_date), timeLabel(n(r.start_minute)) + " - " + timeLabel(n(r.end_minute)), n(r.break_minutes) + " min", s(r.notes) || "-"]))}
-          </section>
-          <section className="paper"><div className="section-heading"><div><p className="eyebrow">ASSIGNED WORK</p><h2>Upcoming appointments</h2></div></div>
-            {table(["When", "Customer", "Vehicle", "Service", "Location", "Status", "Actions"], rows(data.appointments).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))} - {timeLabel(n(r.start_minute) + n(r.duration_minutes))}</small></>, <><strong>{s(r.customer_name)}</strong><small>{s(r.phone)}</small></>, s(r.vehicle) || "Vehicle details pending", <><strong>{s(r.service_name)}</strong><small>{s(r.reference)}{!staff && <> · {money(r.price_cents == null ? null : n(r.price_cents))}</>}</small></>, <><strong>{s(r.location)}</strong><small>{s(r.notes) || "No access notes"}</small></>, status(r.status), <><button onClick={() => bookingEdit(r)}>View job</button><JobPhotos bookingId={s(r.id)} reference={s(r.reference)} />{r.status === "in_progress" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "completed" }, "Job marked complete.")}>Complete job</button> : r.status !== "completed" && r.status !== "cancelled" ? <button className="button" disabled={busy} onClick={() => run("update_booking", { id: r.id, status: "in_progress" }, "Job started.")}>Start job</button> : null}</>]))}
-          </section>
-          <section className="paper"><h2>Recent time entries</h2>{table(["Clock in", "Clock out", "Break", "Worked"], rows(data.entries).map((r) => [stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "In progress", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h"]))}</section>
-        </>
-      )}
-      {data.squareEnvironment==="sandbox"&&<p className="notice" role="status"><strong>Square sandbox testing.</strong> Payment links use test money. Sandbox transactions are excluded from live revenue reports.</p>}
-      {section === "expenses" && (() => { const summary = data.summary as R; const categoryRows = rows(summary?.byCategory); return <><section className="paper"><form className="toolbar"><label className="field"><span>Period</span><select name="range" defaultValue={params.get("range") || "year"}><option value="1">Today</option><option value="week">This week</option><option value="month">This month</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="year">This year</option></select></label><label className="field"><span>From</span><input name="from" type="date" defaultValue={params.get("from") || ""} /></label><label className="field"><span>To</span><input name="to" type="date" defaultValue={params.get("to") || ""} /></label><label className="field"><span>Search</span><input name="search" defaultValue={params.get("search") || ""} placeholder="Vendor, category..." /></label><button className="button">Apply</button></form><div className="stats-grid">{[["Operating expenses", money(n(summary?.total_cents)), `${s(data.start)} to ${s(data.end)}`],["Recurring", money(n(summary?.recurring_cents)), "Occurrences in selected period"],["One-time", money(n(summary?.one_time_cents)), "Recorded in selected period"],["Categories", s(categoryRows.length), "Real expense categories"]].map(([label,value,hint]) => <div className="stat" key={label}><p>{label}</p><strong>{value}</strong><small>{hint}</small></div>)}</div></section><div className="admin-grid"><SpendBars title="Spending by funding source" items={rows(summary?.byFunding).map(r=>({label:s(r.label),amount_cents:n(r.amount_cents)}))}/><SpendBars title="Spending by account" items={rows(summary?.byAccount).map(r=>({label:s(r.label),amount_cents:n(r.amount_cents)}))}/><SpendBars title="Where the money goes" items={rows(summary?.byCategory).map(r=>({label:s(r.category),amount_cents:n(r.amount_cents)}))}/><SpendBars title="Top vendors" items={rows(summary?.byVendor).map(r=>({label:s(r.label),amount_cents:n(r.amount_cents)}))}/></div><div className="admin-grid"><section className="paper"><h2>Expense by category</h2>{categoryRows.length ? categoryRows.map((row) => <div className="summary-row" key={s(row.category)}><span>{s(row.category)} <small>({s(row.count)})</small></span><strong>{money(n(row.amount_cents))}</strong></div>) : <div className="empty-state"><h3>No expenses yet</h3><p>Start tracking operating expenses to see true operating costs.</p><button className="button" onClick={() => expenseEdit()}>Add expense +</button></div>}</section><section className="paper"><h2>Expense reporting</h2><p className="small-note">Recurring items are calculated for the selected period without creating duplicate records. Expense totals include recorded operating expenses, including linked inventory purchases once.</p><Link className="text-link" href={`/admin/reports?from=${encodeURIComponent(s(data.start))}&to=${encodeURIComponent(s(data.end))}`}>Open profitability report</Link></section></div><section className="paper"><div className="section-heading"><div><p className="eyebrow">OPERATING COSTS</p><h2>Expense records</h2></div></div>{table(["Date","Vendor","Category","Paid from / account","Marketing source","Amount","Frequency","Receipt","Actions"], list.map((row) => [s(row.expense_date),<><strong>{s(row.vendor) || "No vendor"}</strong><small>{s(row.description)}</small></>,s(row.category),<>{s(row.funding_source)}<small>{s(row.payment_account) || "Account not recorded"} · {s(row.payment_method)}</small></>,s(row.marketing_stream).replace("dima-google","Partner Google").replace("business-google","Business Google").replace("business-meta","Business Meta") || "—",money(n(row.amount_cents)),title(s(row.recurrence)),row.receipt_url ? <a className="text-link" href={s(row.receipt_url)} target="_blank">View</a> : "-",<><button onClick={() => expenseEdit(row)}>Edit</button><button className="link-button" onClick={() => run("delete_expense", { id: row.id }, "Expense deleted.")}>Delete</button></>]))}</section></> })()}
-      {section === "inventory" && (() => { const summary = data.summary as R; return <><section className="paper"><form className="toolbar"><label className="field"><span>Search inventory</span><input name="search" defaultValue={params.get("search") || ""} placeholder="Product, SKU, supplier..." /></label><button className="button">Search</button></form><div className="stats-grid">{[["Inventory items",s(summary?.items),"Active products"],["Inventory value",money(n(summary?.value_cents)),"Quantity x cost basis"],["Low stock",s(summary?.low_stock),"At or below minimum"],["Out of stock",s(summary?.out_of_stock),"Requires attention"]].map(([label,value,hint]) => <div className="stat" key={label}><p>{label}</p><strong>{value}</strong><small>{hint}</small></div>)}</div></section><section className="paper"><div className="section-heading"><div><p className="eyebrow">STOCK CONTROL</p><h2>Inventory</h2></div></div>{table(["Product","Stock","Status","Value","Supplier","Actions"], list.map((item) => [<><strong>{s(item.name)}</strong><small>{s(item.sku) || s(item.category)}</small></>,`${s(item.quantity)} ${s(item.unit)}`,<span className={`inventory-status ${s(item.stock_status)}`}>{title(s(item.stock_status))}</span>,money(n(item.quantity) * n(item.unit_cost_cents)),s(item.supplier) || "-",<><button className="button" onClick={() => movementEdit(item)}>Record movement</button><button onClick={() => inventoryEdit(item)}>Edit</button><Link className="text-link" href={`/admin/inventory?id=${s(item.id)}`}>History</Link></>]))}</section>{params.get("id") && <section className="paper"><div className="section-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2>Inventory movement history</h2></div></div>{table(["Date","Item","Type","Change","Recorded by","Notes"], rows(data.movements).map((movement) => [s(movement.occurred_on),s(movement.item_name),title(s(movement.movement_type)),`${n(movement.quantity) > 0 ? "+" : ""}${s(movement.quantity)}`,s(movement.user_name) || "System",s(movement.notes) || "-"]))}</section>}</> })()}
-      {reportMode && rep && (
-        <>
-          <form className="toolbar">
-            <label className="field">
-              <span>Reporting period</span>
-              <select name="range" defaultValue={params.get("range") || "30"}>
-                {[
-                  ["1", "Today"],
-                  ["yesterday", "Yesterday"],
-                  ["week", "This week"],
-                  ["month", "This month"],
-                  ["last_month", "Last month"],
-                  ["30", "Last 30 days"],
-                  ["90", "90 days"],
-                  ["year", "This year"],
-                ].map(([v, l]) => (
-                  <option value={v} key={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Custom from</span>
-              <input
-                type="date"
-                name="from"
-                defaultValue={params.get("from") || ""}
-              />
-            </label>
-            <label className="field">
-              <span>To</span>
-              <input
-                type="date"
-                name="to"
-                defaultValue={params.get("to") || ""}
-              />
-            </label>
-            <button className="button">Apply dates</button>
-          </form>
-          <p className="small-note">
-            {rep.start} through {rep.end} · Central Time. Net sales are completed website appointments; collections include all Square payments and are shown less refunds, before processing fees.
-          </p>
-          {section === "marketing" && <AdsPerformance report={rep}/>}
-          {section === "dashboard" && <div className="admin-grid dashboard-operations">
-                <section className="paper">
-                  <h2>Today's schedule</h2>
-                  {table(
-                    ["Time", "Customer", "Service", "Detailer", "Status"],
-                    rows(data.today).map((r) => [
-                      timeLabel(n(r.start_minute)),
-                      s(r.customer_name),
-                      s(r.service_name),
-                      s(r.detailer_name) || "Unassigned",
-                      status(r.status),
-                    ]),
-                  )}
-                  <Link
-                    className="text-link"
-                    href={"/admin/calendar?date=" + dateToday()}
-                  >
-                    Open calendar
-                  </Link>
-                </section>
-                <section className="paper">
-                  <h2>Unassigned jobs</h2>
-                  {table(["When", "Customer", "Service", "Action"], rows(data.unassigned).map((r) => [<><strong>{s(r.booking_date)}</strong><small>{timeLabel(n(r.start_minute))}</small></>, s(r.customer_name), s(r.service_name), <Link className="text-link" href="/admin/bookings">Assign detailer</Link>]))}
-                </section>
-          </div>}
-          {data.square != null && <SquareRevenue connection={data.square as Awaited<ReturnType<typeof squareRevenueStatus>>} summary={rep.square} />}
-          <div className="stats-grid">
-            {[
-              ["Net sales", money(rep.net_sales), "Completed work, excluding tips"],
-              ["Payments collected", money(rep.payments_collected), "Verified Stripe, Square, or manual payments less refunds"],
-              ["Outstanding", money(rep.outstanding), "Completed work not yet fully collected"],
-              ["Refunds", money(rep.refunds), "Refunds on payments in selected period"],
-              ["Appointment tips", money(rep.tips), "Tips recorded on completed website appointments"],
-              ...(canViewExpenses ? [
-                ["Operating expenses", money(rep.expenses), "Recorded expenses in period"],
-                ["Net operating profit", money(rep.net_operating_profit), "Revenue less operating expenses"],
-                ["Operating margin", rep.operating_margin == null ? "No paid revenue" : rep.operating_margin.toFixed(1) + "%", "Not tax or full accounting profit"],
-              ] : []),
-              ["Bookings", s(rep.bookings.total), "Created in period"],
-              ["New leads", s(rep.leads), "Quote and callback enquiries; excludes direct bookings"],
-              ...(canViewGrowthReports ? [[
-                "Booking conversion",
-                rep.conversion_rate == null
-                  ? "No visits"
-                  : rep.conversion_rate.toFixed(1) + "%",
-                "Booked sessions / tracked visitors",
-              ]] : []),
-              [
-                "Average paid appointment",
-                money(rep.average_order),
-                "Linked collections / paid appointments",
-              ],
-              [
-                "Revenue per website payer",
-                money(rep.revenue_per_customer),
-                "Linked collections / website customers",
-              ],
-              [
-                "New customers",
-                s(rep.customers.new_customers),
-                "Created in period",
-              ],
-              [
-                "Returning customers",
-                s(rep.customers.returning),
-                "2+ completed visits, all time",
-              ],
-            ].map(([k, v, h]) => (
-              <div className="stat" key={k}>
-                <p>{k}</p>
-                <strong>{v}</strong>
-                <small>{h}</small>
-              </div>
-            ))}
-          </div>
-          {section === "dashboard" && (
-            <>
-              <div className="stats-grid">
-                {Object.entries(rep.windows).map(([k, v]) => (
-                  <div className="stat" key={k}>
-                    <p>
-                      Revenue{" "}
-                      {k === "week"
-                        ? "this week"
-                        : k === "month"
-                          ? "this month"
-                          : k === "year"
-                            ? "this year"
-                            : k}
-                    </p>
-                    <strong>{money(n(v))}</strong>
-                    <small>Verified net payments</small>
-                  </div>
-                ))}
-              </div>
-              <div className="stats-grid">
-                {[
-                  ["Today's jobs", s((data.operations as R | undefined)?.today_jobs), "Scheduled visits"],
-                  ["Active detailers", s((data.operations as R | undefined)?.active_detailers), "Active detailer profiles"],
-                  ["Unassigned jobs", s((data.operations as R | undefined)?.unassigned_jobs), "Need a detailer"],
-                ].map(([k, v, h]) => <div className="stat" key={k}><p>{k}</p><strong>{v}</strong><small>{h}</small></div>)}
-              </div>
-              <div className="admin-grid">
-
-                {canViewExpenses && <section className="paper">
-                  <h2>Financial trend</h2>
-                  {rep.financial_series.length ? <>{table(["Date", "Revenue", "Expenses", "Net operating profit"], rep.financial_series.map((row) => [s(row.day), money(n(row.revenue)), money(n(row.expenses)), money(n(row.net_operating_profit))]))}<p className="small-note">Revenue is verified payments less refunds. Operating expenses include recorded expenses only; labor is shown separately when time entries exist.</p></> : <div className="empty-state"><p>No financial activity in this period.</p></div>}
-                </section>}
-                <section className="paper">
-                  <h2>Booking health</h2>
-                  {Object.entries(rep.bookings).map(([k, v]) => (
-                    <div className="summary-row" key={k}>
-                      <span>{title(k)}</span>
-                      <strong>{s(v)}</strong>
-                    </div>
-                  ))}
-                  <div className="summary-row">
-                    <span>Customers, all time</span>
-                    <strong>{s(rep.customers.total)}</strong>
-                  </div>
-                  <div className="summary-row">
-                    <span>Repeat customer share</span>
-                    <strong>
-                      {n(rep.customers.total)
-                        ? (
-                            (n(rep.customers.returning) /
-                              n(rep.customers.total)) *
-                            100
-                          ).toFixed(1) + "%"
-                        : "No customers"}
-                    </strong>
-                  </div>
-                  <div className="summary-row"><span>Recorded labor cost</span><strong>{money(rep.labor_cost)}</strong></div>
-                  {allowedSections.includes("inventory") && <div className="summary-row"><span>Inventory alerts</span><strong>{s((data.inventory as R | undefined)?.low_stock)} low · {s((data.inventory as R | undefined)?.out_of_stock)} out</strong></div>}
-                </section>
-              </div>
-            </>
-          )}
-          {canViewExpenses && <><ProfitChart series={rep.financial_series}/><MarketingCostReturn costs={rep.expense_summary.byMarketing} campaigns={rep.campaigns}/></>}
-          <div className="admin-grid">
-            <section className="paper">
-              <h2>Revenue by payment date</h2>
-              {rep.series.length ? (
-                <>
-                  <div
-                    className="chart"
-                    role="img"
-                    aria-label="Daily net payment revenue"
-                  >
-                    {rep.series.map((r) => (
-                      <div
-                        key={s(r.day)}
-                        style={{
-                          height:
-                            Math.max(
-                              2,
-                              (n(r.revenue) /
-                                Math.max(
-                                  ...rep.series.map((x) => n(x.revenue)),
-                                  1,
-                                )) *
-                                100,
-                            ) + "%",
-                        }}
-                        title={s(r.day) + ": " + money(n(r.revenue))}
-                      />
-                    ))}
-                  </div>
-                  <div className="chart-labels">
-                    <span>{rep.start}</span>
-                    <span>{rep.end}</span>
-                  </div>
-                  <details>
-                    <summary>View chart data</summary>
-                    {table(
-                      ["Date", "Revenue"],
-                      rep.series.map((r) => [s(r.day), money(n(r.revenue))]),
-                    )}
-                  </details>
-                </>
-              ) : (
-                <div className="empty-state">
-                  <p>No verified payments in this period.</p>
-                </div>
-              )}
-            </section>
-            {canViewGrowthReports && <section className="paper">
-              <h2>Customer journey</h2>
-              {rep.events.length ? (
-                rep.events.map((r) => (
-                  <div className="summary-row" key={s(r.name)}>
-                    <span>{title(s(r.name))}</span>
-                    <strong>{s(r.count)}</strong>
-                  </div>
-                ))
-              ) : (
-                <p>No tracked activity yet.</p>
-              )}
-              <p className="small-note">
-                Phone clicks measure intent, not answered calls. Manually record
-                actual phone leads in Leads.
-              </p>
-            </section>}
-          </div>
-          {canViewGrowthReports && <section className="paper">
-            <div className="section-heading"><div><p className="eyebrow">ACQUISITION</p><h2>Channel performance</h2></div></div>
-            <div className="stats-grid acquisition-stats">
-              <article className="stat"><p>True enquiries</p><strong>{s(rep.leads)}</strong><small>Website enquiries and manually entered prospects.</small></article>
-              <article className="stat"><p>Bookings</p><strong>{s(rep.bookings.total)}</strong><small>Reserved appointments in this reporting period.</small></article>
-              <article className="stat"><p>New clients</p><strong>{s(rep.customers.new_customers)}</strong><small>New customer records, kept separate from leads.</small></article>
-            </div>
-            {table(
-              [
-                "Channel",
-                "Enquiries",
-                "Bookings",
-                "Clients",
-                "Paid revenue",
-                "Spend",
-                "CPL",
-                "CPA",
-                "ROAS",
-              ],
-              rep.channels.filter((r) => n(r.leads) || n(r.bookings) || n(r.clients) || n(r.revenue) || r.spend != null || ["Google Ads", "Meta Ads"].includes(r.channel)).map((r) => [
-                r.channel,
-                s(r.leads),
-                s(r.bookings),
-                s(r.clients),
-                money(r.revenue),
-                r.spend == null ? "Not entered" : money(r.spend),
-                r.cpl == null ? "—" : money(r.cpl),
-                r.cpa == null ? "—" : money(r.cpa),
-                r.roas == null ? "—" : r.roas.toFixed(2) + "×",
-              ]),
-              { comparison: true, label: "Channel performance" },
-            )}
-            <p className="small-note">
-              Enquiries are contact-form or manually entered prospects. A direct booking is not also counted as a lead. Paid revenue uses verified collected payments. This channel table uses manually entered spend. Imported Meta metrics appear in Marketing’s Ad account performance report; missing spend is not zero.
-            </p>
-          </section>}
-          {canViewGrowthReports && <section className="paper">
-            <div className="section-heading"><div><p className="eyebrow">OWNERSHIP</p><h2>Lead stream performance</h2></div></div>
-            {table(
-              ["Lead stream", "Enquiries", "Bookings", "Clients", "Paid revenue", "Spend", "CPL", "CPA", "ROAS"],
-              rep.lead_streams.map((r) => [
-                <><strong>{marketingStreamLabel(r.lead_stream)}</strong><small>{r.lead_stream === "Unassigned" ? "Add lead_stream to campaign URLs" : "Tagged acquisition stream"}</small></>,
-                s(r.leads), s(r.bookings), s(r.clients), money(r.revenue),
-                r.spend == null ? "Not entered" : money(r.spend),
-                r.cpl == null ? "—" : money(r.cpl),
-                r.cpa == null ? "—" : money(r.cpa),
-                r.roas == null ? "—" : r.roas.toFixed(2) + "×",
-              ]),
-              { comparison: true, label: "Lead stream performance" },
-            )}
-            <p className="small-note">Use the campaign links above to assign each booking to the correct funding source. Earnings are calculated automatically from eligible service revenue. Older sources remain separate until reviewed.</p>
-          </section>}
-          {section !== "dashboard" && (
-            <>
-              <section className="paper">
-                <h2>Campaign attribution</h2>
-                {table(
-                  ["Channel", "Lead stream", "Campaign", "Enquiries", "Bookings", "Clients", "Paid revenue"],
-                  rep.campaigns
-                    .filter((r) => n(r.leads) || n(r.bookings) || n(r.revenue))
-                    .map((r) => [
-                      s(r.source),
-                      marketingStreamLabel(s(r.lead_stream)),
-                      <span className="compact-id" title={s(r.campaign)}>{s(r.campaign) || "(not tagged)"}</span>,
-                      s(r.leads),
-                      s(r.bookings),
-                      s(r.clients),
-                      money(n(r.revenue)),
-                    ]),
-                )}
-              </section>
-              <section className="paper">
-                <h2>Services &amp; combinations by paid revenue</h2>
-                <p className="small-note">Appointments with multiple services appear as one combination, so each payment is counted once.</p>
-                {table(
-                  ["Service or combination", "Paid bookings", "Revenue"],
-                  rep.topServices.map((r) => [
-                    s(r.service_name),
-                    s(r.bookings),
-                    money(n(r.revenue)),
-                  ]),
-                )}
-              </section>
-            </>
-          )}
-          {section === "marketing" && (
-            <>
-              <section className="paper">
-                <div className="section-heading"><div><p className="eyebrow">DATA QUALITY</p><h2>Tracking &amp; ad connections</h2></div></div>
-                <div className="stats-grid acquisition-stats">
-                  <article className="stat"><p>Website attribution</p><strong>Active</strong><small>UTMs, Google click IDs, social click IDs, referrer and lead stream are stored with each visit.</small></article>
-                  <article className="stat"><p>Google Ads</p><strong>{business.google_ads_id ? "Conversions configured" : "Not configured"}</strong><small>Conversion tags do not import campaign spend. Google Ads reporting API is not connected yet.</small></article>
-                  <article className="stat"><p>Meta Ads</p><strong>{business.meta_pixel_id ? "Tracking configured" : "Not configured"}</strong><small>Pixel/CAPI tracking is separate from spend reporting. Use the Meta connection in Ad account performance above.</small></article>
-                  <article className="stat"><p>Spend source</p><strong>Separate reports</strong><small>Ad account performance uses imported Meta spend. Channel reports below use manual spend; the two are not added together.</small></article>
-                </div>
-              </section>
-              <section className="paper">
+  const workspace = adminNavigation(allowedSections).find((group) => group.sections.includes(section));
+  const spendContent = (<section className="paper">
                 <div className="section-heading">
                   <h2>Ad spend</h2>
                   <button
@@ -1256,8 +687,8 @@ export function AdminWorkspace({
                     money(n(r.amount_cents)),
                   ]),
                 )}
-              </section>
-              <section className="paper">
+              </section>);
+  const campaignContent = (<section className="paper">
                 <h2>Email & SMS campaigns</h2>
                 <p className="small-note">
                   Only opted-in recipients are selected. Consent is checked
@@ -1322,15 +753,190 @@ export function AdminWorkspace({
                     </>,
                   ]),
                 )}
-              </section>
-            </>
-          )}
+              </section>);
+  return (
+    <>
+      {!["dashboard", "marketing"].includes(section) && <div className="admin-heading">
+        <div>
+          <h1>{adminSectionLabels[section] || title(section)}</h1>
+          <p>
+            {{bookings: "Appointments, assignments and payments in one place.", calendar: "See your upcoming appointments.", employees: "Your people, their work and pay plans.", payroll: "See what each person earned and why.", schedule: "Plan the week and assign your team.", customers: "Customer details and service history.", leads: "Keep track of new enquiries.", services: "Your services, pricing and availability.", hours: "Review clocked time and approve hours.", expenses: "Keep your business costs in view.", payments: "Collected payments and transaction history.", inventory: "Products, stock levels and purchases.", performance: "Work completed and earnings by employee.", team: "Manage who can access your workspace.", my_schedule: "Your shifts, assigned jobs and time clock.", reports: "Revenue, costs and business performance.", analytics: "Understand website activity and acquisition.", reviews: "Customer feedback and review requests."}[section] || "Manage your studio."}
+          </p>
+        </div>
+        {["bookings", "calendar"].includes(section) && !staff && (
+          <button
+            className="button"
+            onClick={() => {
+              setLead(undefined);
+              setCreating(true);
+            }}
+          >
+            New booking
+          </button>
+        )}
+        {section === "employees" && <button className="button" onClick={()=>employeeEdit()}>Add employee</button>}
+        {section === "services" && (
+          <button className="button" onClick={() => serviceEdit()}>
+            Add service +
+          </button>
+        )}
+        {section === "leads" && (
+          <button className="button" onClick={() => leadEdit()}>
+            Add lead +
+          </button>
+        )}
+        {section === "gallery" && (
+          <button className="button" onClick={() => galleryEdit()}>
+            Add photos +
+          </button>
+        )}
+        {section === "marketing" && (
+          <button className="button" onClick={() => campaignEdit()}>
+            Create campaign +
+          </button>
+        )}
+        {section === "expenses" && <button className="button" onClick={() => expenseEdit()}>Add expense +</button>}
+        {section === "inventory" && <button className="button" onClick={() => inventoryEdit()}>Add inventory item +</button>}
+      </div>}
+      {workspace && workspace.sections.length > 1 && !["dashboard", "marketing"].includes(section) && <><nav className="workspace-tabs" aria-label={workspace.label + " sections"}>{workspace.sections.map((item) => <Link className={item === section ? "active" : ""} aria-current={item === section ? "page" : undefined} href={"/admin/" + item} key={item}>{adminSectionLabels[item] || title(item)}</Link>)}</nav><label className="workspace-mobile-select"><span>{workspace.label}</span><select aria-label={`${workspace.label} section`} value={section} onChange={event => router.push(`/admin/${event.target.value}`)}>{workspace.sections.map(item => <option key={item} value={item}>{adminSectionLabels[item] || title(item)}</option>)}</select></label></>}
+      {notice && (
+        <div className="success-message" role="status">
+          {notice}
+        </div>
+      )}
+      {error && (
+        <div className="error-message" role="alert">
+          {error}
+        </div>
+      )}
+      {section === "dashboard" && rep && <AdminOverview data={data} user={user} allowedSections={allowedSections} />}
+      {section === "marketing" && rep && <GrowthWorkspace data={data} business={business} allowedSections={allowedSections} campaignContent={campaignContent} spendContent={spendContent} onCreateCampaign={() => campaignEdit()} />}
+      {section === "employees" && <>
+        <StudioSnapshot items={[
+          {label:"Active team",value:list.filter(r=>r.active).length,detail:"Employee profiles"},
+          {label:"Login ready",value:list.filter(r=>r.user_id && r.login_active).length,detail:"Linked active accounts"},
+          {label:"Scheduled this week",value:`${(list.reduce((sum,r)=>sum+n(r.scheduled_minutes),0)/60).toFixed(1)}h`,detail:"Across the team"},
+          {label:"Custom pay rules",value:rows(data.rules).filter(r=>r.active).length,detail:"Service-specific rates"},
+        ]}/>
+        <div className="studio-section-bar"><h2>Your people</h2><span>Work, pay & profiles</span></div>
+        <StudioCollection cards={list.map(r=>({id:s(r.id),title:s(r.name),subtitle:s(r.position) || "Team member",badge:status(r.active?"active":"inactive"),facts:[
+          {label:"Email",value:s(r.email)||"Not set"},{label:"This week",value:`${(n(r.scheduled_minutes)/60).toFixed(1)} hours`},
+          {label:"Phone",value:s(r.phone)||"Not set"},{label:"Workspace access",value:!r.user_id?"Not linked":!r.login_active?"Disabled":accessRoleLabel(s(r.login_role)||"staff")},
+        ],content:<PayPlanSummary employee={r} rules={rows(data.rules)}/>,actions:<>
+          {allowedSections.includes("payroll") && !staff && <button className="button" aria-label={`Work history for ${s(r.name)}`} onClick={()=>setEmployeeHistory({id:s(r.id),name:s(r.name)})}>Work history</button>}
+          {((allowedSections.includes("payroll")&&!staff)||user.role==="owner"||(s(r.login_role)!=="owner"&&(user.role!=="manager"||!r.user_id||s(r.login_role)==="staff")))&&<details className="admin-action-menu"><summary aria-label={`Manage employee ${s(r.name)}`}>Manage</summary><div className="admin-action-menu-content">
+            {(user.role==="owner"||(s(r.login_role)!=="owner"&&(user.role!=="manager"||!r.user_id||s(r.login_role)==="staff")))&&<button onClick={()=>employeeEdit({...r,hourly_rate_cents:n(r.hourly_rate_cents)/100,availability:employeeAvailability.filter(a=>s(a.employee_id)===s(r.id))})}>Edit profile</button>}
+            {allowedSections.includes("payroll")&&!staff&&<button aria-label={`Pay settings for ${s(r.name)}`} onClick={()=>compensationEdit(r)}>Pay settings</button>}
+            {(user.role==="owner"||(s(r.login_role)!=="owner"&&(user.role!=="manager"||!r.user_id||s(r.login_role)==="staff")))&&<EmployeeAccessLink employeeId={s(r.id)} employeeName={s(r.name)} email={s(r.email)} hasLogin={!!r.user_id} disabled={!r.active}/>}
+          </div></details>}
+        </>}))}/>
+      </>}
+      {section === "employees" && <details className="paper admin-secondary-panel"><summary><span>Training &amp; employee resources</span><small>Videos, checklists and documents</small></summary><div className="admin-secondary-panel-content"><EmployeeResources manage /></div></details>}
+      {section === "team" && (
+        <>
+          <details className="paper admin-secondary-panel"><summary>Roles & access guide</summary><div className="admin-secondary-panel-content">
+            <div className="section-heading">
+              <div><p className="eyebrow">ACCESS CONTROL</p><h2>Team logins &amp; roles</h2></div>
+
+            </div>
+            <p className="small-note">Every person uses their own email and password. Detailer accounts are automatically linked to an employee profile so their published shifts, assigned work and time clock appear in My Schedule.</p>
+            <div className="role-permissions-grid">
+              <div><strong>Owner</strong><p>Full business access, including finances and team permissions. Only an owner can create or change another owner.</p></div>
+              <div><strong>Admin</strong><p>Full business access, including finances and account management. Cannot grant or change owner access.</p></div>
+              <div><strong>Manager</strong><p>Runs bookings, customers, employees, schedules, hours, payroll and daily operations. No account management or marketing finances.</p></div>
+              <div><strong>Detailer</strong><p>My Schedule only: published shifts, assigned work and personal time clock. No customer lists, business calendar, payroll or reports.</p></div>
+            </div>
+          </div></details>
+          <section className="paper">
+            <div className="section-heading"><button className="button" onClick={()=>teamEdit()}>Create login</button><div><p className="eyebrow">AUTHORIZED USERS</p><h2>{list.filter((member) => member.active).length} active logins</h2></div><Link className="text-link" href={params.get("removed")==="1"?"/admin/team":"/admin/team?removed=1"}>{params.get("removed")==="1"?"Hide removed people":"Show removed people"}</Link></div>
+            {table(
+              ["Team member", "Role", "Employee profile", "Status", "Action"],
+              list.map((member) => [
+                <><strong>{s(member.name)}</strong><small>{s(member.email)}</small></>,
+                accessRoleLabel(member.role),
+                member.employee_id ? <><strong>{s(member.position) || "Employee"}</strong><small>{s(member.phone) || "Phone not set"}</small></> : s(member.role) === "staff" ? "Profile missing" : "Not required",
+                status(member.removed_at?"removed":member.active ? "active" : "disabled"),
+                (user.role === "owner" || member.role !== "owner") ? <>{!member.removed_at&&<button onClick={() => teamEdit(member)}>Edit access</button>}{member.id!==user.user_id&&<RemoveTeamMember id={s(member.id)} name={s(member.name)} removed={!!member.removed_at}/>}</> : "Owner only",
+              ]),
+            )}
+          </section>
         </>
       )}
+      {section === "schedule" && (
+        <>
+          <section className="paper">
+            <div className="section-heading"><div><p className="eyebrow">WEEKLY ROSTER</p><h2>Schedule week of {s(data.week)}</h2></div><div className="button-row"><button className="button" onClick={() => shiftEdit()} disabled={!scheduleEmployees.length}>Add shift</button><details className="admin-action-menu"><summary>Schedule actions</summary><div className="admin-action-menu-content"><p className="small-note">Create draft shifts from availability, then publish them to your team.</p><button disabled={busy || !scheduleEmployees.length} onClick={() => run("generate_schedule", { week: s(data.week), start_minute: 540, end_minute: 1020 }, "Draft shifts created from availability.")}>Generate week</button><button disabled={busy} onClick={() => run("publish_schedule", { week: s(data.week) }, "Schedule published. Notification status is recorded below.")}>Publish schedule</button></div></details></div></div>
+            <form className="toolbar"><label className="field"><span>Week starts</span><input name="week" type="date" defaultValue={s(data.week)} /></label><button className="button">Load week</button></form>
+            <div className="schedule-view-tabs" role="tablist" aria-label="Schedule view">
+              {(["week", "staff", "day"] as const).map((view) => <button className={scheduleView === view ? "active" : ""} key={view} onClick={() => setScheduleView(view)} role="tab" aria-selected={scheduleView === view}>{title(view)}</button>)}
+            </div>
+            {scheduleView === "week" && <div className="staffing-board" aria-label="Weekly staffing board">
+              {rosterDays.map((day) => { const shifts = scheduleShifts.filter((shift) => s(shift.shift_date) === day && s(shift.status) === "scheduled"); const target = n(rows(data.staffing).find((item) => s(item.staffing_date) === day)?.required_staff); const jobs = rows(data.workload).find((item) => s(item.booking_date) === day); const visible = shifts.slice(0, 7); return <article className="staffing-day" key={day}><button className="staffing-day-heading" onClick={() => { setScheduleDay(day); setScheduleView("day"); }}><strong>{scheduleDayLabel(day)}</strong><span>{target ? `Staff ${shifts.length}/${target} ${shifts.length >= target ? "Ready" : "Needs staff"}` : `${shifts.length} staff scheduled`}</span><small>{s(jobs?.bookings) || "0"} appointments</small></button><div className="staffing-chips">{visible.map((shift) => <button className="staffing-chip" key={s(shift.id)} onClick={() => shiftEdit(shift)}><strong>{s(shift.name)}</strong><span>{timeLabel(n(shift.start_minute))} - {timeLabel(n(shift.end_minute))}</span></button>)}{shifts.length > visible.length && <button className="staffing-more" onClick={() => { setScheduleDay(day); setScheduleView("day"); }}>+ {shifts.length - visible.length} more</button>}</div><button className="staffing-add" onClick={() => shiftEdit({ shift_date: day, start_minute: 540, end_minute: 1020 })}>+ Add worker</button></article>})}
+            </div>}
+            {scheduleView === "staff" && <div className="staffing-board-scroll"><div className="staffing-matrix">
+              <div className="staffing-matrix-head">Employee</div>{rosterDays.map((day) => <div className="staffing-matrix-head" key={day}>{scheduleDayLabel(day)}</div>)}
+              {scheduleEmployees.map((employee) => <Fragment key={s(employee.id)}><div className="staffing-person"><strong>{s(employee.name)}</strong><small>{s(employee.position)}</small></div>{rosterDays.map((day) => { const shift = scheduleShifts.find((item) => s(item.employee_id) === s(employee.id) && s(item.shift_date) === day && s(item.status) === "scheduled"); const available = employeeAvailability.find((item) => s(item.employee_id) === s(employee.id) && n(item.weekday) === new Date(day + "T12:00:00Z").getUTCDay()); return <button className={shift ? "matrix-shift" : "matrix-off"} key={day} onClick={() => shift ? shiftEdit(shift) : shiftEdit({ employee_id: employee.id, shift_date: day, start_minute: available?.available ? n(available.start_minute) : 540, end_minute: available?.available ? n(available.end_minute) : 1020 })}>{shift ? `${timeLabel(n(shift.start_minute))} - ${timeLabel(n(shift.end_minute))}` : "Off"}</button>})}</Fragment>)}
+            </div></div>}
+            {scheduleView === "day" && <><div className="day-picker" aria-label="Choose schedule day">{rosterDays.map((day) => <button className={day === selectedScheduleDay ? "active" : ""} key={day} onClick={() => setScheduleDay(day)}>{scheduleDayLabel(day)}</button>)}</div><ScheduleDayTimeline day={selectedScheduleDay} shifts={calendarLayouts.get(selectedScheduleDay) || []} appointments={scheduleAppointments.filter((appointment) => s(appointment.booking_date) === selectedScheduleDay)} startMinute={calendarStartMinute} hours={calendarHours} onShiftEdit={shiftEdit} /></>}
+          </section>
+          <details className="paper admin-secondary-panel"><summary><span>Appointments this week</span><small>{rows(data.workload).reduce((total, row) => total + n(row.bookings), 0)} bookings</small></summary><div className="admin-secondary-panel-content">{table(["Date", "Bookings"], rows(data.workload).map((r) => [s(r.booking_date), s(r.bookings)]))}</div></details>
+          <details className="paper admin-secondary-panel"><summary><span>Employee notifications</span><small>{rows(data.notifications).length ? `${rows(data.notifications).length} updates` : "No updates yet"}</small></summary><div className="admin-secondary-panel-content">{table(["Employee", "Channel", "Status", "Details"], rows(data.notifications).map((r) => [s(r.name), s(r.channel).toUpperCase(), status(r.status), s(r.error) || "Queued for delivery"]))}{!(data.integrations as R | undefined)?.sms && <p className="small-note">SMS notifications are not connected yet. Published shifts are still available in each employee’s schedule.</p>}</div></details>
+        </>
+      )}
+      {section === "hours" && <>
+        <StudioSnapshot items={[{label:"Hours in view",value:`${(list.reduce((sum,r)=>sum+n(r.worked_minutes),0)/60).toFixed(1)}h`},{label:"Completed entries",value:list.filter(r=>r.clock_out).length},{label:"Awaiting approval",value:list.filter(r=>r.clock_out&&!r.approved).length},{label:"Still clocked in",value:list.filter(r=>!r.clock_out).length}]}/>
+        <section className="paper">
+          <div className="section-heading"><div><p className="eyebrow">TIME REVIEW</p><h2>Actual worked hours</h2></div></div>
+          <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Load hours</button></form>
+          {table(["Employee", "Clock in", "Clock out", "Break", "Worked", "Approval"], list.map((r) => [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, stamp(r.clock_in), r.clock_out ? stamp(r.clock_out) : "Currently clocked in", n(r.break_minutes) + " min", (n(r.worked_minutes) / 60).toFixed(2) + "h", r.approved ? "Approved" : <button disabled={busy || !r.clock_out} onClick={() => run("approve_time", { id: r.id }, "Time entry approved.")}>Approve</button>]))}
+        </section>
+      </>}
+      {section === "payroll" && allowedSections.includes("payroll") && !staff && (
+        <section className="paper payroll-workspace">
+          <div className="section-heading"><div><p className="eyebrow">PAYROLL ESTIMATE</p><h2>Employee earnings</h2></div><div className="button-row"><button disabled={!rows(data.employees).length} onClick={() => compensationEdit()}>Manage pay plans</button><a className="button" href={`/api/manage?section=payroll&export=csv&start=${encodeURIComponent(s(data.start))}&end=${encodeURIComponent(s(data.end))}`}>Export CSV</a></div></div>
+          <form className="toolbar"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)} /></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)} /></label><button className="button">Calculate</button></form>
+          <details className="payroll-explanation"><summary>How earnings are calculated</summary><p className="small-note">Paid hours use completed clock entries when present. If none exist for an employee in this period, scheduled shift hours are used as the payable fallback. Job pay follows each employee’s saved plan or service rule, using the final service price excluding tips and the employee’s share of the job. Tips are allocated separately.</p></details>
+          <PayrollList records={list} employees={rows(data.employees)} rules={rows(data.rules)} onHistory={r => setEmployeeHistory({ id: s(r.id), name: s(r.name), start: s(data.start), end: s(data.end) })} onPaySettings={compensationEdit} />
+        </section>
+      )}
+      {section === "performance" && <>
+        <form className="toolbar studio-filter-surface"><label className="field"><span>From</span><input name="start" type="date" defaultValue={s(data.start)}/></label><label className="field"><span>To</span><input name="end" type="date" defaultValue={s(data.end)}/></label><button className="button">Apply dates</button></form>
+        <StudioSnapshot items={[{label:"Completed assignments",value:list.reduce((sum,r)=>sum+n(r.jobs_completed),0),detail:"Jobs can have multiple employees"},{label:"Paid hours",value:`${(list.reduce((sum,r)=>sum+n(r.minutes),0)/60).toFixed(1)}h`},{label:"Attributed revenue",value:money(list.reduce((sum,r)=>sum+n(r.attributed_revenue),0))},{label:"Estimated earnings",value:money(list.reduce((sum,r)=>sum+n(r.total_earnings_cents),0))}]}/>
+        <StudioCollection cards={list.map(r=>({id:s(r.id),title:s(r.name),subtitle:s(r.position),facts:[{label:"Completed jobs",value:n(r.jobs_completed)},{label:"Estimated earnings",value:money(n(r.total_earnings_cents))},{label:"Paid hours",value:`${(n(r.minutes)/60).toFixed(2)}h`},{label:"Service revenue",value:money(n(r.attributed_revenue))}],content:<details><summary>Earnings & productivity</summary><div className="studio-metric-list">{[["Job commission",money(n(r.commission_cents))],["Tips",money(n(r.tips_cents))],["Hourly pay",money(n(r.hourly_earnings_cents))],["Revenue per hour",n(r.minutes)?money(Math.round(n(r.attributed_revenue)/(n(r.minutes)/60))):"No paid hours"],["Average job",n(r.jobs_completed)?money(Math.round(n(r.attributed_revenue)/n(r.jobs_completed))):"No completed jobs"]].map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></details>,actions:<button className="button" aria-label={`Work history for ${s(r.name)}`} onClick={()=>setEmployeeHistory({id:s(r.id),name:s(r.name),start:s(data.start),end:s(data.end)})}>Work history</button>}))}/>
+        <p className="small-note">Completed jobs, attributed revenue, allocated tips and completed clock entries. These are operational totals, not employee scores.</p>
+      </>}
+      {section === "my_schedule" && !data.employee && (
+        <section className="paper empty-state">
+          <p className="eyebrow">EMPLOYEE WORKSPACE</p>
+          <h2>This login is not linked to a detailer profile.</h2>
+          <p>Your manager can open Employees, edit your profile with the same login email, and enable Active employee. Your published shifts, assigned jobs and time clock will then appear here.</p>
+          {user.role !== "staff" && <Link className="button" href="/admin/employees">Open employees</Link>}
+        </section>
+      )}
+      {section === "my_schedule" && !!data.employee && (
+        <StaffWorkspace data={data} busy={busy} onClock={clock} onViewJob={bookingEdit} onJobStatus={(job, nextStatus) => { void run("update_booking", { id: job.id, status: nextStatus }, nextStatus === "completed" ? "Job marked complete." : "Job started."); }} />
+      )}
+      {section === "my_schedule" && <details className="paper admin-secondary-panel"><summary><span>Training &amp; documents</span><small>Videos, checklists and personal resources</small></summary><div className="admin-secondary-panel-content"><EmployeeResources /></div></details>}
+      {data.squareEnvironment==="sandbox"&&<p className="notice" role="status"><strong>Square sandbox testing.</strong> Payment links use test money. Sandbox transactions are excluded from live revenue reports.</p>}
+      {section === "expenses" && (()=>{const summary=data.summary as R;return <>
+        <StudioSnapshot items={[{label:"Operating expenses",value:money(n(summary?.total_cents)),detail:`${s(data.start)} – ${s(data.end)}`},{label:"Recurring",value:money(n(summary?.recurring_cents))},{label:"One-time",value:money(n(summary?.one_time_cents))},{label:"Categories",value:rows(summary?.byCategory).length}]}/>
+        <form className="toolbar studio-filter-surface"><label className="field"><span>Period</span><select name="range" defaultValue={params.get("range")||"year"}>{[["1","Today"],["week","This week"],["month","This month"],["30","Last 30 days"],["90","Last 90 days"],["year","This year"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label className="field"><span>From</span><input name="from" type="date" defaultValue={params.get("from")||""}/></label><label className="field"><span>To</span><input name="to" type="date" defaultValue={params.get("to")||""}/></label><label className="field"><span>Search</span><input name="search" defaultValue={params.get("search")||""} placeholder="Vendor, category…"/></label><button className="button">Apply</button></form>
+        <nav className="studio-view-switch" aria-label="Expense view"><button aria-pressed={expenseView==="records"} onClick={()=>setExpenseView("records")}>Expense records</button><button aria-pressed={expenseView==="breakdown"} onClick={()=>setExpenseView("breakdown")}>Spending breakdown</button></nav>
+        {expenseView==="records"?<section className="paper"><div className="studio-section-bar"><h2>Expense ledger</h2><span>{list.length} records</span></div>{table(["Vendor & details","Date","Category","Amount","Actions"],list.map(row=>[<><strong>{s(row.vendor)||"No vendor"}</strong><small>{s(row.description)}</small><details><summary>Payment details</summary><p>{s(row.funding_source)} · {s(row.payment_account)||"No account"} · {s(row.payment_method)}</p><p>{title(s(row.recurrence))}</p><p>Marketing source: {({"business-google":"Business Google","business-meta":"Business Meta","dima-google":"Partner Google"} as Record<string,string>)[s(row.marketing_stream)] || marketingStreamLabel(s(row.marketing_stream)) || "Not assigned"}</p>{!!row.receipt_url&&<a href={s(row.receipt_url)} target="_blank" rel="noopener noreferrer">View receipt</a>}</details></>,s(row.expense_date),s(row.category),<strong>{money(n(row.amount_cents))}</strong>,<><button onClick={()=>expenseEdit(row)}>Edit</button><button className="link-button" onClick={()=>run("delete_expense",{id:row.id},"Expense deleted.")}>Delete</button></>]))}</section>:<div className="studio-two-column"><SpendBars title="Where the money goes" items={rows(summary?.byCategory).map(r=>({label:s(r.category),amount_cents:n(r.amount_cents)}))}/><SpendBars title="Top vendors" items={rows(summary?.byVendor).map(r=>({label:s(r.label),amount_cents:n(r.amount_cents)}))}/><SpendBars title="Funding sources" items={rows(summary?.byFunding).map(r=>({label:s(r.label),amount_cents:n(r.amount_cents)}))}/><SpendBars title="Accounts" items={rows(summary?.byAccount).map(r=>({label:s(r.label),amount_cents:n(r.amount_cents)}))}/></div>}
+        <details className="paper admin-secondary-panel"><summary><span>All category totals</span><small>{rows(summary?.byCategory).length} categories</small></summary><div className="admin-secondary-panel-content"><p className="small-note">Complete expense totals for {s(data.start)} – {s(data.end)}.</p><div className="studio-metric-list">{rows(summary?.byCategory).map(row=><div key={s(row.category)}><span>{s(row.category)||"Uncategorised"}</span><strong>{money(n(row.amount_cents))}</strong></div>)}</div>{!rows(summary?.byCategory).length&&<p className="small-note">No expenses in this period.</p>}</div></details>
+        <details className="paper admin-secondary-panel"><summary>How expenses are counted</summary><div className="admin-secondary-panel-content"><p>Recurring items are calculated for the selected period without duplicate records. Linked inventory purchases count once.</p><Link className="studio-soft-link" href={`/admin/reports?from=${encodeURIComponent(s(data.start))}&to=${encodeURIComponent(s(data.end))}`}>Open profitability report</Link></div></details>
+      </>})()}
+      {section === "inventory" && (()=>{const summary=data.summary as R;return <>
+        <StudioSnapshot items={[{label:"Active products",value:s(summary?.items)},{label:"Stock value",value:money(n(summary?.value_cents)),detail:"Quantity × cost basis"},{label:"Running low",value:s(summary?.low_stock)},{label:"Out of stock",value:s(summary?.out_of_stock)}]}/>
+        <form className="toolbar studio-filter-surface"><label className="field"><span>Find a product</span><input name="search" defaultValue={params.get("search")||""} placeholder="Product, SKU or supplier"/></label><button className="button">Search inventory</button></form>
+        <StudioCollection kind="stock" cards={list.map(item=>({id:s(item.id),title:s(item.name),subtitle:s(item.sku)||s(item.category),mark:"▧",badge:<span className={`inventory-status ${s(item.stock_status)}`}>{title(s(item.stock_status))}</span>,facts:[{label:"In stock",value:`${s(item.quantity)} ${s(item.unit)}`},{label:"Stock value",value:money(n(item.quantity)*n(item.unit_cost_cents))},{label:"Supplier",value:s(item.supplier)||"Not set"},{label:"Category",value:s(item.category)||"Uncategorised"}],actions:<><button className="button" onClick={()=>movementEdit(item)}>Stock movement</button><details className="admin-action-menu"><summary>Manage</summary><div className="admin-action-menu-content"><button onClick={()=>inventoryEdit(item)}>Edit product</button><Link href={`/admin/inventory?id=${s(item.id)}`} className="text-link">View history</Link></div></details></>}))}/>
+        {params.get("id")&&<section className="paper"><h2>Movement history</h2>{table(["Date","Item","Type","Change","Recorded by","Notes"],rows(data.movements).map(m=>[s(m.occurred_on),s(m.item_name),title(s(m.movement_type)),`${n(m.quantity)>0?"+":""}${s(m.quantity)}`,s(m.user_name)||"System",s(m.notes)||"—"]))}</section>}
+      </>})()}
+      {reportMode && rep && !["dashboard", "marketing"].includes(section) && <StudioReports report={rep} section={section} allowedSections={allowedSections}/>}
       {!reportMode &&
         ["bookings", "customers", "leads", "calendar", "payments"].includes(
           section,
-        ) && (
+        ) && (section !== "payments" || paymentView === "collect") && (
           <>
           <button
             className="admin-filter-toggle"
@@ -1343,6 +949,7 @@ export function AdminWorkspace({
             Search &amp; filters
           </button>
           <form id="admin-record-filters" className={`toolbar admin-filter-panel${recordFiltersOpen ? " is-open" : ""}`}>
+            {section === "payments" && <input type="hidden" name="payment_view" value={paymentView} />}
             {((section === "customers" && archivedCustomers) || archivedBookings) && <input type="hidden" name="archived" value="1" />}
             <label className="field">
               <span>{section === "payments" ? "Search website appointments" : "Search records"}</span>
@@ -1377,7 +984,7 @@ export function AdminWorkspace({
               </>
             )}
             <button className="button">Filter</button>
-            <Link className="text-link" href={"/admin/" + section + ((section === "customers" && archivedCustomers) || archivedBookings ? "?archived=1" : "")}>
+            <Link className="text-link" href={"/admin/" + section + (section === "payments" ? `?payment_view=${paymentView}` : (section === "customers" && archivedCustomers) || archivedBookings ? "?archived=1" : "")}>
               Clear
             </Link>
           </form>
@@ -1385,23 +992,13 @@ export function AdminWorkspace({
         )}
       {section === "bookings" && (
         <>
-          <div className="filter-tabs">
-            {[
-              ["", "All"],
-              ["?date=" + dateToday(), "Today"],
-              ["?view=upcoming", "Upcoming"],
-              ["?view=past", "Past"],
-              ["?status=completed", "Completed"],
-              ["?status=cancelled", "Cancelled"],
-              ["?status=no_show", "No-show"],
-            ].map(([q, l]) => (
-              <Link key={l} href={"/admin/bookings" + q + (archivedBookings ? (q ? "&" : "?") + "archived=1" : "")}>
-                {l}
-              </Link>
-            ))}
-            {canArchiveCustomers && <Link href={archivedBookings ? "/admin/bookings" : "/admin/bookings?archived=1"}>
-              {archivedBookings ? "Back to bookings" : "Archived customer appointments"}
-            </Link>}
+          <div className="booking-viewbar">
+            <label><span>Show</span><select aria-label="Booking view" value={archivedBookings ? "archived" : params.get("status") || (params.get("date") === dateToday() ? "today" : params.get("view") || "all")} onChange={event => {
+              const view = event.target.value;
+              const query = view === "all" ? "" : view === "today" ? `?date=${dateToday()}` : ["upcoming", "past"].includes(view) ? `?view=${view}` : view === "archived" ? "?archived=1" : `?status=${view}`;
+              router.push(`/admin/bookings${query}`);
+            }}><option value="all">All bookings</option><option value="today">Today</option><option value="upcoming">Upcoming</option><option value="past">Past appointments</option><option value="new">New</option><option value="confirmed">Booked</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="no_show">No-shows</option>{canArchiveCustomers && <option value="archived">Archived customer appointments</option>}</select></label>
+            <span>{s(data.total)} {n(data.total) === 1 ? "booking" : "bookings"}</span>
           </div>
           {archivedBookings && <p className="small-note">Appointments for archived customers. Payment history remains available in Payments. Restore a customer from Customers → Archived records to return their appointments to the main list.</p>}
           {bookingsTable(list)}
@@ -1480,33 +1077,11 @@ export function AdminWorkspace({
           </div>
         </>
       )}
-      {section === "services" &&
-        table(
-          [
-            "Service",
-            "Category",
-            "Price / duration",
-            "Visibility",
-            "Order",
-            "Actions",
-          ],
-          list.map((r) => [
-            <strong>{s(r.name)}</strong>,
-            s(r.category),
-            <>
-              {s(r.pricing_mode) === "quote"
-                ? "By consultation"
-                : money(n(r.price_cents))}
-              <small>
-                {n(r.duration_minutes) / 60} hours · {s(r.pricing_mode)}
-              </small>
-            </>,
-            status(r.active ? "active" : "disabled"),
-            s(r.sort_order),
-            <button onClick={() => serviceEdit(r)}>Edit service</button>,
-          ]),
-        )}
-      {["customers","leads"].includes(section)&&<CrmTagLibrary tags={crmTagRows(data.tags)}/>}
+      {section === "services" && <>
+        <StudioSnapshot items={[{label:"Services in view",value:list.length},{label:"Available to book",value:list.filter(r=>r.active).length},{label:"By consultation",value:list.filter(r=>r.pricing_mode==="quote").length},{label:"Categories",value:new Set(list.map(r=>s(r.category))).size}]}/>
+        <StudioCollection kind="services" cards={list.map(r=>({id:s(r.id),title:s(r.name),subtitle:s(r.category),mark:"◇",badge:status(r.active?"active":"disabled"),facts:[{label:"Starting price",value:r.pricing_mode==="quote"?"By quote":money(n(r.price_cents))},{label:"Appointment",value:`${n(r.duration_minutes)/60}h`}],content:<span>{title(s(r.pricing_mode))} pricing · Display order {s(r.sort_order)}</span>,actions:<button className="button" onClick={()=>serviceEdit(r)}>Edit service</button>}))}/>
+      </>}
+      {["customers","leads"].includes(section)&&<details className="studio-tag-library"><summary>Manage labels</summary><CrmTagLibrary tags={crmTagRows(data.tags)}/></details>}
       {section === "customers" && (
         <>
           {canArchiveCustomers && <nav className="filter-tabs" aria-label="Customer records">
@@ -1637,103 +1212,26 @@ export function AdminWorkspace({
               )}
             </section>
           )}
-          {table(
-            [
-              "Customer",
-              "Contact",
-              "Bookings",
-              "Net lifetime spend",
-              "Last / upcoming",
-              "Action",
-            ],
-            list.map((r) => [
-              <>
-                {[s(r.first_name), s(r.last_name)].filter(Boolean).join(" ") || s(r.email) || s(r.phone) || "Customer"}
-                <small>Since {stamp(r.created_at)}</small>
-                <RecordTags kind="customer" id={s(r.id)} tags={crmTagRows(r.tags)} catalog={crmTagRows(data.tags)}/>
-              </>,
-              <>
-                {s(r.email)}
-                <small>{s(r.phone)}</small>
-              </>,
-              s(r.booking_count),
-              money(n(r.total_spent)),
-              <>
-                {s(r.last_booking) || "No past visit"}
-                <small>{s(r.upcoming_booking) || "No upcoming visit"}</small>
-              </>,
-              <div className="button-row">
-                <Link className="text-link" href={"/admin/customers?id=" + s(r.id) + (archivedCustomers ? "&archived=1" : "")}>Open profile</Link>
-                {canArchiveCustomers && <ArchiveCustomer kind="customer" id={s(r.id)} name={[s(r.first_name), s(r.last_name)].filter(Boolean).join(" ") || s(r.email) || "customer"} archived={Boolean(r.archived_at)} onChanged={refreshCustomers} />}
-              </div>,
-            ]),
-          )}
+          <StudioSnapshot items={[{label:"Customers in view",value:list.length},{label:"With appointments",value:list.filter(r=>n(r.booking_count)>0).length},{label:"Upcoming visits",value:list.filter(r=>r.upcoming_booking).length},{label:"Lifetime spend",value:money(list.reduce((total,r)=>total+n(r.total_spent),0)),detail:"Customers in this view"}]}/>
+          <StudioCollection cards={list.map(r=>({id:s(r.id),title:[s(r.first_name),s(r.last_name)].filter(Boolean).join(" ")||s(r.email)||"Customer",subtitle:s(r.email)||s(r.phone),facts:[{label:"Visits booked",value:n(r.booking_count)},{label:"Lifetime spend",value:money(n(r.total_spent))},{label:"Last visit",value:s(r.last_booking)||"No past visit"},{label:"Next visit",value:s(r.upcoming_booking)||"Not booked"}],content:<><span>{s(r.phone)}</span><RecordTags kind="customer" id={s(r.id)} tags={crmTagRows(r.tags)} catalog={crmTagRows(data.tags)}/><small>Customer since {stamp(r.created_at)}</small></>,actions:<><Link className="button" href={"/admin/customers?id="+s(r.id)+(archivedCustomers?"&archived=1":"")}>Open profile</Link>{canArchiveCustomers&&<ArchiveCustomer kind="customer" id={s(r.id)} name={[s(r.first_name),s(r.last_name)].filter(Boolean).join(" ")||s(r.email)||"customer"} archived={Boolean(r.archived_at)} onChanged={refreshCustomers}/>}</>}))}/>
+
         </>
       )}
       {section === "customers" && canArchiveCustomers && <SquareCustomerHistory onImported={refreshCustomers} refreshKey={customerArchiveVersion} />}
-      {section === "leads" && <section className="paper">
-        <p className="eyebrow">PHONE ENQUIRIES</p>
-        <h2>Record the call. Keep the source accurate.</h2>
-        <p>Calls to one shared phone number do not identify the ad or website that brought the caller. Use <strong>Phone call · source unknown</strong> until a tracking number or call report confirms the source.</p>
-        <p className="small-note">Google Ads call reporting covers calls from ads. To distinguish your website, Google Business and other campaigns, use dedicated tracking numbers that forward to your existing number. Website phone clicks measure intent, not answered calls.</p>
-      </section>}
-      {section === "leads" && allowedSections.includes("marketing") && <MetaLeadForms />}
-      {section === "leads" &&
-        table(
-          ["Lead", "Source / stream", "Status", "Contact", "Actions"],
-          list.map((r) => [
-            <>
-              {s(r.name)}
-              {!!r.call_customer && <span className="status-pill call-customer-tag">Call Customer</span>}
-              <RecordTags kind="lead" id={s(r.id)} tags={crmTagRows(r.tags)} catalog={crmTagRows(data.tags)}/>
-              {rows(r.activity).length>0&&<details><summary>Activity</summary>{rows(r.activity).map((a,i)=><p key={i} className="small-note">{s(a.body)}<small>{new Date(s(a.created_at)).toLocaleString("en-US",{timeZone:"America/Chicago"})} CT</small></p>)}</details>}
-              <details><summary>Form answers & notes</summary><p className="lead-answers">{s(r.notes)||"No notes"}</p></details>
-            </>,
-            <>
-              {s(r.source)}
-              <small>{marketingStreamLabel(s(r.lead_stream))}{s(r.campaign) && <> · <span className="compact-id" title={s(r.campaign)}>{s(r.campaign)}</span></>}</small>
-            </>,
-            <>{status(r.status==="won"?"sold":r.status)}<LeadOutcome id={s(r.id)}/></>,
-            <>
-              {!!r.phone && (
-                <a className="text-link" href={"tel:" + s(r.phone)}>
-                  Call
-                </a>
-              )}
-              <small>
-                {!!r.email && <a href={"mailto:" + s(r.email)}>{s(r.email)}</a>}
-              </small>
-              {!!r.phone && <a href={"sms:" + s(r.phone)}>SMS</a>}
-            </>,
-            <>
-              <button onClick={() => leadEdit(r)}>Edit</button>
-              {!r.customer_id && (
-                <button
-                  disabled={busy}
-                  onClick={() => run("convert_lead", { id: r.id })}
-                >
-                  Create customer
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  setLead({
-                    id: s(r.id),
-                    name: s(r.name),
-                    email: s(r.email),
-                    phone: s(r.phone),
-                  });
-                  setCreating(true);
-                }}
-              >
-                Book
-              </button>
-            </>,
-          ]),
-        )}
+      {section === "leads" && <>
+        <StudioSnapshot items={[{label:"Enquiries in view",value:list.length},{label:"New",value:list.filter(r=>r.status==="new").length},{label:"Won",value:list.filter(r=>r.status==="won").length},{label:"Callbacks requested",value:list.filter(r=>r.call_customer).length}]}/>
+        <StudioCollection kind="leads" cards={list.map(r=>({id:s(r.id),title:s(r.name)||"New enquiry",subtitle:s(r.source)||"Source unknown",badge:status(r.status==="won"?"sold":r.status),facts:[{label:"Phone",value:r.phone?<a href={"tel:"+s(r.phone)}>{s(r.phone)}</a>:"Not provided"},{label:"Email",value:r.email?<a href={"mailto:"+s(r.email)}>{s(r.email)}</a>:"Not provided"}],content:<>
+          {!!r.call_customer&&<span className="status-pill">Callback requested</span>}
+          <RecordTags kind="lead" id={s(r.id)} tags={crmTagRows(r.tags)} catalog={crmTagRows(data.tags)}/>
+          <details><summary>Details & activity</summary><p>{marketingStreamLabel(s(r.lead_stream))}{r.campaign?` · ${s(r.campaign)}`:""}</p><p className="lead-answers">{s(r.notes)||"No notes"}</p>{rows(r.activity).map((a,i)=><p key={i}>{s(a.body)}<small>{stamp(a.created_at)}</small></p>)}</details><LeadOutcome id={s(r.id)}/>
+        </>,actions:<><button className="button" onClick={()=>{setLead({id:s(r.id),name:s(r.name),email:s(r.email),phone:s(r.phone)});setCreating(true);}}>Book a visit</button><details className="admin-action-menu"><summary>More</summary><div className="admin-action-menu-content"><button onClick={()=>leadEdit(r)}>Edit enquiry</button>{!r.customer_id&&<button disabled={busy} onClick={()=>run("convert_lead",{id:r.id})}>Create customer</button>}{!!r.phone&&<a className="text-link" href={"sms:"+s(r.phone)}>Send SMS</a>}</div></details></>}))}/>
+        <details className="paper admin-secondary-panel"><summary>Phone tracking & connected forms</summary><div className="admin-secondary-panel-content"><p>Calls to one shared number cannot identify a caller’s source. Use Phone call · source unknown until a tracking number or call report confirms it.</p><p className="small-note">Dedicated tracking numbers can forward to your existing number. Website phone clicks measure intent, not answered calls.</p>{allowedSections.includes("marketing")&&<MetaLeadForms/>}</div></details>
+      </>}
       {section === "payments" && (
         <>
-          {data.square != null && <SquareRevenue connection={data.square as Awaited<ReturnType<typeof squareRevenueStatus>>} />}
+          <nav className="studio-view-switch" aria-label="Payment view">{[["square","Square transactions"],["website","Website payments"],["collect","Collect a payment"]].map(([id,label])=><button key={id} aria-pressed={paymentView===id} onClick={()=>setPaymentView(id)}>{label}</button>)}</nav>
+          {data.square != null && <details className="paper admin-secondary-panel"><summary>Square connection & sync</summary><div className="admin-secondary-panel-content"><SquareRevenue connection={data.square as Awaited<ReturnType<typeof squareRevenueStatus>>}/></div></details>}
+          {paymentView==="square"&&<section className="paper">
           <h2>{params.get("squareArchive")==="1"?"All imported Square accounts":"Current Square account transactions"}</h2><p><Link className="text-link" href={params.get("squareArchive")==="1"?"/admin/payments":"/admin/payments?squareArchive=1"}>{params.get("squareArchive")==="1"?"Back to current account":"View previous accounts / imported history"}</Link></p>
           <p className="small-note">Previous-account history is retained in the archive. Only the connected account’s completed production payments in USD count toward current Square revenue. Amounts include tips; processing fees are listed separately.</p>
           {table(
@@ -1754,7 +1252,8 @@ export function AdminWorkspace({
             <span className="small-note">Page {Math.max(1, Number(params.get("squarePage")) || 1)} · up to 100 payments per page</span>
             {rows(data.squarePayments).length === 100 && <Link className="text-link" href={`/admin/payments?${params.get("squareArchive")==="1"?"squareArchive=1&":""}squarePage=${Math.max(1, Number(params.get("squarePage")) || 1) + 1}`}>Older payments</Link>}
           </nav>
-          <h2>Website payment records</h2>
+          </section>}
+          {paymentView==="website"&&<section className="paper"><h2>Website payment records</h2>
           <p className="small-note">
             Website invoices are shown separately for appointment management. Square records above and their matching website invoices count once in revenue. A checkout redirect never marks an appointment paid.
           </p>
@@ -1776,7 +1275,8 @@ export function AdminWorkspace({
               stamp(r.paid_at),
             ]),
           )}
-          <h2>Collect payment</h2>
+          </section>}
+          {paymentView==="collect"&&<section className="paper"><h2>Collect payment</h2>
           {table(
             ["Appointment", "Customer", "Estimate", "Action"],
             list
@@ -1795,6 +1295,7 @@ export function AdminWorkspace({
                 </button>,
               ]),
           )}
+          </section>}
         </>
       )}
       {section === "messages" && (
@@ -1855,46 +1356,11 @@ export function AdminWorkspace({
           </section>
         </>
       )}
-      {section === "reviews" && (
-        <>
-          <p className="small-note">
-            Requests are tied to completed appointments. Only genuine submitted
-            feedback can be published.
-          </p>
-          {table(
-            ["Customer", "Rating", "Feedback", "Status", "Received", "Actions"],
-            list.map((r) => [
-              s(r.name),
-              r.rating ? s(r.rating) + "/5" : "Awaiting",
-              s(r.text),
-              status(r.status),
-              stamp(r.created_at),
-              r.rating ? (
-                <>
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      run("publish_review", { id: r.id, status: "published" })
-                    }
-                  >
-                    Publish
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      run("publish_review", { id: r.id, status: "hidden" })
-                    }
-                  >
-                    Hide
-                  </button>
-                </>
-              ) : (
-                "Awaiting customer"
-              ),
-            ]),
-          )}
-        </>
-      )}
+      {section === "reviews" && <>
+        <StudioSnapshot items={[{label:"Requests in view",value:list.length},{label:"Feedback received",value:list.filter(r=>r.rating).length},{label:"Published",value:list.filter(r=>r.status==="published").length},{label:"Awaiting response",value:list.filter(r=>!r.rating).length}]}/>
+        <StudioCollection cards={list.map(r=>({id:s(r.id),title:s(r.name)||"Customer",subtitle:stamp(r.created_at),badge:status(r.status),content:<><p className="studio-review-rating">{r.rating?`${s(r.rating)} / 5`:"Awaiting feedback"}</p><p>{s(r.text)||"The customer has not submitted their review yet."}</p></>,actions:r.rating?<><button className="button" disabled={busy} onClick={()=>run("publish_review",{id:r.id,status:"published"})}>Publish</button><button disabled={busy} onClick={()=>run("publish_review",{id:r.id,status:"hidden"})}>Hide</button></>:undefined}))}/>
+        <p className="small-note">Review requests belong to completed appointments. Only genuine submitted feedback can be published.</p>
+      </>}
       {section === "gallery" &&
         table(
           [
@@ -1940,7 +1406,7 @@ export function AdminWorkspace({
           "reviews",
           "messages",
           "payments",
-        ].includes(section) && (
+        ].includes(section) && (section !== "payments" || paymentView === "collect") && (
           <div className="toolbar">
             {n(params.get("page") || 1) > 1 && (
               <Link
@@ -1985,7 +1451,7 @@ export function AdminWorkspace({
       )}
       {creating && (
         <Modal
-          title={lead ? "Book for " + lead.name : "Create appointment"}
+          title={lead ? "Book for " + lead.name : "New booking"}
           onClose={closeCreating}
           wide
         >

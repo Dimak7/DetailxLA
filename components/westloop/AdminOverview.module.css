@@ -1,0 +1,171 @@
+.overview { --overview-pill: color-mix(in srgb,var(--gold) 7%,var(--admin-surface)); display: grid; gap: 24px; min-width: 0; color: var(--ink); }
+.header { padding: 5px 4px 1px; }
+.header h1 { margin: 0; font-size: clamp(27px,2.8vw,37px); line-height: 1.15; letter-spacing: -.055em; font-weight: 750; }
+.header p { margin: 9px 0 0; color: var(--muted); font-size: 13px; }
+.snapshot { display: grid; grid-template-columns: minmax(145px,.8fr) minmax(0,3fr); align-items: center; gap: 24px; }
+.snapshot.snapshotWithoutAction { grid-template-columns: minmax(0,1fr); }
+.newBooking { display: flex; align-items: center; justify-content: center; min-height: 54px; padding: 14px 20px; border-radius: 999px; background: var(--gold); color: #fff; font-size: 13px; font-weight: 650; text-decoration: none; text-align: center; }
+.newBooking:hover { background: color-mix(in srgb,var(--gold) 87%,var(--ink)); }
+:global(.admin-shell[data-theme="dark"]) .newBooking { background: var(--admin-primary-bg); color: var(--admin-primary-text); }
+.kpis { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 13px; min-width: 0; }
+.kpi { display: flex; flex-direction: column; justify-content: center; min-height: 104px; padding: 19px 21px; gap: 9px; min-width: 0; border-radius: 27px; background: var(--admin-surface); color: var(--ink); text-decoration: none; }
+.kpi > span { font-size: 11px; line-height: 1.5; color: var(--muted); }
+.kpi > strong { font-size: clamp(23px,2.1vw,29px); font-weight: 750; line-height: 1.1; letter-spacing: -.05em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+a.kpi:hover { background: var(--overview-pill); }
+.daySurface { display: grid; grid-template-columns: minmax(0,2.3fr) minmax(220px,1fr); gap: 36px; padding: 29px 31px 20px; background: var(--admin-surface); border-radius: 29px; min-width: 0; }
+.agenda, .attention { min-width: 0; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
+.sectionHeading h2, .attention > h2, .reportBar h2 { margin: 0; font-size: 18px; line-height: 1.3; font-weight: 700; letter-spacing: -.035em; }
+.quietLink { color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 550; padding-block: 5px; }
+.quietLink:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+.appointments { min-width: 0; }
+.appointment { display: grid; grid-template-columns: 64px minmax(105px,1.1fr) minmax(100px,1.1fr) auto; align-items: center; gap: 14px; min-height: 74px; padding: 13px 0; border-bottom: 1px solid color-mix(in srgb,var(--line) 65%,transparent); }
+.appointmentTime { font-size: 11px; font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.appointmentPerson, .appointmentService { display: grid; gap: 4px; min-width: 0; }
+.appointmentPerson strong, .appointmentService strong { font-size: 12px; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+.appointmentPerson span, .appointmentService span { color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.actionPill { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 8px 13px; background: var(--overview-pill); border-radius: 999px; color: var(--ink); font-size: 11px; font-weight: 550; white-space: nowrap; text-decoration: none; }
+.actionPill:hover { background: color-mix(in srgb,var(--gold) 13%,var(--admin-surface)); }
+.moreAppointments summary { cursor: pointer; padding-block: 15px 5px; font-size: 11px; color: var(--muted); }
+.agendaFooter { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 12px; }
+.agendaFooter > span { color: var(--muted); font-size: 9px; line-height: 1.5; }
+.emptyAgenda { padding: 24px 0; font-size: 14px; }
+.emptyAgenda p { color: var(--muted); font-size: 12px; margin: 8px 0 18px; }
+.attention { padding-top: 0; scroll-margin-top: 100px; }
+.attentionList { margin-top: 20px; display: grid; gap: 16px; }
+.attentionAction, .assignmentDetails > summary, .caughtUp { display: flex; align-items: start; gap: 10px; color: var(--ink); font-size: 12px; line-height: 1.5; text-decoration: none; }
+.attentionList svg { flex-shrink: 0; margin-top: 1px; }
+.attentionAction strong, .assignmentDetails > summary > span { font-weight: 550; font-size: 11px; }
+.attentionAction small { display: block; color: var(--muted); font-size: 10px; margin-top: 4px; line-height: 1.6; }
+.attentionAction:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+.assignmentDetails > summary { cursor: pointer; list-style: none; }
+.assignmentDetails > summary::-webkit-details-marker { display: none; }
+.assignmentDetails > summary::after { content: "+"; margin-left: auto; color: var(--muted); }
+.assignmentDetails[open] > summary::after { content: "−"; }
+.assignmentDetails > div { padding-left: 28px; margin-top: 9px; }
+.unassignedJob { display: grid; gap: 3px; padding: 9px 0; color: var(--ink); text-decoration: none; }
+.unassignedJob strong { font-size: 11px; font-weight: 550; }
+.unassignedJob span { color: var(--muted); font-size: 10px; }
+.unassignedJob:hover strong { text-decoration: underline; }
+.caughtUp { color: var(--muted); font-size: 11px; }
+.quickLinks { display: flex; flex-wrap: wrap; gap: 7px 12px; margin-top: 24px; }
+.quickLinks a { font-size: 10px; color: var(--muted); padding-block: 4px; text-decoration: none; }
+.quickLinks a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.business { background: var(--admin-surface); border-radius: 29px; padding: 27px 31px 20px; min-width: 0; }
+.reportBar { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 4px; }
+.reportControls { display: flex; align-items: center; gap: 10px; }
+:global(.admin-shell.admin-redesign) .overview .periodControl { padding: 8px 30px 8px 13px; min-height: 36px; border: 0; border-radius: 999px; font-size: 11px; background: var(--overview-pill); color: var(--ink); }
+.datePicker { position: relative; }
+.datePicker summary { cursor: pointer; list-style: none; font-size: 11px; color: var(--muted); padding: 8px 3px; white-space: nowrap; }
+.datePicker summary::-webkit-details-marker { display: none; }
+.datePicker form { position: absolute; right: 0; top: calc(100% + 10px); width: 270px; z-index: 5; display: grid; gap: 14px; padding: 20px; background: var(--admin-surface); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 16px 50px #0002; }
+.datePicker label { display: grid; gap: 6px; color: var(--muted); font-size: 11px; }
+.datePicker input { width: 100%; min-width: 0; padding: 10px; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; background: var(--admin-surface); }
+.chartFrame { min-width: 0; }
+:global(.admin-shell.admin-redesign) .overview .chartFrame > :global(.paper) { border: 0; padding: 0; margin: 0; box-shadow: none; border-radius: 0; background: transparent; }
+.chartFrame :global([aria-label="Revenue, costs and operating result"]) > div:first-child { display: none; }
+.chartFrame :global([aria-label="Chart metric"]) { margin: 20px 0; gap: 9px; }
+:global(.admin-shell.admin-redesign) .overview .chartFrame :global([aria-label="Chart metric"]) button { border: 0; box-shadow: none; border-radius: 17px; background: var(--admin-surface-soft); min-height: 66px; padding: 13px 16px; gap: 7px; }
+:global(.admin-shell.admin-redesign) .overview .chartFrame :global([aria-label="Chart metric"]) button[aria-pressed="true"] { background: var(--overview-pill); box-shadow: inset 0 -2px var(--chart-line); }
+.chartFrame :global([aria-label="Chart metric"]) button strong { font-size: 16px; }
+.chartFrame :global([aria-label="Chart metric"]) button span { font-size: 11px; min-height: 0; }
+.chartFrame :global([aria-label="Chart calculation"]) { border: 0; border-radius: 999px; background: var(--admin-surface-soft); padding: 3px; }
+:global(.admin-shell.admin-redesign) .overview .chartFrame :global([aria-label="Chart calculation"]) button { border-radius: 999px; padding: 8px 13px; min-height: 34px; font-size: 10px; }
+.reportFooter { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 18px; color: var(--muted); font-size: 10px; }
+.operatingSummary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; margin-top: 26px; }
+.operatingSummary > div { display: grid; gap: 10px; }
+.operatingSummary span { color: var(--muted); font-size: 12px; }
+.operatingSummary strong { font-size: 27px; font-weight: 700; letter-spacing: -.04em; }
+.operatingSummary .actionPill { justify-self: start; }
+.supporting { display: grid; gap: 12px; }
+.disclosure { background: var(--admin-surface); border-radius: 24px; min-width: 0; }
+.disclosure > summary { display: flex; align-items: center; gap: 15px; cursor: pointer; list-style: none; padding: 22px 27px; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary strong { font-size: 12px; font-weight: 600; }
+.disclosure > summary > span { font-size: 13px; margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.disclosure > summary::after { content: "+"; color: var(--muted); font-size: 18px; margin-left: auto; }
+.disclosure:has(summary > span) > summary::after { margin-left: 0; }
+.disclosure[open] > summary::after { content: "−"; }
+.disclosureBody { padding: 0 12px 12px; }
+.definitions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; padding: 0 27px 25px; }
+.definitions strong { font-size: 12px; font-weight: 600; }
+.definitions p { color: var(--muted); font-size: 11px; line-height: 1.8; margin: 7px 0 0; }
+.overview :is(a,select,input,button,summary):focus-visible { outline: 2px solid var(--admin-focus,var(--gold)); outline-offset: 4px; }
+@media (max-width:1200px) {
+  .snapshot { grid-template-columns: minmax(140px,.75fr) minmax(0,3fr); gap: 16px; }
+  .kpis { gap: 10px; }
+  .kpi { padding: 18px 16px; }
+  .daySurface { gap: 24px; grid-template-columns: minmax(0,2fr) minmax(190px,1fr); padding-inline: 25px; }
+  .appointment { grid-template-columns: 60px minmax(0,1fr) auto; gap: 11px; }
+  .appointmentPerson { grid-column: 2; grid-row: 1; }
+  .appointmentService { grid-column: 2; grid-row: 2; margin-top: -8px; }
+  .appointmentService span { display: none; }
+  .appointmentTime { grid-column: 1; grid-row: 1 / span 2; }
+  .appointment > .actionPill { grid-column: 3; grid-row: 1 / span 2; }
+  .appointmentPerson span { font-size: 11px; }
+  .appointmentPerson strong { font-size: 12px; color: var(--ink); font-weight: 600; }
+}
+@media (max-width:900px) {
+  .snapshot { grid-template-columns: minmax(0,1fr); }
+  .newBooking { max-width: 220px; }
+  .daySurface { grid-template-columns: minmax(0,1fr); gap: 24px; }
+  .attention { border-top: 1px solid color-mix(in srgb,var(--line) 65%,transparent); padding-top: 20px; }
+  .attentionList { grid-template-columns: repeat(2,minmax(0,1fr)); margin-top: 16px; gap: 14px 20px; }
+  .quickLinks { margin-top: 16px; }
+  .appointment { grid-template-columns: 65px minmax(0,1fr) minmax(0,1fr) auto; min-height: 73px; }
+  .appointmentTime,.appointmentPerson,.appointmentService,.appointment > .actionPill { grid-row: auto; grid-column: auto; }
+  .appointmentService { margin-top: 0; }
+  .appointmentPerson strong { font-size: 12px; color: var(--ink); font-weight: 650; }
+  .appointmentPerson span { font-size: 11px; }
+  .appointmentService span { display: block; }
+}
+@media (max-width:600px) {
+  .overview { gap: 19px; }
+  .header { padding: 2px 3px 0; }
+  .header h1 { font-size: 28px; letter-spacing: -.05em; }
+  .header p { font-size: 12px; margin-top: 8px; }
+  .snapshot { gap: 14px; }
+  .newBooking { width: 100%; max-width: none; min-height: 50px; font-size: 13px; }
+  .kpis { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .kpi { min-height: 99px; border-radius: 25px; padding: 21px; gap: 8px; }
+  .kpi > span { font-size: 11px; }
+  .kpi > strong { font-size: 27px; }
+  .daySurface { padding: 23px 21px 18px; border-radius: 28px; gap: 18px; }
+  .sectionHeading { margin-bottom: 8px; }
+  .sectionHeading h2,.attention > h2,.reportBar h2 { font-size: 18px; }
+  .appointment { grid-template-columns: 60px minmax(0,1fr) auto; gap: 10px; padding-block: 15px; min-height: 79px; }
+  .appointmentTime { grid-column: 1; grid-row: 1 / span 2; font-size: 10px; }
+  .appointmentPerson { grid-column: 2; grid-row: 1; }
+  .appointmentPerson strong { font-size: 11px; font-weight: 600; color: var(--ink); }
+  .appointmentPerson span { display: block; font-size: 10px; }
+  .appointmentService { grid-column: 2; grid-row: 2; margin-top: -7px; }
+  .appointmentService strong { font-size: 11px; line-height: 1.5; font-weight: 500; }
+  .appointmentService span { display: none; }
+  .appointment > .actionPill { grid-column: 3; grid-row: 1 / span 2; min-height: 38px; padding-inline: 11px; font-size: 10px; }
+  .attentionList { grid-template-columns: minmax(0,1fr); gap: 14px; }
+  .attention > h2 { font-size: 15px; }
+  .attentionAction strong,.assignmentDetails > summary > span { font-size: 12px; }
+  .quickLinks { gap: 7px; }
+  .quickLinks a { background: var(--overview-pill); color: var(--ink); border-radius: 999px; padding: 8px 11px; min-height: 34px; display: inline-flex; align-items: center; }
+  .business { padding: 23px 21px 19px; border-radius: 28px; }
+  .reportBar { align-items: start; flex-direction: column; gap: 13px; }
+  .reportControls { width: 100%; justify-content: space-between; }
+  :global(.admin-shell.admin-redesign) .overview .periodControl { min-height: 38px; }
+  .datePicker form { width: min(270px,calc(100vw - 60px)); }
+  .chartFrame :global([aria-label="Chart metric"]) { gap: 5px; margin: 18px 0; }
+  :global(.admin-shell.admin-redesign) .overview .chartFrame :global([aria-label="Chart metric"]) button { padding: 12px 8px; min-height: 65px; border-radius: 14px; }
+  .chartFrame :global([aria-label="Chart metric"]) button strong { font-size: 13px; }
+  .chartFrame :global([aria-label="Chart metric"]) button span { font-size: 9px; line-height: 1.5; }
+  .supporting { gap: 10px; }
+  .disclosure { border-radius: 23px; }
+  .disclosure > summary { padding: 21px; }
+  .definitions { grid-template-columns: minmax(0,1fr); gap: 17px; padding-inline: 21px; }
+  .operatingSummary { grid-template-columns: minmax(0,1fr); }
+  .operatingSummary strong { font-size: 26px; }
+}
+@media (max-width:360px) {
+  .daySurface,.business { padding-inline: 17px; }
+  .appointment { grid-template-columns: 53px minmax(0,1fr) auto; gap: 8px; }
+  .appointment > .actionPill { padding-inline: 9px; }
+  .kpi { padding-inline: 18px; }
+}

@@ -6,6 +6,7 @@ import "./globals.css";
 import "./ceramics.css";
 import "./admin-theme.css";
 import "./admin-layout-fixes.css";
+import "./admin-redesign.css";
 const body = Manrope({ subsets: ["latin"], variable: "--font-body" });
 const display = Cormorant_Garamond({
   subsets: ["latin"],
