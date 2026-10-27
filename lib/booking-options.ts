@@ -56,7 +56,7 @@ const packages: Record<string, ServicePackage[]> = {
     { id: "ceramic-10-year", name: "10 Year", priceCents: 175000, description: "Our longest-term package, starting at $1,750 after paint assessment." },
   ],
   "paint-correction": [
-    { id: "correction-level-1", name: "Level 1 · 60% Correction", priceCents: 52500, description: "A focused refinement for lighter swirls, haze and improved gloss." },
+    { id: "correction-level-1", name: "Level 1 · 60% Correction", priceCents: 52500, description: "A focused refinement for lighter swirls, haze, and improved gloss." },
     { id: "correction-level-2", name: "Level 2 · 75% Correction", priceCents: 75000, description: "A more involved correction for stronger defect reduction and clarity." },
     { id: "correction-level-3", name: "Level 3 · By Quote", priceCents: null, description: "A custom plan for demanding paintwork after an in-person assessment." },
   ],

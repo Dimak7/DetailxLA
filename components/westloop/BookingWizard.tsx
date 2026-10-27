@@ -311,7 +311,7 @@ export function BookingWizard({
         {step === 0 && (
           <>
             <h2 ref={stepHeading} tabIndex={-1} className="booking-step-heading">What does your car need?</h2>
-            <p>Select as many services as you need for the same vehicle. For example, combine Interior Detail, Ceramic Coating and Headlight Restoration in one appointment.</p>
+            <p>Select as many services as you need for the same vehicle. For example, combine Interior Detail, Ceramic Coating, and Headlight Restoration in one appointment.</p>
             <p className="small-note" role="status">{selectedServices.length ? `${selectedServices.length} service${selectedServices.length === 1 ? "" : "s"} selected · ${durationMinutes / 60} hours total` : "Select all the care your car needs."}</p>
             {services.map((s) => (
               <label className="service-option" key={s.id}>

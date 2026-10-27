@@ -26,7 +26,7 @@ export default async function Page() {
         <div className={styles.panel}>
           <p className={styles.eyebrow}>A QUESTION BEFORE YOU BOOK?</p>
           <h2 id="enquiry-title">Tell us about your car.</h2>
-          <p className={styles.panelIntro}>Share the vehicle, its condition and your priorities. We’ll help you compare the right service, expected scope and booking path.</p>
+          <p className={styles.panelIntro}>Share the vehicle, its condition, and your priorities. We’ll help you compare the right service, expected scope, and booking path.</p>
           <ContactForm />
         </div>
         <aside className={styles.studio} aria-labelledby="studio-title">
@@ -38,7 +38,7 @@ export default async function Page() {
             {business.phone && <div><dt>Call us</dt><dd><CallLink phone={business.phone} /></dd></div>}
             {business.service_area && <div><dt>Serving</dt><dd>{business.service_area}</dd></div>}
           </dl>
-          <div className={styles.booking}><h3>Ready to book?</h3><p>Choose a service, review your estimate and reserve an available time online.</p><Link href="/booking" className="button outline">Book an appointment</Link></div>
+          <div className={styles.booking}><h3>Ready to book?</h3><p>Choose a service, review your estimate, and reserve an available time online.</p><Link href="/booking" className="button outline">Book an appointment</Link></div>
         </aside>
       </section>
     </PageShell>

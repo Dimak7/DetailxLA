@@ -12,11 +12,11 @@ const groups: Group[] = ["All services", "Detailing", "Paint & protection", "Oth
 const priorities = ["full-detail", "interior-detail", "exterior-detail", "paint-correction", "ceramic-coating", "deep-interior-cleaning", "maintenance-detail", "headlight-restoration"];
 const summaries: Record<string, string> = {
   "full-detail": "Interior and exterior cleaning in one visit.",
-  "interior-detail": "Refresh seats, carpets and everyday cabin surfaces.",
-  "exterior-detail": "Hand wash, wheels, tires and exterior finishing care.",
+  "interior-detail": "Refresh seats, carpets, and everyday cabin surfaces.",
+  "exterior-detail": "Hand wash, wheels, tires, and exterior finishing care.",
   "paint-correction": "Machine polishing to improve swirls and dull paint.",
   "ceramic-coating": "Protect prepared paint and make routine washing easier.",
-  "deep-interior-cleaning": "Extra care for embedded dirt, stains and pet hair.",
+  "deep-interior-cleaning": "Extra care for embedded dirt, stains, and pet hair.",
   "maintenance-detail": "Regular interior and exterior upkeep between details.",
   "headlight-restoration": "Refresh cloudy headlight lenses and their finish.",
 };
