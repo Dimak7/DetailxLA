@@ -2,6 +2,7 @@
 import {JobPayments} from "./JobPayments";
 import { JobWorkspace } from "./JobWorkspace";
 import { EmployeeResources, EmployeeAccessLink } from "./EmployeeResources";
+import { EmployeeJobHistory } from "./EmployeeJobHistory";
 import { ExpenseEditor } from "./ExpenseEditor";
 import type { ExpenseDirectory } from "@/lib/platform/expense-directory";
 import {CrmTagLibrary,RecordTags,LeadOutcome} from "./CrmTags";
@@ -103,6 +104,7 @@ export function AdminWorkspace({
   const router = useRouter(),
     params = useSearchParams();
   const [openedJob, setOpenedJob] = useState<R | null>(null);
+  const [employeeHistory, setEmployeeHistory] = useState<{ id: string; name: string; start?: string; end?: string } | null>(null);
   const [expense, setExpense] = useState<R | null>(null);
   const [editor, setEditor] = useState<EditorSpec | null>(null),
     [creating, setCreating] = useState(false),
@@ -937,7 +939,7 @@ export function AdminWorkspace({
             <>{s(r.position)}<small>{!r.user_id ? "Login not linked" : !r.login_active ? "Login disabled" : `${accessRoleLabel(s(r.login_role) || "staff")} access`}</small></>, s(r.phone) || "Not set", status(r.active ? "active" : "inactive"),
             compensationPlanLabel(r), (n(r.scheduled_minutes) / 60).toFixed(1) + "h",
             <>{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <button onClick={() => employeeEdit({ ...r, hourly_rate_cents: n(r.hourly_rate_cents) / 100, availability: employeeAvailability.filter((a) => s(a.employee_id) === s(r.id)) })}>Edit profile</button>}
-              {allowedSections.includes("payroll") && !staff && <button className="button" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Commission & pay</button>}{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <EmployeeAccessLink employeeId={s(r.id)} employeeName={s(r.name)} email={s(r.email)} hasLogin={!!r.user_id} disabled={!r.active} />}</>,
+              {allowedSections.includes("payroll") && !staff && <><button className="button" aria-label={`Work history for ${s(r.name)}`} onClick={() => setEmployeeHistory({ id: s(r.id), name: s(r.name) })}>Work history</button><button aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button></>}{(user.role === "owner" || (s(r.login_role) !== "owner" && (user.role !== "manager" || !r.user_id || s(r.login_role) === "staff"))) && <EmployeeAccessLink employeeId={s(r.id)} employeeName={s(r.name)} email={s(r.email)} hasLogin={!!r.user_id} disabled={!r.active} />}</>,
           ]))}
         </section>
       )}
@@ -1012,7 +1014,7 @@ export function AdminWorkspace({
               <small className="payroll-employee-role">{s(r.position)}</small>
               <small>{s(r.paid_hours_source) === "actual_clocked" ? "Clocked time" : "Scheduled-hours fallback"}</small>
               <small className="payroll-employee-plan">Default plan: {compensationPlanLabel(rows(data.employees).find((employee) => employee.id === r.id) || r)}</small>
-              {allowedSections.includes("payroll") && !staff && <button className="link-button employee-pay-action" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Commission & pay</button>}
+              {allowedSections.includes("payroll") && !staff && <><button className="link-button employee-pay-action" aria-label={`Work history for ${s(r.name)}`} onClick={() => setEmployeeHistory({ id: s(r.id), name: s(r.name), start: s(data.start), end: s(data.end) })}>Work history</button><button className="link-button employee-pay-action" aria-label={`Pay settings for ${s(r.name)}`} onClick={() => compensationEdit(r)}>Pay settings</button></>}
             </div>,
             (n(r.scheduled_minutes) / 60).toFixed(2) + "h", (n(r.actual_minutes) / 60).toFixed(2) + "h", (n(r.minutes) / 60).toFixed(2) + "h", money(n(r.hourly_earnings_cents)), money(n(r.attributed_revenue)), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.adjustment_cents)), money(n(r.total_earnings_cents)),
           ]), { comparison: true, label: "Employee payroll", className: "admin-payroll-table" })}
@@ -1028,7 +1030,7 @@ export function AdminWorkspace({
           <p className="small-note">Metrics are derived from completed jobs, attributed revenue, allocated tips, and completed clock entries. They are operational facts, not employee scores.</p>
           {table(["Employee", "Paid hours", "Completed jobs", "Revenue attributed", "Commission", "Tips", "Hourly pay", "Total pay", "Revenue / hour", "Average job"], list.map((r) => {
             const hours = n(r.minutes) / 60, jobs = n(r.jobs_completed), revenue = n(r.attributed_revenue);
-            return [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small></>, hours.toFixed(2) + "h", s(jobs), money(revenue), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.hourly_earnings_cents)), money(n(r.total_earnings_cents)), hours ? money(Math.round(revenue / hours)) : "No paid hours", jobs ? money(Math.round(revenue / jobs)) : "No completed jobs"];
+            return [<><strong>{s(r.name)}</strong><small>{s(r.position)}</small><button className="link-button employee-pay-action" aria-label={`Work history for ${s(r.name)}`} onClick={() => setEmployeeHistory({ id: s(r.id), name: s(r.name), start: s(data.start), end: s(data.end) })}>Work history</button></>, hours.toFixed(2) + "h", s(jobs), money(revenue), money(n(r.commission_cents)), money(n(r.tips_cents)), money(n(r.hourly_earnings_cents)), money(n(r.total_earnings_cents)), hours ? money(Math.round(revenue / hours)) : "No paid hours", jobs ? money(Math.round(revenue / jobs)) : "No completed jobs"];
           }), { comparison: true, label: "Employee performance" })}
         </section>
       )}
@@ -2227,6 +2229,7 @@ export function AdminWorkspace({
             )}
           </div>
         )}
+      {employeeHistory && <EmployeeJobHistory employeeId={employeeHistory.id} employeeName={employeeHistory.name} start={employeeHistory.start} end={employeeHistory.end} onClose={() => setEmployeeHistory(null)} />}
       {expense && <ExpenseEditor initial={expense} directory={data.expenseDirectory as ExpenseDirectory} onClose={() => setExpense(null)} />}
       {openedJob && <JobWorkspace booking={openedJob} employees={rows(data.employees)} rules={rows(data.payRules)} services={rows(data.services)} canPay={allowedSections.includes("payroll")} canCollect={allowedSections.includes("payments")} staff={staff} environment={s(data.squareEnvironment)} onClose={() => setOpenedJob(null)} onEditAppointment={(job) => {setOpenedJob(null); bookingEdit(job);}} />}
       {editor && (
