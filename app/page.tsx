@@ -64,7 +64,7 @@ export default async function Home() {
       {fullDetail && <section className={`${styles.detailingFeature} wrap`} id="full-detail" aria-labelledby="detailing-heading">
         <div className={styles.detailingImage}><Image src="/brand/photos/hand-wash.webp" alt="Detailer hand washing a black car with a sponge" fill sizes="(max-width: 760px) 100vw, 48vw" /></div>
         <div className={styles.detailingCopy}><p className="eyebrow">DETAILING, YOUR WAY</p><h2 id="detailing-heading">A clean cabin.<br /><em>A fresh exterior.</em></h2>
-          <p>From the cabin you touch every day to the paint, glass and wheels outside, choose focused care or bring everything together in one visit. We make the differences clear before you book.</p>
+          <p>From the cabin you touch every day to the paint, glass, and wheels outside; choose focused care or bring everything together in one visit. We make the differences clear before you book.</p>
           <div className={styles.detailingPrice}><strong>From $250</strong><span>Interior · Exterior · Full detail</span></div>
           <div className={styles.links}><Link className="button" href="/booking">Choose your detail</Link><Link className="text-link" href="/services#all-services">Compare details</Link></div>
           {detailing.length > 0 && <div className={styles.focusedDetails}><p>Only need one area?</p>{detailing.map((service) => <Link key={service.id} href={`/services/${service.slug}`}><span>{service.name}</span><strong>{servicePrice(service)}</strong></Link>)}</div>}
