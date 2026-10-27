@@ -73,7 +73,7 @@ export default async function Home() {
       {coating && <section className={`${styles.coating} wrap`} id="ceramic-coating">
         <div className={styles.featureHeading}>
           <p className="eyebrow">CERAMIC COATING</p><h2>Love the finish?<br /><em>Help protect it.</em></h2>
-          <p>Ceramic coating starts with preparation. We assess the paint, explain any refinement it needs, then build a protected, high-gloss finish that is easier to maintain.</p>
+          <p>Ceramic coating starts with preparation. We assess the paint, explain any refinement it needs, then build a protected, high-gloss finish that is easier to maintain over time.</p>
           <div className={styles.featurePrice}><span>{servicePrice(coating)}</span><small>Preparation and vehicle condition guide the final scope.</small></div>
           <div className={styles.links}><Link className="button" href={coatingBooking}>Request a consultation</Link><Link className="text-link" href="/services/ceramic-coating">See coating details</Link></div>
         </div>
