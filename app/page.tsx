@@ -31,7 +31,7 @@ export default async function Home() {
   const detailing = ["interior-detail", "exterior-detail"].flatMap((slug) => services.filter((s) => s.slug === slug));
   const featured = [
     { slug: "full-detail", purpose: "Choose your detail", copy: "Interior, exterior or complete care built around what your vehicle needs today.", image: "/brand/photos/green-car-foam.webp", imageAlt: "Green sports car covered in wash foam", displayPrice: "From $250" },
-    { slug: "paint-correction", purpose: "Improve the paint", copy: "Measured machine polishing for suitable swirls, haze and fine marks.", image: "/brand/photos/paint-beading.webp", imageAlt: "Water beading on black paint beside a microfiber towel" },
+    { slug: "paint-correction", purpose: "Improve the paint", copy: "Measured machine polishing for swirls, haze and fine marks.", image: "/brand/photos/paint-beading.webp", imageAlt: "Water beading on black paint beside a microfiber towel" },
     { slug: "ceramic-coating", purpose: "Protect the finish", copy: "Prepared paint, richer gloss and easier maintenance with lasting protection.", image: "/brand/photos/mercedes-foam.webp", imageAlt: "Black Mercedes covered in foam during coating preparation" },
   ].flatMap((item) => {
     const service = services.find((s) => s.slug === item.slug);
