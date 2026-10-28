@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { serviceDuration, servicePrice } from "@/lib/service-content";
+import { getServiceFaqs, serviceDuration, servicePrice } from "@/lib/service-content";
 import { servicePackages } from "@/lib/booking-options";
 import { money, type Service } from "@/lib/platform/types";
 import styles from "./PaintCorrection.module.css";
@@ -30,12 +30,7 @@ const bookingInclusionLabels = new Map([
 export function PaintCorrection({ service }: { service: Service }) {
   const booking = `/booking?service=${encodeURIComponent(service.id)}`;
   const correctionPackages = servicePackages("paint-correction");
-  const questions = [
-    { title: "How long will you need my car?", answer: `The current appointment estimate is ${serviceDuration(service.duration_minutes)}. Vehicle size, paint condition, and the agreed correction can change that timing. We confirm drop-off and collection arrangements for your visit.` },
-    { title: "Will every scratch disappear?", answer: "No. Deep scratches, stone chips, and failing paint may need repair instead. Removing too much material to chase a mark can be the wrong choice. We explain the realistic improvement after inspecting your paint." },
-    { title: "Is ceramic coating included?", answer: "Only when it is expressly included in your agreed scope. Correction refines the finish; ceramic coating is a separate protection service. We can discuss both together." },
-    { title: "What should I tell you before booking?", answer: "Share your car’s make, model, and the marks that bother you. Mention previous polishing, repainting, coatings, wraps or paint protection film. Photos help start the conversation, but the paint still needs an in-person assessment." },
-  ];
+  const questions = getServiceFaqs(service);
 
 
   return <div className={`${serviceStyles.page} ${styles.page}`}>
@@ -101,7 +96,7 @@ export function PaintCorrection({ service }: { service: Service }) {
     </section>
 
     <section className={styles.finish} id="paint-questions" aria-labelledby="finish-title">
-      <div className={styles.faqs}><p className={styles.eyebrow}>04 / GOOD TO KNOW</p>{questions.map(item => <details key={item.title}><summary>{item.title}<span aria-hidden="true">+</span></summary><p>{item.answer}</p></details>)}</div>
+      <div className={styles.faqs}><p className={styles.eyebrow}>04 / GOOD TO KNOW</p>{questions.map(item => <details key={item.question}><summary>{item.question}<span aria-hidden="true">+</span></summary><p>{item.answer}</p></details>)}</div>
       <div className={styles.finalAction}><p className={styles.eyebrow}>LET’S GET YOUR FINISH BACK.</p><h2 id="finish-title">See your paint<br /><span>differently.</span></h2><p>Choose a time and tell us about your car.<br />We’ll help you find the right correction.</p><div><Link className="button" href={booking}>Book paint correction</Link><Link className="button outline" href="/contact">Ask about your vehicle</Link></div></div>
     </section>
   </div>;

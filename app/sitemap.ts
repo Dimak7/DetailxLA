@@ -1,9 +1,12 @@
 import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/platform/settings";
-import { publicData } from "@/lib/platform/public";
+import { query } from "@/lib/platform/db";
 export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { services } = await publicData();
+  if (process.env.ADMIN_PREVIEW === "true") return [];
+  const services = await query<{ slug: string }>(
+    "SELECT slug FROM wl.services WHERE active=true ORDER BY sort_order,name",
+  );
   return [
     "",
     "/services",

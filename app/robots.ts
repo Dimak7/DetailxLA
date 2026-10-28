@@ -8,7 +8,8 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: "/",
+      // Gallery uploads are public images; the remaining API routes stay excluded.
+      allow: ["/", "/api/media/"],
       disallow: [
         "/admin",
         "/api/",

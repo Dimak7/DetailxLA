@@ -5,9 +5,9 @@ import { BRAND_NAME } from "../brand";
 
 export const defaultSettings: BusinessSettings = {
   name: BRAND_NAME,
-  phone: "",
+  phone: "+17733082038",
   email: "",
-  address: "",
+  address: "1001 W Jackson Blvd, Chicago, IL 60607",
   hours_label: "Monday-Saturday, 8:00 AM-8:00 PM; Sunday, 8:00 AM-5:00 PM",
   service_area: "West Loop, Fulton Market, River North, South Loop, Chicago",
   appointment_mode: "shop",

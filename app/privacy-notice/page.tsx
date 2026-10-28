@@ -1,10 +1,12 @@
 import { settings } from "@/lib/platform/settings";
 import { PageShell } from "@/components/westloop/PageShell";
+import { pageMetadata } from "@/lib/seo";
 export const dynamic = "force-dynamic";
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Privacy Notice",
-  alternates: { canonical: "/privacy-notice" },
-};
+  description: "How West Loop Ceramics uses contact, vehicle, booking, and payment information, plus your choices for marketing and requests about personal information.",
+  path: "/privacy-notice",
+});
 export default async function Page() {
   const b = await settings();
   return (

@@ -3,18 +3,18 @@ import Link from "next/link";
 import { publicData } from "@/lib/platform/public";
 import { servicePrice } from "@/lib/service-content";
 import { siteUrl } from "@/lib/platform/settings";
-import { openingHoursSpecification } from "@/lib/platform/business-hours";
+import { businessSchema, faqSchema, pageMetadata, serializeStructuredData, structuredData, websiteSchema, webPageSchema } from "@/lib/seo";
 import { PageShell } from "@/components/westloop/PageShell";
 import { CinematicHero } from "@/components/westloop/CinematicHero";
 import { CeramicFilm } from "@/components/westloop/CeramicFilm";
 import styles from "./Home.module.css";
 
 export const dynamic = "force-dynamic";
-export const metadata = {
-  title: { absolute: "West Loop Ceramics | Car Detailing, Paint Correction & Coating" },
+export const metadata = pageMetadata({
+  title: "Car Detailing & Ceramic Coating in Chicago",
   description: "Interior and exterior car detailing, paint correction, and ceramic coating in Chicago’s West Loop. Compare services and prices, then book your visit.",
-  alternates: { canonical: "/" },
-};
+  path: "/",
+});
 
 const questions = [
   { question: "Which detail should I choose?", teaser: "Match the service to the part of the car that needs attention.", answer: "Choose Interior Detail for the cabin, Exterior Detail for the body, wheels, and glass, or Full Detail when both need care in one visit. Extensive Interior Detail is the better fit for embedded dirt, pet hair or heavier condition work. If you are unsure, tell us what bothers you most and we will guide you." },
@@ -38,17 +38,15 @@ export default async function Home() {
     return service ? [{ ...item, service }] : [];
   });
   const coatingBooking = coating ? `/booking?service=${coating.id}` : "/contact";
-  const schema = {
-    "@context": "https://schema.org", "@type": "AutomotiveBusiness",
-    name: business.name, url: siteUrl(), areaServed: "Chicago, Illinois",
-    openingHoursSpecification: openingHoursSpecification(business),
-    sameAs: [business.instagram_url, business.google_review_url].filter(Boolean),
-    ...(business.phone ? { telephone: business.phone } : {}),
-    ...(business.address ? { address: { "@type": "PostalAddress", streetAddress: business.address, addressLocality: "Chicago", addressRegion: "IL", addressCountry: "US" } } : {}),
-  };
+  const schema = structuredData([
+    businessSchema(siteUrl(), business),
+    websiteSchema(siteUrl(), business.name),
+    webPageSchema(siteUrl(), "/", "Car Detailing, Paint Correction & Ceramic Coating in Chicago", String(metadata.description)),
+    faqSchema(siteUrl(), "/", questions),
+  ]);
   return (
     <PageShell business={business}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(schema) }} />
       <CinematicHero />
       <section className={styles.quickServices} id="detailing" aria-labelledby="choose-care-heading"><div className="wrap" id="services">
         <div className={styles.quickHeading}><div><p className="eyebrow">YOUR CAR. THE RIGHT CARE.</p><h2 id="choose-care-heading">What does your car need?</h2></div><Link className="text-link" href="/services">All services &amp; prices</Link></div>

@@ -11,9 +11,9 @@ import { PaintCorrection } from "@/components/westloop/PaintCorrection";
 import { money } from "@/lib/platform/types";
 import { publicServiceInclusion } from "@/lib/public-copy";
 import { siteUrl } from "@/lib/platform/settings";
-import { BRAND_NAME } from "@/lib/brand";
+import { breadcrumbSchema, businessSchema, faqSchema, pageMetadata, serializeStructuredData, serviceSchema, structuredData, webPageSchema } from "@/lib/seo";
 import { servicePackages } from "@/lib/booking-options";
-import { careStages, getServiceContent, serviceDuration, servicePrice } from "@/lib/service-content";
+import { careStages, getServiceContent, getServiceFaqs, serviceDuration, servicePrice } from "@/lib/service-content";
 import styles from "@/components/westloop/ServiceDetails.module.css";
 
 export const dynamic = "force-dynamic";
@@ -26,12 +26,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const service = services.find((item) => item.slug === slug);
   if (!service) notFound();
   const content = getServiceContent(service);
-  return {
+  return pageMetadata({
     title: `${service.name} in Chicago`, description: content.metadata,
-    alternates: { canonical: `/services/${service.slug}` },
-    openGraph: { title: `${service.name} in Chicago | ${BRAND_NAME}`, siteName: BRAND_NAME, type: "website", description: content.metadata, url: `/services/${service.slug}`, images: [{ url: content.image, width: 1920, height: 1080, alt: content.imageAlt }] },
-    twitter: { card: "summary_large_image", title: `${service.name} in Chicago | ${BRAND_NAME}`, description: content.metadata, images: [content.image] },
-  };
+    path: `/services/${service.slug}`,
+    image: content.image, imageAlt: content.imageAlt,
+  });
 }
 
 export default async function Page({ params }: PageProps) {
@@ -44,19 +43,18 @@ export default async function Page({ params }: PageProps) {
   const related = content.related.flatMap((relatedSlug) => d.services.filter((item) => item.slug === relatedSlug && item.id !== service.id)).slice(0, 3);
   const isCoating = service.slug === "ceramic-coating";
   const packages = servicePackages(service.slug);
-  const schema = {
-    "@context": "https://schema.org",
-    "@graph": [
-      { "@type": "Service", name: service.name, description: service.description, url: `${siteUrl()}/services/${service.slug}`, provider: { "@type": "AutomotiveBusiness", name: d.business.name, url: siteUrl() }, areaServed: "Chicago",
-        ...(service.pricing_mode === "fixed" ? { offers: { "@type": "Offer", price: service.price_cents / 100, priceCurrency: "USD", url: `${siteUrl()}${bookingHref}` } } : service.pricing_mode === "starting" ? { offers: { "@type": "AggregateOffer", lowPrice: service.price_cents / 100, priceCurrency: "USD" } } : {}),
-      },
-      { "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Services", item: `${siteUrl()}/services` }, { "@type": "ListItem", position: 2, name: service.name, item: `${siteUrl()}/services/${service.slug}` }] },
-    ],
-  };
+  const servicePath = `/services/${service.slug}`;
+  const schema = structuredData([
+    businessSchema(siteUrl(), d.business),
+    { ...webPageSchema(siteUrl(), servicePath, `${service.name} in Chicago`, content.metadata), mainEntity: { "@id": `${siteUrl()}${servicePath}#service` }, breadcrumb: { "@id": `${siteUrl()}${servicePath}#breadcrumbs` } },
+    serviceSchema(siteUrl(), service, content.overview, content.image),
+    breadcrumbSchema(siteUrl(), [{ name: "Services", path: "/services" }, { name: service.name, path: servicePath }]),
+    faqSchema(siteUrl(), servicePath, getServiceFaqs(service)),
+  ]);
   if (service.slug === "paint-correction") return (
     <PageShell business={d.business} showBookingCTA={false} mobileBookingCTA mobileBookingHref={bookingHref}>
       <PaintCorrection service={service} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(schema) }} />
     </PageShell>
   );
   return (
@@ -103,13 +101,13 @@ export default async function Page({ params }: PageProps) {
 
         <section className={styles.section} aria-labelledby="preparation-heading"><div className={styles.preparationLayout}><div><p className={styles.eyebrow}>BEFORE YOUR VISIT</p><h2 id="preparation-heading">A little preparation.<br /><em>A smoother visit.</em></h2></div><ol className={styles.preparationList}>{content.preparation.map((item) => <li key={item}>{item}</li>)}</ol></div></section>
 
-        <section className={`${styles.section} ${styles.faqSection}`} aria-labelledby="faq-heading"><div className={styles.faqLayout}><div><p className={styles.eyebrow}>GOOD QUESTIONS</p><h2 id="faq-heading">Know what<br /><em>to expect.</em></h2><p className={styles.bodyCopy}>A clear understanding of the service is part of a good result.</p></div><div className={styles.faqs}>{content.faqs.map((faq) => <details key={faq.question}><summary>{faq.question}<span aria-hidden="true">+</span></summary><p>{faq.answer}</p></details>)}</div></div></section>
+        <section className={`${styles.section} ${styles.faqSection}`} aria-labelledby="faq-heading"><div className={styles.faqLayout}><div><p className={styles.eyebrow}>GOOD QUESTIONS</p><h2 id="faq-heading">Know what<br /><em>to expect.</em></h2><p className={styles.bodyCopy}>A clear understanding of the service is part of a good result.</p></div><div className={styles.faqs}>{getServiceFaqs(service).map((faq) => <details key={faq.question}><summary>{faq.question}<span aria-hidden="true">+</span></summary><p>{faq.answer}</p></details>)}</div></div></section>
 
         <section className={styles.consultation}><p className={styles.eyebrow}>{service.name.toUpperCase()}</p><h2>Ready to get started?</h2><p>Choose a time and tell us about your car. We will confirm the details that matter before the work begins.</p><div className={styles.actions}><Link className="button" href={bookingHref}>Book {service.name.toLowerCase()}</Link><Link className={styles.textLink} href="/contact">Ask a question</Link></div></section>
 
         {related.length > 0 && <section className={styles.section} aria-labelledby="related-heading"><div className={styles.sectionHeading}><div><p className={styles.eyebrow}>MORE SERVICES</p><h2 id="related-heading">Other ways to care for your car.</h2></div><Link className={styles.textLink} href="/services">View all services</Link></div><ServiceCards services={related} compact /></section>}
       </div>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(schema) }} />
     </PageShell>
   );
 }

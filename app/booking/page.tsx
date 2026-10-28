@@ -1,15 +1,17 @@
 import { publicData } from "@/lib/platform/public";
 import { PageShell } from "@/components/westloop/PageShell";
 import { BookingWizard } from "@/components/westloop/BookingWizard";
+import { pageMetadata } from "@/lib/seo";
 import {
   effectiveDepositPercent,
   paymentProvider,
 } from "@/lib/platform/settings";
 export const dynamic = "force-dynamic";
-export const metadata = {
-  title: "Book Your Visit",
-  alternates: { canonical: "/booking" },
-};
+export const metadata = pageMetadata({
+  title: "Book Car Detailing in Chicago",
+  description: "Book detailing, paint correction, or ceramic coating at West Loop Ceramics. Select your services, review your estimate, and choose an available appointment.",
+  path: "/booking",
+});
 export default async function Page({
   searchParams,
 }: {
