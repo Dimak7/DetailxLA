@@ -2,11 +2,15 @@ import { publicData } from "@/lib/platform/public";
 import { PageShell } from "@/components/westloop/PageShell";
 import { Gallery } from "@/components/westloop/Gallery";
 import type { GalleryItem } from "@/lib/platform/types";
+import { pageMetadata } from "@/lib/seo";
 export const dynamic = "force-dynamic";
-export const metadata = {
-  title: "The Finish | Work Gallery",
-  alternates: { canonical: "/gallery" },
-};
+export const metadata = pageMetadata({
+  title: "Car Detailing Gallery in Chicago",
+  description: "Explore West Loop Ceramics' detailing gallery: careful hand washing, interior cleaning, wheel care, and the finishing details. Find the right care for your car.",
+  path: "/gallery",
+  image: "/brand/photos/hand-wash.webp",
+  imageAlt: "A detailer carefully hand washing a black car",
+});
 const featuredPortfolio: GalleryItem[] = [
   {
     "id": "customer-hand-wash",

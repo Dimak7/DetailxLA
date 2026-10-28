@@ -1,10 +1,12 @@
 import { settings } from "@/lib/platform/settings";
 import { PageShell } from "@/components/westloop/PageShell";
+import { pageMetadata } from "@/lib/seo";
 export const dynamic = "force-dynamic";
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Service Terms",
-  alternates: { canonical: "/service-rules" },
-};
+  description: "Review West Loop Ceramics' appointment, pricing, deposit, cancellation, and vehicle preparation terms before booking your car care in Chicago.",
+  path: "/service-rules",
+});
 export default async function Page() {
   const b = await settings();
   return (

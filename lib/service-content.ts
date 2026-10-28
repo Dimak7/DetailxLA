@@ -41,9 +41,9 @@ export const careStages = [
 
 export const serviceContent: Record<string, ServiceContent> = {
   "ceramic-coating": {
-    eyebrow: "OUR SIGNATURE SURFACE PROTECTION",
-    headline: "A beautiful finish.\nA better care routine.",
-    introduction: "Ceramic protection starts with the surface beneath it. Thoughtful preparation, careful application, and clear aftercare bring the whole finish together.",
+    eyebrow: "CERAMIC COATING IN CHICAGO’S WEST LOOP",
+    headline: "Ceramic coating.\nA better care routine.",
+    introduction: "Ceramic coating adds protection to prepared paint, supports gloss, and makes routine washing easier. We help you choose the preparation and coating around your car and the way you care for it.",
     overview: "A ceramic coating forms a protective layer on a prepared surface. It can help water and dirt release more easily during washing and support the appearance of the finish. The right preparation depends on your paint, its history, and how you use your car. We review those details before confirming the work.",
     image: "/brand/photos/paint-beading.webp",
     imageAlt: "Water beading on black paint beside a microfiber towel",
@@ -56,10 +56,12 @@ export const serviceContent: Record<string, ServiceContent> = {
     ],
     preparation: ["Tell us about previous coatings, paint protection film or recent paintwork.", "Point out swirls, marks or panels you want us to assess before coating.", "Allow flexibility around collection and the initial cure guidance discussed for your car."],
     faqs: [
+      { question: "Is ceramic coating different from wax or a ceramic sealant?", answer: "Yes. Wax and ceramic sealant are protection options for a different maintenance routine. A ceramic coating is a separate application with its own surface preparation, curing, and aftercare. Compare the confirmed service scope and product, rather than choosing on the word ‘ceramic’ alone." },
       { question: "Is paint correction included?", answer: "Ceramic coating includes the preparation shown in the service scope. Machine paint correction is a separate service unless it is specifically included in your confirmed quote. We review the paint first and explain any recommended additional work." },
       { question: "Will ceramic coating stop scratches or stone chips?", answer: "No. A ceramic coating does not make paint scratch-proof and is not impact protection against stone chips. Careful washing and sensible maintenance remain important." },
       { question: "How long will the coating last?", answer: "That depends on the coating selected, preparation, storage, use, and maintenance. We discuss the applicable product and care requirements when we assess your vehicle rather than promise a one-size-fits-all lifespan." },
       { question: "Can I wash or drive the car straight away?", answer: "Collection and initial exposure or washing restrictions depend on the coating and application conditions. Follow the specific cure and aftercare instructions provided at handover." },
+      { question: "Does a coated car still need washing?", answer: "Yes. A coating supports easier cleaning; it does not replace it. Follow your coating’s aftercare instructions, use suitable wash materials, and arrange maintenance when road grime or other contamination builds up." },
     ],
     related: ["paint-correction", "maintenance-detail", "exterior-detail"],
     metadata: "Explore ceramic coating in Chicago: surface preparation, application, aftercare, current starting prices, and a clear consultation before work begins.",
@@ -98,7 +100,6 @@ export const serviceContent: Record<string, ServiceContent> = {
       { question: "Can every scratch be removed?", answer: "No. Deep damage, chips, and defects beyond the safely correctable surface may remain. The inspection helps distinguish improvements we can make from damage that may require paint repair." },
       { question: "Is this the same as a wash or wax?", answer: "A wash cleans the surface, while wax adds temporary protection. Paint correction uses polishing to refine suitable defects in the finish. Each serves a different purpose." },
       { question: "Do I need single-step or multi-step correction?", answer: "That depends on the defects, paint condition, and the result you want. A single polishing stage can be suitable for lighter refinement; more involved correction separates defect reduction and finishing. We assess the car before agreeing the approach, timing, and price." },
-      { question: "How long does paint correction take?", answer: "The appointment estimate above is a starting point for planning. Vehicle size, paint condition, and the polishing scope can change the time required. We confirm the expected collection time when the work is agreed." },
       { question: "Can matte paint, wraps or paint protection film be corrected?", answer: "Conventional polishing is intended for suitable glossy paint. Matte and satin finishes, wraps, and film need their own care approach. Tell us what is on the car before choosing this service." },
       { question: "Should I coat the car after correction?", answer: "Coating can be a useful next step once you are happy with the finish. It is quoted and booked separately unless your confirmed scope includes both services." },
     ],
@@ -106,8 +107,8 @@ export const serviceContent: Record<string, ServiceContent> = {
     metadata: "Paint correction in Chicago's West Loop. Understand swirl removal, single-step polishing, multi-step assessment, and realistic results. See current pricing and book.",
   },
   "exterior-detail": {
-    eyebrow: "THE EVERYDAY, RECONSIDERED",
-    headline: "Clean lines.\nA considered finish.",
+    eyebrow: "EXTERIOR CAR DETAILING IN CHICAGO",
+    headline: "Exterior detailing.\nA considered finish.",
     introduction: "An attentive exterior reset, from the first hand wash to the final glass and tire details.",
     overview: "Road dirt, dusty wheels, and marked glass can hide the lines you love about your car. An exterior detail brings those surfaces back into focus. It is a straightforward choice for everyday exterior care, with suitable finishing protection confirmed for your vehicle.",
     image: "/brand/photos/green-car-foam.webp",
@@ -129,8 +130,8 @@ export const serviceContent: Record<string, ServiceContent> = {
     metadata: "A considered exterior car detail in Chicago, with hand washing, wheel and tire care, exterior glass, and suitable finishing protection. View current pricing.",
   },
   "interior-detail": {
-    eyebrow: "A BETTER PLACE TO SPEND TIME",
-    headline: "A fresh start\nfrom the inside.",
+    eyebrow: "INTERIOR CAR DETAILING IN CHICAGO",
+    headline: "Interior detailing.\nA fresh start inside.",
     introduction: "The everyday touchpoints deserve attention too. Restore a cleaner, more comfortable feel to the space you use most.",
     overview: "An interior detail brings together vacuuming, cleaning of seats and carpets, and care for the dashboard, doors, and vents. Stains and odors are reviewed as part of the condition assessment. We match expectations to the materials and the condition of your cabin.",
     image: "/brand/photos/mercedes-interior.webp",
@@ -153,7 +154,7 @@ export const serviceContent: Record<string, ServiceContent> = {
   },
   "full-detail": {
     eyebrow: "FULL SERVICE DETAILING IN CHICAGO",
-    headline: "The whole car.\nConsidered together.",
+    headline: "Full service detailing.\nInside and out.",
     introduction: "Interior and exterior care in one visit. Full service detailing brings the cabin, paintwork, wheels, and finishing touches together for a car that feels cared for throughout.",
     overview: "Full Detail combines cabin care with an exterior hand wash, wheels and tires, trim attention, and wax protection. It is a practical way to address the whole car in one appointment. More involved paint correction, ceramic coating or extensive interior work can be discussed separately if needed.",
     image: "/brand/photos/hand-wash.webp",
@@ -182,6 +183,7 @@ export const serviceContent: Record<string, ServiceContent> = {
       ],
     },
     faqs: [
+      { question: "Should I book interior, exterior, or full detailing?", answer: "Choose Interior Detail when the cabin needs attention, Exterior Detail for the bodywork, wheels, and glass, or Full Detail when both areas need care in one appointment. If swirls remain after washing, Paint Correction addresses a different concern: defects in the paint finish." },
       { question: "Does Full Detail include paint correction?", answer: "No. Full Detail focuses on cleaning and the listed finishing steps. Machine polishing is offered through Paint Correction, with its own assessment and price." },
       { question: "Is ceramic coating included?", answer: "The listed protection for Full Detail is wax. Ceramic Coating is a separate surface-protection service with different preparation and aftercare requirements." },
       { question: "What if the interior needs more extensive work?", answer: "Tell us about heavy staining, pet hair or embedded dirt before the visit. We can assess whether Extensive Interior Detail or an adjusted scope would better suit the car." },
@@ -192,8 +194,8 @@ export const serviceContent: Record<string, ServiceContent> = {
     metadata: "Full service car detailing in Chicago's West Loop. Explore interior and exterior care, wheel and trim attention, wax protection, inclusions, and current booking prices.",
   },
   "deep-interior-cleaning": {
-    eyebrow: "TIME FOR A DEEPER RESET",
-    headline: "More attention\nwhere life leaves a mark.",
+    eyebrow: "DEEP INTERIOR CAR CLEANING IN CHICAGO",
+    headline: "Deep interior cleaning.\nA more thorough reset.",
     introduction: "For cabins that need more than a routine refresh. Focused cleaning, extraction, and attention to the details that take time.",
     overview: "Embedded dirt, pet hair, and old spills each call for a different approach. Extensive Interior Detail starts with the condition of your materials, then focuses on the areas that need extra work. The final scope and estimate reflect the cabin we are actually treating.",
     image: "/brand/photos/interior-cleaning.webp",
@@ -216,8 +218,8 @@ export const serviceContent: Record<string, ServiceContent> = {
     metadata: "Extensive interior car detailing in Chicago for embedded dirt, pet hair, and condition-based stain treatment. Explore extraction, preparation, and current starting prices.",
   },
   "maintenance-detail": {
-    eyebrow: "KEEP THE FEELING",
-    headline: "Good care\nhas a rhythm.",
+    eyebrow: "MAINTENANCE DETAILING IN CHICAGO",
+    headline: "Maintenance detailing.\nKeep the feeling.",
     introduction: "A care routine built around your car, its condition, and the way you drive. Keep the next visit straightforward.",
     overview: "Maintenance detailing is about keeping up with the interior and exterior rather than waiting for another full reset. We review the current condition and any existing protection, then discuss suitable visit frequency and scope. Pricing is agreed after that conversation.",
     image: "/brand/photos/green-car-foam.webp",
@@ -239,8 +241,8 @@ export const serviceContent: Record<string, ServiceContent> = {
     metadata: "Plan ongoing interior and exterior car care in Chicago. Maintenance detail scope, frequency, and pricing are discussed after reviewing your vehicle.",
   },
   "headlight-restoration": {
-    eyebrow: "A CLEARER FINISH",
-    headline: "Bring clarity\nback to the front.",
+    eyebrow: "HEADLIGHT RESTORATION IN CHICAGO",
+    headline: "Headlight restoration.\nA clearer finish.",
     introduction: "Restore clarity to both headlights for $150. Includes care for suitable cloudy or weathered exterior lenses and a protective finish.",
     overview: "Surface deterioration can leave a headlight looking hazy even when the car is clean. Restoration addresses suitable exterior lens condition. We first review whether the concern is on the outside of the lens or involves damage that detailing cannot resolve.",
     image: "/brand/photos/mercedes-foam.webp",
@@ -295,4 +297,21 @@ export function serviceDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
   return [hours ? `${hours} ${hours === 1 ? "hour" : "hours"}` : "", remainder ? `${remainder} min` : ""].filter(Boolean).join(" ") || "Confirmed on booking";
+}
+
+// Keep customer-facing answers and structured data on the same live catalogue
+// values, including quote-based services that must not advertise a $0 price.
+export function getServiceFaqs(service: Service): Question[] {
+  const serviceName = service.name.toLowerCase();
+  const priceAnswer = service.pricing_mode === "quote"
+    ? `${service.name} is priced by consultation. Tell us about your vehicle and its condition so we can confirm the work and price before you book.`
+    : `${service.name} ${service.pricing_mode === "starting" ? "starts at" : "is listed at"} ${servicePrice({ ...service, pricing_mode: "fixed" })} for a sedan. Vehicle size, condition, and any selected extras can change the total. We confirm the final scope and price before work begins.`;
+  return [
+    { question: `How much does ${serviceName} cost?`, answer: priceAnswer },
+    ...(service.duration_minutes > 0 ? [{
+      question: `How long does ${serviceName} take?`,
+      answer: `The current appointment estimate is ${serviceDuration(service.duration_minutes)}. Vehicle size, condition, and the agreed work can change that timing. We confirm drop-off and collection arrangements for your visit.${service.slug === "ceramic-coating" ? " Coating cure and first-wash guidance are confirmed separately for the product applied." : ""}`,
+    }] : []),
+    ...getServiceContent(service).faqs,
+  ];
 }

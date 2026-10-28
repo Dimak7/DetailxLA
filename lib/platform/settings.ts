@@ -105,7 +105,7 @@ export async function settings(): Promise<BusinessSettings> {
   );
   const business = {
     ...defaultSettings,
-    phone: process.env.NEXT_PUBLIC_BUSINESS_PHONE || "",
+    phone: process.env.NEXT_PUBLIC_BUSINESS_PHONE || defaultSettings.phone,
     email: process.env.BUSINESS_EMAIL || "",
     ga4_id: process.env.GOOGLE_ANALYTICS_ID || "",
     google_ads_id: process.env.GOOGLE_ADS_ID || "",
