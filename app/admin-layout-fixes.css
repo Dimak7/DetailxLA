@@ -4,6 +4,12 @@ body:has(.admin-shell) {
   overscroll-behavior-x: none;
 }
 
+@media (max-width: 760px) {
+  html:has(.admin-shell) {
+    scroll-padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  }
+}
+
 .admin-shell {
   min-width: 0;
   max-width: 100%;

@@ -7,6 +7,7 @@ import { Wordmark } from "./PublicShell";
 import { BRAND_NAME } from "@/lib/brand";
 import { adminNavigation, adminSectionLabels } from "@/lib/platform/admin-navigation";
 import type { Session } from "@/lib/platform/types";
+import { useAdminViewport } from "./useAdminViewport";
 
 function NavIcon({ name }: { name: string }) {
   const paths: Record<string, React.ReactNode> = {
@@ -36,6 +37,7 @@ function rememberTheme(theme: AdminTheme) {
 }
 
 export function AdminShell({ user, sections, children, initialTheme }: { user: Session; sections: string[]; children: React.ReactNode; initialTheme?: AdminTheme }) {
+  const viewportRef = useAdminViewport();
   const path = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -70,7 +72,7 @@ export function AdminShell({ user, sections, children, initialTheme }: { user: S
     ...(home !== "bookings" && canSearchBookings ? [{ target: "bookings", label: user.role === "staff" ? "My jobs" : "Bookings", icon: "bookings", active: ["bookings", "calendar", "services"].includes(currentSection) }] : []),
     ...(sections.includes("schedule") ? [{ target: "schedule", label: "Schedule", icon: "schedule", active: ["schedule", "employees", "hours", "payroll", "performance", "team"].includes(currentSection) }] : []),
   ];
-  return <div className="admin-shell admin-redesign" data-theme={theme} data-section={currentSection}>
+  return <div ref={viewportRef} className="admin-shell admin-redesign" data-theme={theme} data-section={currentSection}>
     <header className="app-global-bar">
       <Link className="app-brand" href={`/admin/${home}`} aria-label={`${BRAND_NAME} home`}><Wordmark/></Link>
       <div className="workspace-location"><span>{activeWorkspace?.label || "Workspace"}</span>{currentSection !== activeWorkspace?.target && <><i aria-hidden="true">/</i><strong>{adminSectionLabels[currentSection] || currentSection}</strong></>}</div>

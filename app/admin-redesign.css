@@ -368,6 +368,29 @@
 }
 @media(max-width:380px){.admin-shell.admin-redesign .admin-mobile-menu nav a{grid-template-columns:minmax(0,1fr);padding:18px 14px;}.admin-shell.admin-redesign .admin-mobile-menu nav a strong{font-size:13px;}}
 
+@media (min-width: 761px) {
+  .admin-shell.admin-redesign .admin-sidebar {
+    top: calc(var(--admin-viewport-top, 0px) + 16px);
+    height: calc(var(--admin-viewport-height, 100dvh) - 32px);
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-shell.admin-redesign .admin-mobile-nav {
+    /* Explicit top avoids WebKit leaving a bottom-fixed bar at keyboard height. */
+    top: calc(var(--admin-viewport-top, 0px) + var(--admin-viewport-height, 100dvh) - max(12px, env(safe-area-inset-bottom)));
+    bottom: auto;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    transform: translateY(-100%);
+    padding: 6px 7px;
+  }
+
+  .admin-shell.admin-redesign .app-body > .admin-main {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  }
+}
+
 /* Keep chrome quiet; reserve the brighter fill for primary actions. */
 .admin-shell.admin-redesign[data-theme="dark"] .app-global-bar { background: var(--cream); }
 .admin-shell.admin-redesign[data-theme="dark"] .admin-global-search { background: var(--admin-surface); box-shadow: inset 0 0 0 1px #ffffff06; }
