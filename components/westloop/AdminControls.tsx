@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import modalStyles from "./AdminModal.module.css";
 export type RecordData = Record<string, unknown>;
 export type Field = {
   key: string;
@@ -44,6 +45,50 @@ export async function action(name: string, data: RecordData) {
   if (!r.ok) throw Error(d.error || "The change could not be saved.");
   return d.result as RecordData;
 }
+
+// Nested editors share one document lock. Closing a child must leave its parent
+// modal in place, and closing the last modal restores the original page position.
+const openModals: HTMLDialogElement[] = [];
+let documentLock: { restore: () => void; returnFocus: HTMLElement | null } | null = null;
+function lockModalDocument(returnFocus: HTMLElement | null) {
+  const body = document.body;
+  const root = document.documentElement;
+  const x = window.scrollX, y = window.scrollY;
+  const previous = {
+    position: body.style.position,
+    top: body.style.top,
+    left: body.style.left,
+    width: body.style.width,
+    overflow: body.style.overflow,
+    paddingRight: body.style.paddingRight,
+    rootOverflow: root.style.overflow,
+    scrollBehavior: root.style.scrollBehavior,
+  };
+  const gutter = Math.max(0, window.innerWidth - root.clientWidth);
+  if (gutter) body.style.paddingRight = `${parseFloat(getComputedStyle(body).paddingRight) + gutter}px`;
+  root.style.scrollBehavior = "auto";
+  root.style.overflow = "hidden";
+  body.style.position = "fixed";
+  body.style.top = `${-y}px`;
+  body.style.left = `${-x}px`;
+  body.style.width = "100%";
+  body.style.overflow = "hidden";
+  return {
+    returnFocus,
+    restore() {
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.left = previous.left;
+      body.style.width = previous.width;
+      body.style.overflow = previous.overflow;
+      body.style.paddingRight = previous.paddingRight;
+      root.style.overflow = previous.rootOverflow;
+      window.scrollTo(x, y);
+      root.style.scrollBehavior = previous.scrollBehavior;
+    },
+  };
+}
+
 export function Modal({
   title,
   onClose,
@@ -55,54 +100,53 @@ export function Modal({
   children: React.ReactNode;
   wide?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDialogElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
     const previous = document.activeElement as HTMLElement | null;
-    const old = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const focusable = 'button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]';
-    (ref.current?.querySelector<HTMLElement>(focusable) || ref.current)?.focus();
-    function key(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-      if (e.key === "Tab") {
-        const items = ref.current?.querySelectorAll<HTMLElement>(focusable);
-        if (!items?.length) return;
-        const first = items[0],
-          last = items[items.length - 1];
-        const outsideControls = document.activeElement === ref.current || !ref.current?.contains(document.activeElement);
-        if (e.shiftKey && (document.activeElement === first || outsideControls)) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && (document.activeElement === last || outsideControls)) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    }
-    document.addEventListener("keydown", key);
+    if (!documentLock) documentLock = lockModalDocument(previous);
+    openModals.push(dialog);
+    // The browser's top layer keeps dialogs above clipped containers and makes
+    // the rest of the page inert, including the mobile navigation underneath.
+    if (!dialog.open) dialog.showModal();
+    closeRef.current?.focus({ preventScroll: true });
     return () => {
-      document.body.style.overflow = old;
-      document.removeEventListener("keydown", key);
-      previous?.focus();
+      const index = openModals.indexOf(dialog);
+      if (index !== -1) openModals.splice(index, 1);
+      if (dialog.open) dialog.close();
+      const parent = openModals.at(-1);
+      if (parent) {
+        const target = previous?.isConnected && parent.contains(previous)
+          ? previous
+          : parent.querySelector<HTMLElement>("[data-modal-close]");
+        if (!parent.contains(document.activeElement)) target?.focus({ preventScroll: true });
+      } else {
+        const lock = documentLock;
+        documentLock = null;
+        lock?.restore();
+        if (lock?.returnFocus?.isConnected) lock.returnFocus.focus({ preventScroll: true });
+      }
     };
-  }, [onClose]);
+  }, []);
   return (
-    <div className="modal-backdrop">
+    <dialog
+      className={modalStyles.viewport}
+      ref={ref}
+      aria-label={title}
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
+    >
       <div
-        className={"modal" + (wide ? " wide-modal" : "")}
-        ref={ref}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
+        className={`modal ${modalStyles.panel}${wide ? " wide-modal" : ""}`}
       >
-        <div className="modal-header">
+        <div className={`modal-header ${modalStyles.header}`}>
           <h2>{title}</h2>
-          <button onClick={onClose}>Close</button>
+          <button ref={closeRef} className={modalStyles.close} data-modal-close type="button" onClick={onClose}>Close</button>
         </div>
-        {children}
+        <div className={modalStyles.body}>{children}</div>
       </div>
-    </div>
+    </dialog>
   );
 }
 export function Editor({
