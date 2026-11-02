@@ -40,7 +40,6 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
   const [schedule, setSchedule] = useState<{ key: string; loading: boolean; slots: AdminBookingTime[]; error: string }>({ key: "", loading: false, slots: [], error: "" });
   const [scheduleRetry, setScheduleRetry] = useState(0);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notes, setNotes] = useState(""), [agreed, setAgreed] = useState(false), [stream, setStream] = useState("Unassigned"), [saved, setSaved] = useState<RecordData | null>(null);
-  const [serviceToAdd, setServiceToAdd] = useState("");
   const [customOpen, setCustomOpen] = useState(false), [customCategory, setCustomCategory] = useState(""), [customName, setCustomName] = useState(""), [customPrice, setCustomPrice] = useState("");
   const [customIds, setCustomIds] = useState<string[]>([]), [savedVehicle, setSavedVehicle] = useState("");
   const customerRequest = useRef(0);
@@ -126,7 +125,7 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
     if (choices.some(choice => choice.service_id === id)) return showIssue("That service is already on this job. Edit its price below.", `price_${id}`);
     if (choices.length >= 12) return showIssue("A booking can contain up to 12 services.", "service_picker");
     setChoices(current => [...current, { service_id: id, service_package: defaultServicePackage(service.slug), addons: [] }]);
-    setServiceToAdd(""); setError("");
+    setError("");
     return true;
   }
   function addCustomJob() {
@@ -163,6 +162,13 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
     });
     return false;
   }
+  function focusServicePicker() {
+    const picker = formRef.current?.elements.namedItem("service_picker");
+    if (picker instanceof HTMLElement) {
+      picker.focus({ preventScroll: true });
+      picker.scrollIntoView({ block: "center" });
+    }
+  }
   function validateCustomer() {
     for (const [key, label] of [["first_name", "first name"], ["last_name", "last name"]] as const) {
       if (!contact[key].trim() || contact[key].trim().length > 80) return showIssue(`Enter the customer's ${label} (up to 80 characters).`, key);
@@ -192,7 +198,6 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
   async function submit(e: FormEvent) {
     e.preventDefault(); setError("");
     if (busy) return;
-    if (serviceToAdd) { showIssue("Add the selected service before saving, or clear the selection.", "service_picker"); return; }
     if (customOpen && (customCategory || customName || customPrice)) { showIssue("Add the custom job before saving, or clear its fields.", "custom_name"); return; }
     if (!validateCustomer() || !validateServices()) return;
     if (!validDiscount) { showIssue("Enter a discount no greater than the subtotal.", "discount"); return; }
@@ -245,7 +250,8 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
       </section>
       <section className={styles.section} aria-labelledby="sale-services-title">
         <div className={styles.sectionHeading}><h3 id="sale-services-title">Services &amp; price</h3><span>2</span></div>
-        <div className={styles.servicePicker}><label className="field"><span>Choose a service</span><select name="service_picker" value={serviceToAdd} onChange={e => setServiceToAdd(e.target.value)}><option value="">Select a service…</option>{services.map(service => <option key={service.id} value={service.id} disabled={choices.some(choice => choice.service_id === service.id)}>{service.name}{choices.some(choice => choice.service_id === service.id) ? " · Added" : service.pricing_mode === "quote" ? " · By quote" : ` · ${money(service.price_cents)}`}</option>)}</select></label><button type="button" disabled={busy || !serviceToAdd} onClick={() => addService(serviceToAdd)}>Add service</button></div>
+        <div className={styles.servicePicker}><label className="field"><span>Choose a service</span><select name="service_picker" value="" onChange={e => { if (e.target.value) addService(e.target.value); }}><option value="">Select a service…</option>{services.map(service => <option key={service.id} value={service.id} disabled={choices.some(choice => choice.service_id === service.id)}>{service.name}{choices.some(choice => choice.service_id === service.id) ? " · Added" : service.pricing_mode === "quote" ? " · By quote" : ` · ${money(service.price_cents)}`}</option>)}</select></label></div>
+        <p className={styles.smallNote} role="status">{choices.length ? `${choices.length} service${choices.length === 1 ? "" : "s"} added. Select another service to add more.` : "Selecting a service adds it to the booking and shows available visit times. You can add more than one."}</p>
         <button className={styles.customToggle} type="button" aria-expanded={customOpen} aria-controls="custom-job-fields" onClick={() => setCustomOpen(!customOpen)}>Custom job <span aria-hidden="true">{customOpen ? "−" : "+"}</span></button>
         {customOpen && <fieldset id="custom-job-fields" className={styles.customFields}><legend>Agreed work, such as a $25 hand wash</legend><label className="field"><span>Service category</span><select name="custom_category" value={customCategory} onChange={e => setCustomCategory(e.target.value)}><option value="">Choose a category…</option>{services.map(service => <option key={service.id} value={service.id} disabled={choices.some(choice => choice.service_id === service.id)}>{service.name}{choices.some(choice => choice.service_id === service.id) ? " · Already added" : ""}</option>)}</select></label><label className="field"><span>Job name</span><input name="custom_name" maxLength={160} value={customName} onChange={e => setCustomName(e.target.value)} placeholder="Hand wash" /></label><label className="field"><span>Agreed price ($)</span><input name="custom_price" type="number" inputMode="decimal" min="0" max="100000" step="0.01" value={customPrice} onChange={e => setCustomPrice(e.target.value)} placeholder="25.00" /></label><p>The job name is what appears on the booking. Choose the category that matches the work for service reporting and pay rules.</p><button type="button" disabled={busy} onClick={addCustomJob}>Add custom job</button></fieldset>}
         {!choices.length && <div className={styles.emptyServices}><ServiceSymbol slug="detail"/><p>Add the service the customer wants, or create a custom job with an agreed price.</p></div>}
@@ -262,14 +268,14 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
         })}</div>
       </section>
       <section className={styles.section} aria-labelledby="sale-time-title">
-        <div className={styles.sectionHeading}><h3 id="sale-time-title">{walkIn ? "Today's visit" : "Visit date & time"}</h3><span>3</span></div>
+        <div className={styles.sectionHeading}><h3 id="sale-time-title">Visit date &amp; time</h3><span>3</span></div>
         <p className={styles.smallNote}>Book the visit now and assign a detailer after saving. Staff schedules are optional.</p>
-        <div className={styles.fieldGrid}><label className="field"><span>Date</span><input name="date" type="date" min={dateToday()} max={walkIn ? dateToday() : dateToday(new Date(Date.now() + 365 * 86400000))} value={date} disabled={walkIn} required onChange={e => setDate(e.target.value)} /></label><label className="field"><span>Reserved time (minutes)</span><input name="duration" type="number" min="30" max="720" step="1" value={duration} placeholder={String(selection?.durationMinutes || 30)} onChange={e => setDuration(e.target.value)} /></label></div>
+        <div className={`${styles.fieldGrid} ${styles.visitFields}`}><label className="field"><span>Visit date</span><input name="date" type="date" min={dateToday()} max={walkIn ? dateToday() : dateToday(new Date(Date.now() + 365 * 86400000))} value={date} disabled={walkIn} required onChange={e => setDate(e.target.value)} /></label><label className="field"><span>Job duration (minutes)</span><input name="duration" type="number" min="30" max="720" step="1" value={duration} placeholder={selection ? String(selection.durationMinutes) : "Set after choosing a service"} disabled={!choices.length} onChange={e => setDuration(e.target.value)} /></label></div>
         {walkIn && <div className={styles.dateHelp}><span>Walk-ins are for today.</span><button type="button" onClick={() => setChannel("phone")}>Book another date</button></div>}
         <div ref={timePickerRef} tabIndex={-1} role="group" aria-labelledby={timePickerId} className={styles.timePicker} aria-busy={loadingSlots}>
-          <span id={timePickerId} className={styles.timeLabel}>Start time (Chicago)</span>
+          <span id={timePickerId} className={styles.timeLabel}>Visit time (Chicago)</span>
           {shopHours && <p className={styles.smallNote}>Shop hours: {timeLabel(Number(shopHours.open_time.slice(0, 2)) * 60 + Number(shopHours.open_time.slice(3)))} – {timeLabel(Number(shopHours.close_time.slice(0, 2)) * 60 + Number(shopHours.close_time.slice(3)))}. Each time reserves the full job duration.</p>}
-          {!choices.length ? <p className={styles.timeState}>Add a service above to see available times.</p> : !validDuration ? null : !date ? <p className={styles.timeState}>Choose an appointment date.</p> : loadingSlots ? <p className={styles.timeState} role="status">Checking available times…</p> : scheduleError ? <div className={styles.timeState} role="alert"><p>{scheduleError}</p><button type="button" onClick={() => setScheduleRetry(value => value + 1)}>Check times again</button></div> : slots.length > 0 ? <>
+          {!choices.length ? <div className={styles.timeState}><p>Choose a service first so we can reserve enough time for the whole job.</p><button type="button" onClick={focusServicePicker}>Choose a service</button></div> : !validDuration ? null : !date ? <p className={styles.timeState}>Choose an appointment date.</p> : loadingSlots ? <p className={styles.timeState} role="status">Checking available times…</p> : scheduleError ? <div className={styles.timeState} role="alert"><p>{scheduleError}</p><button type="button" onClick={() => setScheduleRetry(value => value + 1)}>Check times again</button></div> : slots.length > 0 ? <>
             <div className={styles.timeGrid}>{slots.map(slot => <button type="button" key={slot.minute} disabled={!slot.available} aria-pressed={start === slot.minute} aria-label={`${timeLabel(slot.minute)}${slot.available ? "" : " — unavailable"}`} onClick={() => setStart(slot.minute)}>{timeLabel(slot.minute)}</button>)}</div>
             <p className={styles.smallNote} aria-live="polite">{start >= 0 && availableTimes.some(slot => slot.minute === start) ? `Selected: ${timeLabel(start)} CT.` : "Tap an available time to select it."}{slots.some(slot => !slot.available) ? " Dimmed times are unavailable." : ""}</p>
           </> : null}

@@ -20,7 +20,7 @@
 .sectionHeading > span { display: grid; place-items: center; height: 25px; width: 25px; border-radius: 50%; background: var(--admin-surface); color: var(--muted); font-size: 10px; }
 .fieldGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 13px; }
 .section > :global(.field) { margin-bottom: 15px; }
-:global(.admin-shell.admin-redesign[data-theme]) .form :global(.field) :is(input,select,textarea) { width: 100%; max-width: 100%; min-width: 0; min-height: 46px; border: 1px solid var(--admin-control-border); border-radius: 12px; background: var(--admin-control-bg); color: var(--admin-control-text); box-shadow: none; }
+:global(.admin-shell.admin-redesign[data-theme]) .form :global(.field) :is(input,select,textarea) { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; min-height: 46px; border: 1px solid var(--admin-control-border); border-radius: 12px; background: var(--admin-control-bg); color: var(--admin-control-text); box-shadow: none; }
 :global(.admin-shell.admin-redesign[data-theme]) .form :global(.field) textarea { min-height: 85px; }
 .form :global(.field) > span { font-size: 11px; font-weight: 500; line-height: 1.4; color: var(--muted); }
 .subheading { margin: 23px 0 14px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 14px; font-weight: 600; }
@@ -28,8 +28,7 @@
 :global(.admin-shell.admin-redesign[data-theme]) .customerResults button { min-height: 55px; padding: 12px 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--admin-surface); color: var(--ink); text-align: left; white-space: normal; }
 .customerResults strong, .customerResults small { display: block; overflow-wrap: anywhere; }
 .customerResults small { margin-top: 4px; color: var(--muted); font-size: 11px; }
-.servicePicker { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; align-items: end; }
-:global(.admin-shell.admin-redesign[data-theme]) .servicePicker > button { padding-inline: 14px; min-height: 46px; white-space: normal; }
+.servicePicker { display: grid; grid-template-columns: minmax(0,1fr); gap: 9px; align-items: end; }
 :global(.admin-shell.admin-redesign[data-theme]) .customToggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: 12px; min-height: 42px; padding: 9px 0; border: 0; border-radius: 0; background: transparent; color: var(--admin-selected-text); text-align: left; font-size: 12px; }
 .customToggle > span { font-size: 18px; font-weight: 400; }
 .customFields { display: grid; gap: 12px; min-width: 0; margin: 7px 0 18px; padding: 17px; border: 1px solid var(--admin-control-border); border-radius: 16px; background: var(--admin-surface); }
@@ -58,6 +57,8 @@
 .fullWidth { grid-column: 1 / -1; }
 .dateHelp { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.6; }
 :global(.admin-shell.admin-redesign[data-theme]) .dateHelp button { min-height: 36px; padding: 7px 10px; border: 0; background: var(--admin-surface); color: var(--admin-selected-text); font-size: 11px; white-space: normal; }
+.visitFields { grid-template-columns: minmax(0,1fr); margin-top: 16px; }
+.form input[type="date"]::-webkit-date-and-time-value { min-width: 0; text-align: left; }
 .timePicker { display: grid; gap: 10px; margin-top: 19px; border-radius: 14px; outline: none; }
 .timePicker:focus-visible { outline: 2px solid var(--admin-focus); outline-offset: 5px; }
 .timeLabel { color: var(--muted); font-size: 11px; font-weight: 500; line-height: 1.4; }
@@ -83,7 +84,7 @@
 .grandTotal strong { font-size: 28px; font-weight: 600; letter-spacing: -.045em; line-height: 1.2; }
 .agreement { display: flex; align-items: flex-start; gap: 10px; margin-top: 20px; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .agreement input { margin-top: 3px; flex: 0 0 18px; }
-.saveBar { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0 2px; margin-top: 22px; border-top: 1px solid var(--line); background: var(--admin-surface); }
+.saveBar { position: static; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0 2px; margin-top: 22px; border-top: 1px solid var(--line); background: var(--admin-surface); }
 .saveBar > div { display: grid; gap: 3px; min-width: 0; }
 .saveBar span { color: var(--muted); font-size: 11px; }
 .saveBar strong { font-size: 22px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -106,6 +107,13 @@
  :global(.admin-shell.admin-redesign[data-theme]) .form :global(.field) :is(input,select,textarea) { font-size: 16px; }
  .savedHeading h3 { font-size: 22px; }
 }
+@media (max-width: 560px) {
+ .fieldGrid { grid-template-columns: minmax(0,1fr); }
+ .dateHelp { flex-wrap: wrap; }
+ .saveBar { flex-direction: column; align-items: stretch; gap: 14px; padding-bottom: 4px; }
+ .saveBar > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+ :global(.admin-shell.admin-redesign[data-theme]) .saveBar > button { width: 100%; min-height: 48px; font-size: 13px; }
+}
 @media (max-width: 420px) {
  .section { padding: 17px 14px; }
  .servicePicker { grid-template-columns: minmax(0,1fr); }
@@ -117,9 +125,7 @@
  .steps { gap: 15px; }
  .steps li { gap: 7px; font-size: 11px; }
  .steps li > span { width: 25px; height: 25px; flex-basis: 25px; }
- .saveBar { gap: 12px; align-items: stretch; }
- .saveBar > div { align-content: center; min-width: 65px; }
- :global(.admin-shell.admin-redesign[data-theme]) .saveBar > button { flex: 1; padding-inline: 12px; font-size: 11px; }
+ :global(.admin-shell.admin-redesign[data-theme]) .saveBar > button { padding-inline: 12px; }
  .saveBar strong { font-size: 19px; }
  .grandTotal strong { font-size: 24px; }
 }
