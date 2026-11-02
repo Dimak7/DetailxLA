@@ -346,9 +346,9 @@ export function AdminWorkspace({
               }),
               f("assigned_to", "Assigned detailer", "nullable-select", {
                 options: detailerOptions,
-                hint: "Only active employee accounts are listed.",
+                hint: "Assign an active employee directly. Staff schedules are optional.",
               }),
-              f("assignment_override", "Manager override for a shift or job conflict", "checkbox", {
+              f("assignment_override", "Manager override for time off or an overlapping job", "checkbox", {
                 hint: "Use only after reviewing the visible assignment warning.",
               }),
             ]

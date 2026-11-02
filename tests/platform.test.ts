@@ -378,10 +378,9 @@ test("Relational platform integration", async (t) => {
           /active detailer/,
         );
         await query("UPDATE wl.employees SET active=true WHERE id=$1", [workerProfile.id]);
-        await assert.rejects(
-          () => updateBooking(booking.booking.id, { assigned_to: staff.user_id }, owner!.user_id),
-          /not scheduled/,
-        );
+        await updateBooking(booking.booking.id, { assigned_to: staff.user_id }, owner!.user_id);
+        assert.equal((await query<{ assigned_to: string }>("SELECT assigned_to FROM wl.bookings WHERE id=$1", [booking.booking.id]))[0].assigned_to, staff.user_id,
+          "A manager can assign an active detailer without preparing a roster");
         await assert.rejects(
           () => adminData("bookings", new URLSearchParams(), staff),
           /access/,

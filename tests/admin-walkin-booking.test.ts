@@ -111,3 +111,28 @@ test("walk-in availability is manager-only and keeps capacity, blocked time and 
     await assert.rejects(createBooking(input(service, { admin_sale: { walk_in: true, duration_minutes: 30, prices: [{ service_id: service.id, amount_cents: 2500 }] } }), true), /available appointment/);
   } finally { await closeDatabase(); }
 });
+
+test("admin phone bookings and their available times do not require employee rosters", async () => {
+  try {
+    await openSchedule();
+    const service = (await query<Service>("SELECT * FROM wl.services WHERE slug='exterior-detail'"))[0];
+    const date = dateToday(new Date(Date.now() + 14 * 86400000));
+    assert.equal((await query("SELECT id FROM wl.employee_shifts")).length, 0);
+    assert.equal((await query("SELECT employee_id FROM wl.employee_availability")).length, 0);
+    const params = new URLSearchParams({ date, service_id: service.id, walk_in: "false", duration_minutes: "30" });
+    const response = await adminAvailability(new Request(`https://example.test/api/admin/booking-availability?${params}`, { headers: { Cookie: await cookie("manager") } }));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).slots.find((slot: { minute: number }) => slot.minute === 0).available, true);
+    const { booking } = await createBooking(input(service, {
+      date,
+      admin_sale: { walk_in: false, duration_minutes: 30, prices: [{ service_id: service.id, amount_cents: 2500 }] },
+    }), true);
+    assert.equal(booking.booking_date, date);
+    assert.equal(booking.start_minute, 0);
+    assert.equal(booking.assigned_to, null);
+    assert.equal((await query("SELECT id FROM wl.employee_shifts")).length, 0, "Booking must not create a roster as a side effect");
+    const slots = await availability(date, service.id, undefined, { walk_in: false, duration_minutes: 30 });
+    assert.equal(slots.find(slot => slot.minute === 0)?.available, false, "Booked capacity still closes the slot");
+    assert.equal(slots.find(slot => slot.minute === 30)?.available, true);
+  } finally { await closeDatabase(); }
+});

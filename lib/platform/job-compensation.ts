@@ -66,17 +66,11 @@ export async function saveJobCompensation(value: unknown, actorId: string) {
          ORDER BY b.start_minute LIMIT 1`, [booking.id, booking.booking_date, booking.start_minute, end, employee.user_id, employee.id],
       )).rows[0];
       if (conflict) warnings.push(`${employee.name} is already assigned to ${conflict.reference} during these hours.`);
-      const dated = (await q<{ status: string; start_minute: number; end_minute: number }>(
-        "SELECT status,start_minute,end_minute FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date=$2 ORDER BY updated_at DESC", [employee.id, booking.booking_date],
-      )).rows;
-      const override = dated.find(shift => shift.status !== "scheduled");
-      const covered = !override && dated.some(shift => shift.status === "scheduled" && shift.start_minute <= booking.start_minute && shift.end_minute >= end);
-      const recurring = dated.length ? null : (await q<{ available: boolean; start_minute: number; end_minute: number }>(
-        "SELECT available,start_minute,end_minute FROM wl.employee_availability WHERE employee_id=$1 AND weekday=$2", [employee.id, new Date(booking.booking_date + "T12:00:00Z").getUTCDay()],
+      // Missing or partial roster hours do not prevent a manager assigning work.
+      const override = (await q<{ status: string }>(
+        "SELECT status FROM wl.employee_shifts WHERE employee_id=$1 AND shift_date=$2 AND status<>'scheduled' ORDER BY updated_at DESC LIMIT 1", [employee.id, booking.booking_date],
       )).rows[0];
       if (override) warnings.push(`${employee.name} has a ${override.status.toUpperCase()} date override.`);
-      else if (!covered && !(recurring?.available && recurring.start_minute <= booking.start_minute && recurring.end_minute >= end))
-        warnings.push(`${employee.name} is not scheduled for the full job hours.`);
     }
     if (warnings.length && !input.assignment_override)
       throw new AppError(`Assignment warning: ${warnings.join(" ")} Review the schedule or select the manager override.`);

@@ -263,6 +263,7 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
       </section>
       <section className={styles.section} aria-labelledby="sale-time-title">
         <div className={styles.sectionHeading}><h3 id="sale-time-title">{walkIn ? "Today's visit" : "Visit date & time"}</h3><span>3</span></div>
+        <p className={styles.smallNote}>Book the visit now and assign a detailer after saving. Staff schedules are optional.</p>
         <div className={styles.fieldGrid}><label className="field"><span>Date</span><input name="date" type="date" min={dateToday()} max={walkIn ? dateToday() : dateToday(new Date(Date.now() + 365 * 86400000))} value={date} disabled={walkIn} required onChange={e => setDate(e.target.value)} /></label><label className="field"><span>Reserved time (minutes)</span><input name="duration" type="number" min="30" max="720" step="1" value={duration} placeholder={String(selection?.durationMinutes || 30)} onChange={e => setDuration(e.target.value)} /></label></div>
         {walkIn && <div className={styles.dateHelp}><span>Walk-ins are for today.</span><button type="button" onClick={() => setChannel("phone")}>Book another date</button></div>}
         <div ref={timePickerRef} tabIndex={-1} role="group" aria-labelledby={timePickerId} className={styles.timePicker} aria-busy={loadingSlots}>
