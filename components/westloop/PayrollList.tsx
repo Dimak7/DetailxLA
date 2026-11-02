@@ -33,7 +33,7 @@ export function PayrollList({ records, employees, rules, onHistory, onPaySetting
         <div className={styles.overview}>
           <div className={styles.identity}>
             <span className={styles.avatar} aria-hidden="true">{initials}</span>
-            <div><h3>{name}</h3><p>{text(row.position) || text(employee.position) || "Team member"}</p>{customRates > 0 && <span className={styles.rateBadge}>{customRates} custom {customRates === 1 ? "service rate" : "service rates"}</span>}</div>
+            <div><h3>{name}</h3><p>{text(row.position) || text(employee.position) || "Team member"}</p><p>{number(row.jobs_completed)} completed {number(row.jobs_completed) === 1 ? "job" : "jobs"} in this period</p>{customRates > 0 && <span className={styles.rateBadge}>{customRates} custom {customRates === 1 ? "service rate" : "service rates"}</span>}</div>
           </div>
           <dl className={styles.metrics}>
             <div><dt>Job pay</dt><dd>{money(number(row.commission_cents))}</dd></div>
