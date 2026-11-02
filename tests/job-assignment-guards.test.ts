@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { saveJobCompensation } from "../lib/platform/job-compensation";
+import { updateBooking } from "../lib/platform/bookings";
 import { query, closeDatabase } from "../lib/platform/db";
 
 Object.assign(process.env, { NODE_ENV: "test", PGLITE_PATH: "memory://job-assignment-guards" });
@@ -32,25 +33,21 @@ async function fixture() {
 }
 const assignment = (employee_id: string) => ({ employee_id, pool_share_bps: 10000, pay_type: "percentage", pay_value: 4000 });
 
-test("new assignments require schedule review, overrides are audited and existing pay edits remain possible", async () => {
+test("new assignments need no roster and existing pay edits remain possible", async () => {
   try {
     const f = await fixture(), worker = await f.employee(), job = await f.booking();
     const input = { booking_id: job, assignments: [assignment(worker.id)] };
-    await assert.rejects(saveJobCompensation(input, f.actor), /not scheduled.*manager override/);
-    assert.equal((await query("SELECT id FROM wl.employee_job_assignments")).length, 0);
-    await saveJobCompensation({ ...input, assignment_override: true }, f.actor);
-    const audit = await query<{ after_data: { warnings: string[]; employee_ids: string[] } }>("SELECT after_data FROM wl.audit_logs WHERE entity_id=$1 AND action='assignment_override'", [job]);
-    assert.equal(audit.length, 1);
-    assert.deepEqual(audit[0].after_data.employee_ids, [worker.id]);
-    assert.match(audit[0].after_data.warnings[0], /not scheduled/);
+    await saveJobCompensation(input, f.actor);
+    assert.equal((await query("SELECT id FROM wl.employee_job_assignments")).length, 1);
+    assert.equal((await query("SELECT id FROM wl.audit_logs WHERE entity_id=$1 AND action='assignment_override'", [job])).length, 0);
     await query("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,status) VALUES($1,$2,$3,0,1440,'pto')", [randomUUID(), worker.id, date]);
     await saveJobCompensation({ ...input, assignments: [{ ...assignment(worker.id), pay_value: 5000 }] }, f.actor);
     assert.equal((await query<{ pay_value: number }>("SELECT pay_value FROM wl.employee_job_assignments WHERE booking_id=$1", [job]))[0].pay_value, 5000, "Editing pay on an existing assignment does not reassign the job");
-    assert.equal((await query("SELECT id FROM wl.audit_logs WHERE entity_id=$1 AND action='assignment_override'", [job])).length, 1);
+    assert.equal((await query("SELECT id FROM wl.audit_logs WHERE entity_id=$1 AND action='assignment_override'", [job])).length, 0);
   } finally { await closeDatabase(); }
 });
 
-test("shared assignments block overlap and dated time off overrides recurring availability", async () => {
+test("shared assignments block overlap and explicit time off still requires an audited override", async () => {
   try {
     const f = await fixture(), worker = await f.employee(true), job = await f.booking(), next = await f.booking(630);
     await query("INSERT INTO wl.employee_availability(employee_id,weekday,start_minute,end_minute,available) VALUES($1,4,480,1200,true)", [worker.id]);
@@ -61,11 +58,48 @@ test("shared assignments block overlap and dated time off overrides recurring av
     await query("UPDATE wl.bookings SET status='cancelled' WHERE id=$1", [job]);
     await query("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,status) VALUES($1,$2,$3,0,1440,'pto')", [randomUUID(), worker.id, date]);
     await assert.rejects(saveJobCompensation({ booking_id: next, assignments: [assignment(worker.id)] }, f.actor), /PTO date override/);
-    await query("UPDATE wl.employee_shifts SET status='scheduled',start_minute=600,end_minute=660 WHERE employee_id=$1", [worker.id]);
-    await assert.rejects(saveJobCompensation({ booking_id: next, assignments: [assignment(worker.id)] }, f.actor), /full job hours/);
-    await query("UPDATE wl.employee_shifts SET end_minute=720 WHERE employee_id=$1", [worker.id]);
-    await saveJobCompensation({ booking_id: next, assignments: [assignment(worker.id)] }, f.actor);
+    await saveJobCompensation({ booking_id: next, assignment_override: true, assignments: [assignment(worker.id)] }, f.actor);
     assert.equal((await query<{ assigned_to: string }>("SELECT assigned_to FROM wl.bookings WHERE id=$1", [next]))[0].assigned_to, worker.user);
+    const audit = await query<{ after_data: { warnings: string[]; employee_ids: string[] } }>("SELECT after_data FROM wl.audit_logs WHERE entity_id=$1 AND action='assignment_override'", [next]);
+    assert.equal(audit.length, 1);
+    assert.deepEqual(audit[0].after_data.employee_ids, [worker.id]);
+    assert.match(audit[0].after_data.warnings[0], /PTO date override/);
+  } finally { await closeDatabase(); }
+});
+
+test("both assignment paths allow missing, unavailable and partial published or draft rosters", async () => {
+  try {
+    const f = await fixture();
+    for (const path of ["primary", "team"] as const) {
+      for (const roster of ["missing", "unavailable", "draft", "published"] as const) {
+        const worker = await f.employee(true), job = await f.booking();
+        if (roster === "unavailable")
+          await query("INSERT INTO wl.employee_availability(employee_id,weekday,start_minute,end_minute,available) VALUES($1,4,480,540,false)", [worker.id]);
+        if (roster === "draft" || roster === "published")
+          await query("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,status,published) VALUES($1,$2,$3,480,540,'scheduled',$4)", [randomUUID(), worker.id, date, roster === "published"]);
+        if (path === "primary") await updateBooking(job, { assigned_to: worker.user }, f.actor);
+        else await saveJobCompensation({ booking_id: job, assignments: [assignment(worker.id)] }, f.actor);
+        assert.equal((await query<{ assigned_to: string }>("SELECT assigned_to FROM wl.bookings WHERE id=$1", [job]))[0].assigned_to, worker.user, `${path}: ${roster} roster must not prevent assignment`);
+        assert.equal((await query("SELECT id FROM wl.audit_logs WHERE entity_id=$1 AND action='assignment_override'", [job])).length, 0);
+      }
+    }
+  } finally { await closeDatabase(); }
+});
+
+test("primary assignment retains overlap and OFF, PTO and SICK override review", async () => {
+  try {
+    const f = await fixture(), worker = await f.employee(true), occupied = await f.booking(), overlapping = await f.booking(630);
+    await updateBooking(occupied, { assigned_to: worker.user }, f.actor);
+    await assert.rejects(updateBooking(overlapping, { assigned_to: worker.user }, f.actor), /already has/);
+    await updateBooking(overlapping, { assigned_to: worker.user, assignment_override: true }, f.actor);
+    assert.equal((await query("SELECT id FROM wl.audit_logs WHERE entity_id=$1 AND action='assignment_override'", [overlapping])).length, 1);
+    for (const status of ["off", "pto", "sick"]) {
+      const person = await f.employee(true), job = await f.booking();
+      await query("INSERT INTO wl.employee_shifts(id,employee_id,shift_date,start_minute,end_minute,status) VALUES($1,$2,$3,0,1440,$4)", [randomUUID(), person.id, date, status]);
+      await assert.rejects(updateBooking(job, { assigned_to: person.user }, f.actor), new RegExp(`${status.toUpperCase()} date override`));
+      await updateBooking(job, { assigned_to: person.user, assignment_override: true }, f.actor);
+      assert.equal((await query("SELECT id FROM wl.audit_logs WHERE entity_id=$1 AND action='assignment_override'", [job])).length, 1);
+    }
   } finally { await closeDatabase(); }
 });
 

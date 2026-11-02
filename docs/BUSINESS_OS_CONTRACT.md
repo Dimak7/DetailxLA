@@ -22,6 +22,13 @@
 - **Estimated payroll:** hourly earnings plus allocated commission, tips, and payroll adjustments.
 - **Operating expenses:** recorded expense rows, including linked inventory purchases only once.
 
+## Booking and staff scheduling
+
+- Available appointment times follow studio opening hours, blocked time, job duration, and booking capacity.
+- A booking can be saved before a detailer is assigned. Staff shifts and publishing the weekly roster are optional for booking and assignment.
+- Managers can assign active workers directly even when no shift or recurring availability covers the job. Explicit dated time off and overlapping jobs still require a reviewed, recorded manager override.
+- Staff rosters continue to support team planning and the labelled scheduled-hours payroll fallback; creating or assigning a booking does not generate shifts.
+
 ## Extension rules
 
 1. Add job operations as an extension of a booking; do not introduce a second customer, vehicle, payment, or employee identity.
