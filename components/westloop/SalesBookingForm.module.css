@@ -56,6 +56,20 @@
 .addon input { margin: 3px 0 0; }
 .addon small { color: var(--muted); font-size: 10px; white-space: nowrap; }
 .fullWidth { grid-column: 1 / -1; }
+.dateHelp { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+:global(.admin-shell.admin-redesign[data-theme]) .dateHelp button { min-height: 36px; padding: 7px 10px; border: 0; background: var(--admin-surface); color: var(--admin-selected-text); font-size: 11px; white-space: normal; }
+.timePicker { display: grid; gap: 10px; margin-top: 19px; border-radius: 14px; outline: none; }
+.timePicker:focus-visible { outline: 2px solid var(--admin-focus); outline-offset: 5px; }
+.timeLabel { color: var(--muted); font-size: 11px; font-weight: 500; line-height: 1.4; }
+.timePicker > .smallNote { margin: 0; }
+.timeGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+:global(.admin-shell.admin-redesign[data-theme]) .timeGrid button { min-width: 0; min-height: 44px; padding: 10px 6px; border: 1px solid var(--admin-control-border); border-radius: 12px; background: var(--admin-control-bg); color: var(--admin-control-text); box-shadow: none; font-size: 12px; font-weight: 550; white-space: nowrap; }
+:global(.admin-shell.admin-redesign[data-theme]) .timeGrid button[aria-pressed="true"] { border-color: var(--admin-primary-bg); background: var(--admin-primary-bg); color: var(--admin-primary-text); }
+:global(.admin-shell.admin-redesign[data-theme]) .timeGrid button:disabled { opacity: 1; background: transparent; color: var(--muted); border-color: var(--line); text-decoration: line-through; cursor: not-allowed; }
+.timeGrid button:focus-visible { outline: 2px solid var(--admin-focus); outline-offset: 2px; }
+.timeState { margin: 10px 0 0; padding: 14px; border-radius: 12px; background: var(--admin-surface); color: var(--muted); font-size: 12px; line-height: 1.65; }
+.timeState p { margin: 0 0 10px; }
+:global(.admin-shell.admin-redesign[data-theme]) .timeState button { min-height: 40px; padding: 9px 13px; background: var(--admin-selected-bg); color: var(--admin-selected-text); font-size: 12px; }
 .smallNote { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
 .extra { margin-top: 12px; }
 .extra > :global(.field) { margin-top: 9px; }

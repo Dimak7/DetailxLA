@@ -1,9 +1,11 @@
 "use client";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { action, type RecordData } from "./AdminControls";
 import { JobPayments } from "./JobPayments";
 import { bookingAddOns, bookingCartSelection, defaultServicePackage, servicePackages, type BookingServiceChoice } from "@/lib/booking-options";
 import { dateToday, money, timeLabel, type Service, type BusinessSettings } from "@/lib/platform/types";
+import { loadAdminBookingTimes, nextAdminBookingTime, type AdminBookingTime } from "@/lib/admin-booking-times";
+import { businessHoursForDay } from "@/lib/platform/business-hours";
 import styles from "./SalesBookingForm.module.css";
 
 type Contact = { id: string; first_name: string; last_name: string; phone: string; email: string };
@@ -31,16 +33,19 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
   const [contact, setContact] = useState({ first_name: lead?.name.split(" ")[0] || "", last_name: lead?.name.split(" ").slice(1).join(" ") || "", email: lead?.email || "", phone: lead?.phone || "" });
   const [vehicle, setVehicle] = useState({ year: new Date().getFullYear(), make: "", model: "", vehicle_type: "Sedan" });
   const [search, setSearch] = useState(""), [matches, setMatches] = useState<Contact[]>([]), [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [choices, setChoices] = useState<BookingServiceChoice[]>([]), [date, setDate] = useState(dateToday()), [start, setStart] = useState(-1), [slots, setSlots] = useState<Array<{ minute: number; available: boolean }>>([]);
+  const [choices, setChoices] = useState<BookingServiceChoice[]>([]), [date, setDate] = useState(dateToday()), [start, setStart] = useState(-1);
   const [channel, setChannel] = useState<"walk-in" | "phone">(lead ? "phone" : "walk-in");
   const walkIn = channel === "walk-in";
   const [duration, setDuration] = useState(""), [prices, setPrices] = useState<Record<string, string>>({}), [names, setNames] = useState<Record<string, string>>({}), [discount, setDiscount] = useState("0");
-  const [loadingSlots, setLoadingSlots] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notes, setNotes] = useState(""), [agreed, setAgreed] = useState(false), [stream, setStream] = useState("Unassigned"), [saved, setSaved] = useState<RecordData | null>(null);
+  const [schedule, setSchedule] = useState<{ key: string; loading: boolean; slots: AdminBookingTime[]; error: string }>({ key: "", loading: false, slots: [], error: "" });
+  const [scheduleRetry, setScheduleRetry] = useState(0);
+  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notes, setNotes] = useState(""), [agreed, setAgreed] = useState(false), [stream, setStream] = useState("Unassigned"), [saved, setSaved] = useState<RecordData | null>(null);
   const [serviceToAdd, setServiceToAdd] = useState("");
   const [customOpen, setCustomOpen] = useState(false), [customCategory, setCustomCategory] = useState(""), [customName, setCustomName] = useState(""), [customPrice, setCustomPrice] = useState("");
   const [customIds, setCustomIds] = useState<string[]>([]), [savedVehicle, setSavedVehicle] = useState("");
   const customerRequest = useRef(0);
   const formRef = useRef<HTMLFormElement>(null), panelRef = useRef<HTMLDivElement>(null);
+  const timePickerRef = useRef<HTMLDivElement>(null), timePickerId = useId();
   const session = useRef(crypto.randomUUID()), request = useRef({ body: "", id: "" });
   const ids = choices.map(c => c.service_id).join(",");
   let selection: ReturnType<typeof bookingCartSelection> | null = null;
@@ -49,6 +54,14 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
   catch (e) { selectionError = e instanceof Error ? e.message : "Review the selected services and upgrades."; }
   const durationMinutes = duration === "" ? selection?.durationMinutes || 0 : Number(duration);
   const validDuration = Number.isInteger(durationMinutes) && durationMinutes >= 30 && durationMinutes <= 720;
+  const scheduleParams = new URLSearchParams({ date, walk_in: String(walkIn), duration_minutes: String(durationMinutes) });
+  ids.split(",").filter(Boolean).forEach(id => scheduleParams.append("service_id", id));
+  const scheduleKey = ids && date && validDuration ? scheduleParams.toString() : "";
+  const loadingSlots = Boolean(scheduleKey) && (schedule.key !== scheduleKey || schedule.loading);
+  const slots = schedule.key === scheduleKey ? schedule.slots : [];
+  const scheduleError = schedule.key === scheduleKey ? schedule.error : "";
+  const availableTimes = slots.filter(slot => slot.available);
+  const shopHours = /^\d{4}-\d{2}-\d{2}$/.test(date) ? businessHoursForDay(business, new Date(`${date}T12:00:00Z`).getUTCDay()) : null;
   const selectedPrices = selection?.items.map(item => ({
     service_id: item.service.id,
     name: names[item.service.id]?.trim() || undefined,
@@ -74,23 +87,20 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
     return () => { clearTimeout(timer); controller.abort(); };
   }, [search]);
   useEffect(() => {
-    setStart(-1); setSlots([]); setLoadingSlots(false);
-    if (!ids || !date || !validDuration) return;
-    const controller = new AbortController(); setLoadingSlots(true); setError("");
-    const params = new URLSearchParams({ date, walk_in: String(walkIn), duration_minutes: String(durationMinutes) });
-    ids.split(",").forEach(id => params.append("service_id", id));
-    fetch("/api/admin/booking-availability?" + params, { signal: controller.signal, cache: "no-store" })
-      .then(async r => { const d = await r.json(); if (!r.ok) throw Error(d.error); return d; })
-      .then(d => {
-        setSlots(d.slots);
-        if (walkIn) {
-          const now = Math.floor(chicagoMinute() / 30) * 30;
-          setStart(d.slots.find((slot: { minute: number; available: boolean }) => slot.available && slot.minute >= now)?.minute ?? -1);
-        }
-      }).catch(e => { if (e.name !== "AbortError") setError(e.message); })
-      .finally(() => { if (!controller.signal.aborted) setLoadingSlots(false); });
+    setStart(-1);
+    if (!scheduleKey) return;
+    const controller = new AbortController();
+    setSchedule({ key: scheduleKey, loading: true, slots: [], error: "" });
+    void loadAdminBookingTimes(scheduleKey, controller.signal)
+      .then(times => {
+        if (times === null || controller.signal.aborted) return;
+        setSchedule({ key: scheduleKey, loading: false, slots: times, error: "" });
+        if (walkIn) setStart(nextAdminBookingTime(times, chicagoMinute()));
+      }).catch(cause => {
+        if (!controller.signal.aborted) setSchedule({ key: scheduleKey, loading: false, slots: [], error: cause instanceof Error ? cause.message : "Could not check the schedule. Try again." });
+      });
     return () => controller.abort();
-  }, [ids, date, walkIn, durationMinutes, validDuration]);
+  }, [scheduleKey, walkIn, scheduleRetry]);
   function applyVehicle(v: Vehicle) {
     setSavedVehicle(v.id);
     setVehicle({ year: v.year, make: v.make, model: v.model, vehicle_type: v.type });
@@ -142,6 +152,7 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
   function showIssue(message: string, field?: string) {
     setError(message);
     requestAnimationFrame(() => {
+      if (field === "start") { timePickerRef.current?.focus(); return; }
       const target = field ? formRef.current?.elements.namedItem(field) : null;
       if (target instanceof HTMLElement) {
         let details = target.closest("details");
@@ -252,10 +263,19 @@ export function SalesBookingForm({ services, business, lead, onComplete }: {
       </section>
       <section className={styles.section} aria-labelledby="sale-time-title">
         <div className={styles.sectionHeading}><h3 id="sale-time-title">{walkIn ? "Today's visit" : "Visit date & time"}</h3><span>3</span></div>
-        <div className={styles.fieldGrid}><label className="field"><span>Date</span><input name="date" type="date" min={dateToday()} max={walkIn ? dateToday() : undefined} value={date} disabled={walkIn} required onChange={e => setDate(e.target.value)} /></label><label className="field"><span>Reserved time (minutes)</span><input name="duration" type="number" min="30" max="720" step="1" value={duration} placeholder={String(selection?.durationMinutes || 30)} onChange={e => setDuration(e.target.value)} /></label><label className={`field ${styles.fullWidth}`}><span>Start time (Chicago)</span><select name="start" value={start} required disabled={loadingSlots || !choices.length || !validDuration} onChange={e => setStart(Number(e.target.value))}><option value={-1}>{loadingSlots ? "Checking schedule…" : "Choose a time"}</option>{slots.filter(slot => slot.available).map(slot => <option value={slot.minute} key={slot.minute}>{timeLabel(slot.minute)}</option>)}</select></label></div>
+        <div className={styles.fieldGrid}><label className="field"><span>Date</span><input name="date" type="date" min={dateToday()} max={walkIn ? dateToday() : dateToday(new Date(Date.now() + 365 * 86400000))} value={date} disabled={walkIn} required onChange={e => setDate(e.target.value)} /></label><label className="field"><span>Reserved time (minutes)</span><input name="duration" type="number" min="30" max="720" step="1" value={duration} placeholder={String(selection?.durationMinutes || 30)} onChange={e => setDuration(e.target.value)} /></label></div>
+        {walkIn && <div className={styles.dateHelp}><span>Walk-ins are for today.</span><button type="button" onClick={() => setChannel("phone")}>Book another date</button></div>}
+        <div ref={timePickerRef} tabIndex={-1} role="group" aria-labelledby={timePickerId} className={styles.timePicker} aria-busy={loadingSlots}>
+          <span id={timePickerId} className={styles.timeLabel}>Start time (Chicago)</span>
+          {shopHours && <p className={styles.smallNote}>Shop hours: {timeLabel(Number(shopHours.open_time.slice(0, 2)) * 60 + Number(shopHours.open_time.slice(3)))} – {timeLabel(Number(shopHours.close_time.slice(0, 2)) * 60 + Number(shopHours.close_time.slice(3)))}. Each time reserves the full job duration.</p>}
+          {!choices.length ? <p className={styles.timeState}>Add a service above to see available times.</p> : !validDuration ? null : !date ? <p className={styles.timeState}>Choose an appointment date.</p> : loadingSlots ? <p className={styles.timeState} role="status">Checking available times…</p> : scheduleError ? <div className={styles.timeState} role="alert"><p>{scheduleError}</p><button type="button" onClick={() => setScheduleRetry(value => value + 1)}>Check times again</button></div> : slots.length > 0 ? <>
+            <div className={styles.timeGrid}>{slots.map(slot => <button type="button" key={slot.minute} disabled={!slot.available} aria-pressed={start === slot.minute} aria-label={`${timeLabel(slot.minute)}${slot.available ? "" : " — unavailable"}`} onClick={() => setStart(slot.minute)}>{timeLabel(slot.minute)}</button>)}</div>
+            <p className={styles.smallNote} aria-live="polite">{start >= 0 && availableTimes.some(slot => slot.minute === start) ? `Selected: ${timeLabel(start)} CT.` : "Tap an available time to select it."}{slots.some(slot => !slot.available) ? " Dimmed times are unavailable." : ""}</p>
+          </> : null}
+        </div>
         {choices.length > 0 && !validDuration && <p className="error-message">Reserve between 30 and 720 minutes for this job.</p>}
-        {choices.length > 0 && validDuration && !loadingSlots && !slots.some(slot => slot.available) && <p role="status">No available times. Review the reserved duration{walkIn ? "." : " or choose another date."}</p>}
-        {walkIn && <p className={styles.smallNote}>The next available time is selected automatically. You can also choose an earlier time today for a job already in progress.</p>}
+        {choices.length > 0 && validDuration && date && !loadingSlots && !scheduleError && !availableTimes.length && <p className={styles.timeState} role="status">{shopHours ? "No available times fit this job on this date. Review the reserved duration or choose another date." : "The studio is closed on this date. Choose another date."}</p>}
+        {walkIn && availableTimes.length > 0 && <p className={styles.smallNote}>{start < 0 ? "No later times fit today. Choose an earlier time only for a job already in progress, or book another date." : "The next available time is selected automatically. You can also choose an earlier time today for a job already in progress."}</p>}
         <details className={styles.extra}><summary>Notes &amp; lead source</summary><label className="field"><span>Customer / access notes</span><textarea value={notes} maxLength={2000} onChange={e => setNotes(e.target.value)} /></label>
           {!lead && <label className="field"><span>Marketing source</span><select value={stream} onChange={e => setStream(e.target.value)}><option value="Unassigned">Organic / direct / unassigned</option><option value="Business Google · 10%">Business Google</option><option value="Business Meta · 10%">Business Meta</option><option value="Dima Google · 25%">Partner Google</option></select></label>}
         </details>

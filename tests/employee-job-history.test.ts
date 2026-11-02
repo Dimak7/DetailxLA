@@ -97,12 +97,49 @@ test("team jobs show only the selected worker's earnings and full tip recipient"
   } finally { await closeDatabase(); }
 });
 
+test("period totals include unfinished job pay and tips without treating them as completed payroll", async () => {
+  try {
+    const c = await context();
+    const first = await job(c, { status: "confirmed", price: 32500, tip: 3250, date: "2026-10-29" });
+    await job(c, { status: "confirmed", price: 12500, tip: 3000, date: "2026-10-27" });
+    await job(c, { price: 10000, tip: 1000, date: "2026-10-26" });
+    await job(c, { status: "cancelled", price: 50000, tip: 9000 });
+    await job(c, { status: "no_show", price: 50000, tip: 9000 });
+    await job(c, { status: "confirmed", price: 90000, tip: 9000, date: "2026-11-02" });
+
+    const filters = { start: "2026-10-26", end: "2026-11-01" };
+    const history = await data(c, filters);
+    assert.equal(history.summary.completed_jobs, 1);
+    assert.equal(history.summary.total_earnings_cents, 5000);
+    assert.equal(history.summary.pending_jobs, 2);
+    assert.equal(history.summary.pending_job_pay_cents, 18000);
+    assert.equal(history.summary.pending_tips_cents, 6250);
+    assert.equal(history.summary.pending_total_earnings_cents, 24250);
+    assert.equal(history.summary.period_jobs, 3);
+    assert.equal(history.summary.period_job_pay_cents, 22000);
+    assert.equal(history.summary.period_tips_cents, 7250);
+    assert.equal(history.summary.period_total_earnings_cents, 29250);
+    const payroll = (await payrollSummary(filters.start, filters.end)).find(item => item.id === c.worker.employee)!;
+    assert.equal(payroll.total_earnings_cents, history.summary.total_earnings_cents);
+    assert.equal(payroll.total_earnings_cents, 5000, "unfinished estimates must not become earned payroll");
+
+    const confirmed = await data(c, { ...filters, status: "confirmed" });
+    assert.equal(confirmed.summary.total_earnings_cents, 0);
+    assert.equal(confirmed.summary.period_total_earnings_cents, 24250, "a confirmed-only view must still show its full estimate");
+    await query("UPDATE wl.bookings SET status='completed' WHERE id=$1", [first]);
+    const completed = await data(c, filters);
+    assert.equal(completed.summary.total_earnings_cents, 21250);
+    assert.equal(completed.summary.pending_total_earnings_cents, 8000);
+    assert.equal(completed.summary.period_total_earnings_cents, history.summary.period_total_earnings_cents, "completion moves the amount between sections without double counting");
+  } finally { await closeDatabase(); }
+});
+
 test("all-time summaries cover every page, distinguish pending work, and exclude archived tests", async () => {
   try {
     const c = await context();
     for (let index = 0; index < 26; index++) await job(c, { minute: 500 + index });
-    await job(c, { status: "confirmed" });
-    await job(c, { status: "in_progress" });
+    await job(c, { status: "confirmed", tip: 900 });
+    await job(c, { status: "in_progress", tip: 100 });
     const cancelled = await job(c, { status: "cancelled", tip: 9000 });
     await job(c, { status: "no_show", tip: 1000 });
     await job(c, { archived: true });
@@ -114,16 +151,22 @@ test("all-time summaries cover every page, distinguish pending work, and exclude
     assert.equal(history.summary.tips_cents, 0);
     assert.equal(history.summary.pending_jobs, 2);
     assert.equal(history.summary.pending_job_pay_cents, 8000);
+    assert.equal(history.summary.pending_tips_cents, 1000);
+    assert.equal(history.summary.pending_total_earnings_cents, 9000);
+    assert.equal(history.summary.period_jobs, 28);
+    assert.equal(history.summary.period_total_earnings_cents, 113000);
     assert.deepEqual((await data(c, { page: 2 })).summary, history.summary);
     const completed = await data(c, { status: "completed", page: 2 });
     assert.equal(completed.jobs.length, 1);
     assert.equal(completed.summary.completed_jobs, 26);
     assert.equal(completed.summary.pending_jobs, 0);
+    assert.equal(completed.summary.period_total_earnings_cents, 104000);
     const cancelledRow = (await data(c, { status: "cancelled" })).jobs[0];
     assert.equal(cancelledRow.id, cancelled);
     assert.equal(cancelledRow.earned, false);
     assert.equal(cancelledRow.total_earnings_cents, 0);
     assert.equal(cancelledRow.lines[0].pay_cents, 0);
+    assert.equal((await data(c, { status: "cancelled" })).summary.period_total_earnings_cents, 0);
     assert.equal((await data(c, { end: "2026-10-25" })).pagination.total, 0);
   } finally { await closeDatabase(); }
 });

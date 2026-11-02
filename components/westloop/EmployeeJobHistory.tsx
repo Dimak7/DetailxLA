@@ -44,7 +44,7 @@ export function EmployeeJobHistory({ employeeId, employeeName, start = "", end =
 
   return <Modal title={`${employeeName} · Work history`} onClose={onClose} wide>
     <div className={styles.history}>
-      <p className={styles.intro}>Every assigned job, with services, upgrades and this employee’s earnings. Completed jobs count toward earnings; upcoming work is an estimate.</p>
+      <p className={styles.intro}>Job pay and tips for the selected period, with every service and upgrade. See the full total and how much is completed or still an estimate.</p>
       <form className={styles.filters} onSubmit={event => { event.preventDefault(); setFilters({ ...draft, page: 1 }); }}>
         <label>From<input type="date" value={draft.start} max={draft.end || undefined} onChange={event => setDraft({ ...draft, start: event.target.value })} /></label>
         <label>To<input type="date" value={draft.end} min={draft.start || undefined} onChange={event => setDraft({ ...draft, end: event.target.value })} /></label>
@@ -56,14 +56,18 @@ export function EmployeeJobHistory({ employeeId, employeeName, start = "", end =
       </form>
       {error && <div className="error-message" role="alert">{error} <button onClick={() => setRetry(value => value + 1)}>Try again</button></div>}
       {loading ? <p role="status" className={styles.empty}>Loading work and earnings…</p> : !error && data && <>
-        <div className={styles.period}>{filters.start || filters.end ? `${filters.start ? dateLabel(filters.start) : "First job"} – ${filters.end ? dateLabel(filters.end) : "Latest job"}` : "All-time work history"}<span>Completed jobs only in totals</span></div>
+        <div className={styles.period}>{filters.start || filters.end ? `${filters.start ? dateLabel(filters.start) : "First job"} – ${filters.end ? dateLabel(filters.end) : "Latest job"}` : "All-time work history"}<span>Totals cover all matching pages</span></div>
         <div className={styles.metrics}>
-          <div><span>Completed jobs</span><strong>{data.summary.completed_jobs}</strong></div>
-          <div><span>Job earnings</span><strong>{money(data.summary.job_pay_cents)}</strong></div>
-          <div><span>Employee tips</span><strong>{money(data.summary.tips_cents)}</strong></div>
-          <div><span>Jobs + tips</span><strong>{money(data.summary.total_earnings_cents)}</strong></div>
+          <div><span>Jobs included</span><strong>{data.summary.period_jobs}</strong><small>Cancelled and no-show excluded</small></div>
+          <div><span>Job pay{data.summary.pending_jobs > 0 ? " · incl. estimates" : ""}</span><strong>{money(data.summary.period_job_pay_cents)}</strong></div>
+          <div><span>Employee tips</span><strong>{money(data.summary.period_tips_cents)}</strong>{data.summary.pending_jobs > 0 && <small>Includes tips on unfinished jobs</small>}</div>
+          <div><span>{data.summary.pending_jobs > 0 ? "Estimated total · jobs + tips" : "Total · jobs + tips"}</span><strong>{money(data.summary.period_total_earnings_cents)}</strong></div>
         </div>
-        {data.summary.pending_jobs > 0 && <p className={styles.pending}>{data.summary.pending_jobs} unfinished {data.summary.pending_jobs === 1 ? "job" : "jobs"} · {money(data.summary.pending_job_pay_cents)} estimated job pay, excluded from totals above.</p>}
+        <div className={styles.earningsSplit}>
+          <div><span>Completed · {data.summary.completed_jobs} {data.summary.completed_jobs === 1 ? "job" : "jobs"}</span><strong>{money(data.summary.total_earnings_cents)}</strong><small>{money(data.summary.job_pay_cents)} job pay + {money(data.summary.tips_cents)} tips · included in Payroll</small></div>
+          <div><span>Awaiting completion · {data.summary.pending_jobs} {data.summary.pending_jobs === 1 ? "job" : "jobs"}</span><strong>{money(data.summary.pending_total_earnings_cents)}</strong><small>{money(data.summary.pending_job_pay_cents)} estimated job pay + {money(data.summary.pending_tips_cents)} tips</small></div>
+        </div>
+        {data.summary.pending_jobs > 0 && <p className={styles.pending}>Unfinished jobs are included in the estimated total above. If the work is finished, open the booking and set its status to Completed so it counts in Payroll.</p>}
         {!data.jobs.length ? <div className={styles.empty}><h3>No assigned jobs found</h3><p>Try All time or another status. Work appears here when this employee is assigned in Bookings → Open job → Team &amp; pay. Mark finished work Completed to include it in earnings.</p></div> : <div className={styles.jobs}>
           {data.jobs.map(job => {
             const inactive = job.status === "cancelled" || job.status === "no_show";
@@ -76,7 +80,7 @@ export function EmployeeJobHistory({ employeeId, employeeName, start = "", end =
                 <div><span>Employee tips</span><strong>{inactive ? "—" : money(job.tips_cents)}</strong></div>
                 <div><span>{job.earned ? "Employee earnings" : "Estimated earnings"}</span><strong>{inactive ? "Not earned" : money(job.total_earnings_cents)}</strong></div>
               </div>
-              {!job.earned && <p className={styles.pending}>{inactive ? "Excluded from earned totals." : job.quote_pending ? "Price is not confirmed. Earnings remain an estimate." : "Not completed yet. These earnings are excluded from totals."}</p>}
+              {!job.earned && <p className={styles.pending}>{inactive ? "Excluded from all pay totals." : job.quote_pending ? "Price is not confirmed. Pay is provisional and included in the estimated total." : "Included in the estimated total. Mark this job Completed after the work is finished to include it in Payroll."}</p>}
               {job.earned && job.quote_pending && <p className={styles.pending}>Completed, but the agreed price is missing. Pay is provisional and uses recorded payments, matching Payroll.</p>}
               <details className={styles.breakdown}>
                 <summary>Services &amp; earnings breakdown</summary>
@@ -86,7 +90,7 @@ export function EmployeeJobHistory({ employeeId, employeeName, start = "", end =
                   <div><span>{line.rate_label}</span><strong>{money(line.pay_cents)} {job.earned ? "job pay" : "estimated pay"}</strong></div>
                 </div>)}</div>
               </details>
-              <div className={styles.jobFooter}><Link href={`/admin/bookings?id=${encodeURIComponent(job.id)}`}>View booking &amp; photos</Link><span>{job.earned ? "Included in completed-job earnings" : "Not included in completed-job earnings"}</span></div>
+              <div className={styles.jobFooter}><Link href={`/admin/bookings?id=${encodeURIComponent(job.id)}`}>{job.earned || inactive ? "View booking & photos" : "Review & complete job"}</Link><span>{job.earned ? "Included in Payroll" : inactive ? "Excluded from pay totals" : "Estimated until marked Completed"}</span></div>
             </article>;
           })}
         </div>}

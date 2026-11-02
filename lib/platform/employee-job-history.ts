@@ -26,7 +26,8 @@ export type EmployeeJobHistory = {
   filters: { start: string | null; end: string | null; status: typeof statuses[number] };
   summary: {
     completed_jobs: number; service_total_cents: number; job_pay_cents: number; tips_cents: number; total_earnings_cents: number;
-    pending_jobs: number; pending_job_pay_cents: number;
+    pending_jobs: number; pending_job_pay_cents: number; pending_tips_cents: number; pending_total_earnings_cents: number;
+    period_jobs: number; period_job_pay_cents: number; period_tips_cents: number; period_total_earnings_cents: number;
   };
   jobs: EmployeeHistoryJob[];
   pagination: { page: number; page_size: number; total: number; total_pages: number };
@@ -117,7 +118,11 @@ export async function employeeJobHistory(raw: unknown, user: Session): Promise<E
       earned, quote_pending: quotePending, pay_note: notes.length ? notes.join(" ") : null, lines,
     };
   });
-  const summary = { completed_jobs: 0, service_total_cents: 0, job_pay_cents: 0, tips_cents: 0, total_earnings_cents: 0, pending_jobs: 0, pending_job_pay_cents: 0 };
+  const summary = {
+    completed_jobs: 0, service_total_cents: 0, job_pay_cents: 0, tips_cents: 0, total_earnings_cents: 0,
+    pending_jobs: 0, pending_job_pay_cents: 0, pending_tips_cents: 0, pending_total_earnings_cents: 0,
+    period_jobs: 0, period_job_pay_cents: 0, period_tips_cents: 0, period_total_earnings_cents: 0,
+  };
   for (const job of history) {
     if (job.earned) {
       summary.completed_jobs++;
@@ -128,8 +133,16 @@ export async function employeeJobHistory(raw: unknown, user: Session): Promise<E
     } else if (["new", "confirmed", "in_progress"].includes(job.status)) {
       summary.pending_jobs++;
       summary.pending_job_pay_cents += job.job_pay_cents;
+      summary.pending_tips_cents += job.tips_cents;
+      summary.pending_total_earnings_cents += job.total_earnings_cents;
     }
   }
+  // Period estimates include every eligible matching job, before pagination.
+  // Completed-only values above continue to match payroll's earned amounts.
+  summary.period_jobs = summary.completed_jobs + summary.pending_jobs;
+  summary.period_job_pay_cents = summary.job_pay_cents + summary.pending_job_pay_cents;
+  summary.period_tips_cents = summary.tips_cents + summary.pending_tips_cents;
+  summary.period_total_earnings_cents = summary.total_earnings_cents + summary.pending_total_earnings_cents;
   const pageSize = 25, totalPages = Math.max(1, Math.ceil(history.length / pageSize)), page = Math.min(input.page, totalPages);
   return {
     employee: { id: employee.id, name: employee.name, position: employee.position, active: employee.active },
